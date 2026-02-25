@@ -53,6 +53,40 @@ def get_last_completed_month(target_date: date = None) -> Tuple[int, int]:
     return target_date.year, target_date.month - 1
 
 
+def add_months(d: date, months: int) -> date:
+    """Add `months` to a date, clamping day to valid range for the target month."""
+    month = d.month - 1 + months
+    year = d.year + month // 12
+    month = month % 12 + 1
+    day = min(d.day, calendar.monthrange(year, month)[1])
+    return date(year, month, day)
+
+
+def get_rolling_period_boundaries(joined_date: date, period_index: int) -> Tuple[date, date]:
+    """
+    Return (period_start, period_end) for a rolling monthly period.
+    Period 0: joined_date .. (joined_date + 1 month - 1 day)
+    Period 1: period_0_end + 1 day .. (that + 1 month - 1 day)
+    e.g. joined Feb 25 -> period 0: Feb 25 - Mar 24, period 1: Mar 25 - Apr 24
+    """
+    period_start = add_months(joined_date, period_index)
+    period_end = add_months(joined_date, period_index + 1) - timedelta(days=1)
+    return period_start, period_end
+
+
+def get_rolling_periods_up_to(joined_date: date, up_to_date: date) -> List[Tuple[date, date]]:
+    """Return all complete rolling monthly periods whose end date <= up_to_date."""
+    periods = []
+    i = 0
+    while True:
+        p_start, p_end = get_rolling_period_boundaries(joined_date, i)
+        if p_end > up_to_date:
+            break
+        periods.append((p_start, p_end))
+        i += 1
+    return periods
+
+
 def count_days_from_attendance(labour_attendance: dict, start: date, end: date) -> float:
     """Count present + half-day from pre-fetched attendance dict for a date range."""
     days = 0.0
@@ -97,19 +131,16 @@ def calculate_weekly_salary(labour_id: str, week_end: date = None) -> SalaryReco
     )
 
 
-def calculate_monthly_salary(labour_id: str, year: int, month: int) -> SalaryRecord:
-    """Calculate salary for a full calendar month."""
+def calculate_monthly_salary(labour_id: str, period_start: date, period_end: date) -> SalaryRecord:
+    """Calculate salary for a rolling monthly period (period_start..period_end)."""
     labour = get_labour(labour_id)
     if not labour:
         raise ValueError(f"Labour with id {labour_id} not found")
-    month_start, month_end = get_month_boundaries(year, month)
-    # Clamp to joined_date
-    effective_start = max(month_start, labour.joined_date)
-    days_present = calculate_days_worked(labour_id, effective_start, month_end)
+    days_present = calculate_days_worked(labour_id, period_start, period_end)
     return create_salary_record(
         labour_id=labour_id,
-        week_start=month_start,   # reuse week_start field as period_start
-        week_end=month_end,       # reuse week_end field as period_end
+        week_start=period_start,
+        week_end=period_end,
         days_present=days_present,
         daily_wage=labour.daily_wage
     )
@@ -138,18 +169,13 @@ def calculate_all_pending_weeks(labour_id: str, up_to_date: date = None) -> List
     records = []
 
     if pay_cycle == 'monthly':
-        # Iterate month by month up to last completed month
-        last_year, last_month = get_last_completed_month(up_to_date + timedelta(days=1))
-        year, month = start_date.year, start_date.month
-        while (year, month) <= (last_year, last_month):
-            _, month_end = get_month_boundaries(year, month)
-            if month_end not in paid_ends:
-                record = calculate_monthly_salary(labour_id, year, month)
+        periods = get_rolling_periods_up_to(labour.joined_date, up_to_date)
+        # Skip periods that were already accounted for by start_date
+        periods = [(ps, pe) for ps, pe in periods if pe >= start_date]
+        for p_start, p_end in periods:
+            if p_end not in paid_ends:
+                record = calculate_monthly_salary(labour_id, p_start, p_end)
                 records.append(record)
-            month += 1
-            if month > 12:
-                month = 1
-                year += 1
     else:
         current_week_start, current_week_end = get_week_boundaries(start_date)
         while current_week_end <= up_to_date:
@@ -243,24 +269,19 @@ def recalculate_all_salaries(up_to_date: date = None) -> dict:
             periods_calculated = 0
 
             if pay_cycle == 'monthly':
-                year, month = start_date.year, start_date.month
-                while (year, month) <= (last_year, last_month):
-                    month_start, month_end = get_month_boundaries(year, month)
-                    if month_end not in paid_ends:
-                        effective_start = max(month_start, labour.joined_date)
-                        days_present = count_days_from_attendance(labour_attendance, effective_start, month_end)
+                periods = get_rolling_periods_up_to(labour.joined_date, up_to_date)
+                periods = [(ps, pe) for ps, pe in periods if pe >= start_date]
+                for p_start, p_end in periods:
+                    if p_end not in paid_ends:
+                        days_present = count_days_from_attendance(labour_attendance, p_start, p_end)
                         new_records_data.append({
                             'labour_id': labour.id,
-                            'week_start': month_start,
-                            'week_end': month_end,
+                            'week_start': p_start,
+                            'week_end': p_end,
                             'days_present': days_present,
                             'daily_wage': labour.daily_wage
                         })
                         periods_calculated += 1
-                    month += 1
-                    if month > 12:
-                        month = 1
-                        year += 1
             else:
                 current_week_start, current_week_end = get_week_boundaries(start_date)
                 while current_week_end <= last_friday:

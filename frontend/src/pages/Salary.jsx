@@ -225,10 +225,8 @@ const Salary = () => {
                           {labour.records.map((record, idx) => (
                             <tr key={idx} className="border-t">
                               <td className="py-2">
-                                {labour.pay_cycle === 'monthly'
-                                  ? new Date(record.week_end).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
-                                  : `${new Date(record.week_start).toLocaleDateString()} - ${new Date(record.week_end).toLocaleDateString()}`
-                                }
+                                {new Date(record.week_start).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })} –{' '}
+                                {new Date(record.week_end).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
                               </td>
                               <td className="text-center py-2">{record.days_present}</td>
                               <td className="text-right py-2 font-medium">
