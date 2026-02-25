@@ -29,12 +29,13 @@ export const AuthProvider = ({ children }) => {
     const response = await authAPI.login(username, password);
     const { access_token } = response.data;
     localStorage.setItem('token', access_token);
-    
-    const userResponse = await authAPI.getMe();
-    const userData = userResponse.data;
+
+    // Decode role from JWT payload instead of making a second request
+    const payload = JSON.parse(atob(access_token.split('.')[1]));
+    const userData = { username: payload.sub, role: payload.role };
     localStorage.setItem('user', JSON.stringify(userData));
     setUser(userData);
-    
+
     return userData;
   };
 
