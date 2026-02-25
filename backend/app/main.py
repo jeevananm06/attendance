@@ -1,6 +1,9 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import os
+import asyncio
+import logging
+import httpx
 
 from .models import User, UserRole
 from .auth import get_password_hash
@@ -58,12 +61,27 @@ app.include_router(backup.router)
 app.include_router(reports.router)
 
 
+async def keep_alive():
+    """Ping self every 14 minutes to prevent Render free tier shutdown"""
+    await asyncio.sleep(60)
+    while True:
+        try:
+            render_url = os.getenv("RENDER_EXTERNAL_URL", "")
+            if render_url:
+                async with httpx.AsyncClient() as client:
+                    await client.get(f"{render_url}/health", timeout=10)
+        except Exception:
+            pass
+        await asyncio.sleep(14 * 60)
+
+
 @app.on_event("startup")
 async def startup_event():
     """Initialize database and create default admin user"""
-    import logging
     logger = logging.getLogger(__name__)
     
+    asyncio.create_task(keep_alive())
+
     try:
         init_csv_files()
         logger.info("Database initialized successfully")
