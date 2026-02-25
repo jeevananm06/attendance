@@ -84,14 +84,14 @@ async def startup_event():
 
     try:
         init_csv_files()
-        logger.info("Database initialized successfully")
+        print("DB INIT: Database initialized successfully", flush=True)
     except Exception as e:
-        logger.error(f"Database initialization failed: {e}")
+        print(f"DB INIT ERROR: {e}", flush=True)
         raise
     
     try:
         existing = get_user("admin")
-        logger.info(f"Admin user lookup result: {existing}")
+        print(f"DB ADMIN CHECK: existing={existing}", flush=True)
         if not existing:
             admin_user = User(
                 username="admin",
@@ -100,11 +100,11 @@ async def startup_event():
                 is_active=True
             )
             create_user(admin_user)
-            logger.info("Default admin user created: admin / admin123")
+            print("DB ADMIN CREATED: admin / admin123", flush=True)
         else:
-            logger.info("Admin user already exists")
+            print(f"DB ADMIN EXISTS: {existing.username}", flush=True)
     except Exception as e:
-        logger.error(f"Admin user creation failed: {e}")
+        print(f"DB ADMIN ERROR: {e}", flush=True)
         raise
 
 
