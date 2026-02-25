@@ -82,7 +82,7 @@ const InstallPrompt = () => {
         </div>
         
         <div className="flex-1">
-          <h3 className="font-semibold text-gray-900">Install AttendanceMS</h3>
+          <h3 className="font-semibold text-gray-900">Install Labour Attendance</h3>
           
           {isIOS ? (
             <div className="mt-2 text-sm text-gray-600">

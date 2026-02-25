@@ -10,7 +10,9 @@ import {
   AlertCircle,
   Check,
   Edit2,
-  HardHat
+  HardHat,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 
 const Users = () => {
@@ -26,6 +28,7 @@ const Users = () => {
     password: '',
     role: 'manager'
   });
+  const [showPassword, setShowPassword] = useState(false);
 
   useEffect(() => {
     fetchUsers();
@@ -240,15 +243,24 @@ const Users = () => {
                 <label className="label">
                   Password {editingUser ? '(leave blank to keep current)' : '*'}
                 </label>
-                <input
-                  type="password"
-                  value={formData.password}
-                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                  className="input"
-                  placeholder={editingUser ? 'Enter new password' : 'Enter password (min 6 characters)'}
-                  required={!editingUser}
-                  minLength={editingUser ? 0 : 6}
-                />
+                <div className="relative">
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    value={formData.password}
+                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                    className="input pr-10"
+                    placeholder={editingUser ? 'Enter new password' : 'Enter password (min 6 characters)'}
+                    required={!editingUser}
+                    minLength={editingUser ? 0 : 6}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  >
+                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
+                </div>
               </div>
 
               <div>

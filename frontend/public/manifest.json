@@ -1,6 +1,6 @@
 {
   "name": "Labour Attendance Management System",
-  "short_name": "AttendanceMS",
+  "short_name": "Labour Attendance",
   "description": "Manage labour attendance, salary, and payroll for small organizations",
   "start_url": "/",
   "display": "standalone",
