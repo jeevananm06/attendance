@@ -61,17 +61,33 @@ app.include_router(reports.router)
 @app.on_event("startup")
 async def startup_event():
     """Initialize database and create default admin user"""
-    init_csv_files()
+    import logging
+    logger = logging.getLogger(__name__)
     
-    # Create default admin user if not exists
-    if not get_user("admin"):
-        admin_user = User(
-            username="admin",
-            role=UserRole.ADMIN,
-            hashed_password=get_password_hash("admin123")
-        )
-        create_user(admin_user)
-        print("Default admin user created: admin / admin123")
+    try:
+        init_csv_files()
+        logger.info("Database initialized successfully")
+    except Exception as e:
+        logger.error(f"Database initialization failed: {e}")
+        raise
+    
+    try:
+        existing = get_user("admin")
+        logger.info(f"Admin user lookup result: {existing}")
+        if not existing:
+            admin_user = User(
+                username="admin",
+                role=UserRole.ADMIN,
+                hashed_password=get_password_hash("admin123"),
+                is_active=True
+            )
+            create_user(admin_user)
+            logger.info("Default admin user created: admin / admin123")
+        else:
+            logger.info("Admin user already exists")
+    except Exception as e:
+        logger.error(f"Admin user creation failed: {e}")
+        raise
 
 
 @app.get("/")

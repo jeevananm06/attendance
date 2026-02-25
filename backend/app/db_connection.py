@@ -21,8 +21,12 @@ DATABASE_URL = os.getenv(
 if DATABASE_URL.startswith("postgres://"):
     DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
 
-# Create engine
-engine = create_engine(DATABASE_URL, pool_pre_ping=True)
+# Create engine - add SSL for Supabase/production
+connect_args = {}
+if "supabase" in DATABASE_URL or "render.com" in DATABASE_URL:
+    connect_args["sslmode"] = "require"
+
+engine = create_engine(DATABASE_URL, pool_pre_ping=True, connect_args=connect_args)
 
 # Create session factory
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
