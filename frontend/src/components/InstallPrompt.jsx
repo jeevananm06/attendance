@@ -96,7 +96,7 @@ const InstallPrompt = () => {
           ) : (
             <>
               <p className="mt-1 text-sm text-gray-600">
-                Install for quick access and offline use
+                Install for quick access from your home screen
               </p>
               <button
                 onClick={handleInstall}
