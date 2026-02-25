@@ -38,7 +38,7 @@ const Labours = () => {
     try {
       setLoading(true);
       const response = await laboursAPI.getAll(showInactive);
-      setLabours(response.data);
+      setLabours([...response.data].sort((a, b) => a.name.localeCompare(b.name)));
     } catch (err) {
       setError('Failed to load labours');
       console.error(err);

@@ -28,20 +28,24 @@ const Salary = () => {
     fetchData();
   }, []);
 
-  const fetchData = async () => {
+  const fetchData = async (silent = false) => {
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
       const [pendingRes, laboursRes] = await Promise.all([
         salaryAPI.getAllPending(),
         laboursAPI.getAll()
       ]);
-      setPendingSalaries(pendingRes.data);
-      setLabours(laboursRes.data);
+      const data = pendingRes.data;
+      if (data?.labours) {
+        data.labours = [...data.labours].sort((a, b) => a.name.localeCompare(b.name));
+      }
+      setPendingSalaries(data);
+      setLabours([...laboursRes.data].sort((a, b) => a.name.localeCompare(b.name)));
     } catch (err) {
       setError('Failed to load salary data');
       console.error(err);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 
@@ -52,7 +56,7 @@ const Salary = () => {
       await salaryAPI.calculateAll();
       setSuccess('Salaries calculated successfully!');
       setTimeout(() => setSuccess(''), 3000);
-      fetchData();
+      fetchData(true);
     } catch (err) {
       setError(err.response?.data?.detail || 'Failed to calculate salaries');
     } finally {
@@ -66,7 +70,7 @@ const Salary = () => {
       await salaryAPI.calculate(labourId);
       setSuccess('Salary calculated successfully!');
       setTimeout(() => setSuccess(''), 3000);
-      fetchData();
+      fetchData(true);
     } catch (err) {
       setError(err.response?.data?.detail || 'Failed to calculate salary');
     }
@@ -79,7 +83,7 @@ const Salary = () => {
       await salaryAPI.pay(labourId, weekEnd);
       setSuccess('Salary paid successfully!');
       setTimeout(() => setSuccess(''), 3000);
-      fetchData();
+      fetchData(true);
     } catch (err) {
       setError(err.response?.data?.detail || 'Failed to pay salary');
     } finally {
