@@ -9,8 +9,8 @@ import {
   X
 } from 'lucide-react';
 import {
-  BarChart,
-  Bar,
+  LineChart,
+  Line,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -180,7 +180,7 @@ const Stats = () => {
           <h3 className="text-lg font-semibold text-gray-800 mb-4">Weekly Wages (Last 8 Weeks)</h3>
           {weeklyChartData && weeklyChartData.length > 0 ? (
             <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={weeklyChartData}>
+              <LineChart data={weeklyChartData}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="week" />
                 <YAxis />
@@ -188,9 +188,9 @@ const Stats = () => {
                   formatter={(value) => `₹${value.toLocaleString()}`}
                 />
                 <Legend />
-                <Bar dataKey="paid" name="Paid" fill="#22c55e" />
-                <Bar dataKey="pending" name="Pending" fill="#f97316" />
-              </BarChart>
+                <Line type="monotone" dataKey="paid" name="Paid" stroke="#22c55e" strokeWidth={2} dot={{ r: 4 }} />
+                <Line type="monotone" dataKey="pending" name="Pending" stroke="#f97316" strokeWidth={2} dot={{ r: 4 }} />
+              </LineChart>
             </ResponsiveContainer>
           ) : (
             <div className="h-64 flex items-center justify-center text-gray-500">

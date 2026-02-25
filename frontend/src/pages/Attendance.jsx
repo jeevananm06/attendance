@@ -32,7 +32,7 @@ const Attendance = () => {
         attendanceAPI.getByDate(selectedDate)
       ]);
 
-      setLabours(laboursRes.data);
+      setLabours([...laboursRes.data].sort((a, b) => a.name.localeCompare(b.name)));
 
       const attendanceMap = {};
       attendanceRes.data.forEach((record) => {
