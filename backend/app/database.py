@@ -1,4 +1,7 @@
-import pandas as pd
+try:
+    import pandas as pd
+except ImportError:
+    pd = None
 from pathlib import Path
 from typing import List, Optional
 from datetime import date, datetime
