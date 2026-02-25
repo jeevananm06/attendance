@@ -32,6 +32,26 @@ if USE_POSTGRES:
         # Init
         init_db_tables as init_csv_files
     )
+
+    # CSV-only stubs for PostgreSQL mode
+    def get_leave_balance(labour_id: str):
+        return None
+
+    def init_leave_balance(labour_id: str):
+        return None
+
+    def create_backup(created_by: str):
+        return {"id": "n/a", "filename": "n/a", "created_by": created_by, "note": "Backup not supported in PostgreSQL mode"}
+
+    def get_backups():
+        return []
+
+    def restore_backup(backup_id: str, restored_by: str):
+        return False
+
+    def get_backup_file_path(backup_id: str):
+        return None
+
 else:
     from .database import (
         # User operations
@@ -48,10 +68,13 @@ else:
         create_advance, get_advances, get_pending_advances,
         # Leave operations
         create_leave, get_leaves, approve_leave,
+        get_leave_balance, init_leave_balance,
         # Site operations
         create_site, get_sites, get_site, assign_labour_to_site, get_labours_by_site, get_labour_site,
         # Audit operations
         create_audit_log, get_audit_logs,
+        # Backup operations
+        create_backup, get_backups, restore_backup, get_backup_file_path,
         # Export operations
         export_labours_csv, export_attendance_csv, export_salary_csv, export_all_data,
         # Init

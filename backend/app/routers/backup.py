@@ -4,7 +4,7 @@ from typing import List
 
 from ..models import BackupRecord, User, AuditAction
 from ..auth import get_current_admin
-from ..database import create_backup, get_backups, restore_backup, get_backup_file_path, create_audit_log
+from ..db_wrapper import create_backup, get_backups, restore_backup, get_backup_file_path, create_audit_log
 
 router = APIRouter(prefix="/backup", tags=["Backup"])
 

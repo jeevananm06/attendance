@@ -3,7 +3,7 @@ from typing import List
 
 from ..models import Leave, LeaveCreate, LeaveBalance, LeaveStatus, User, AuditAction
 from ..auth import get_current_manager_or_admin
-from ..database import (
+from ..db_wrapper import (
     create_leave, get_leaves, approve_leave, get_leave_balance,
     init_leave_balance, get_labour, create_audit_log
 )

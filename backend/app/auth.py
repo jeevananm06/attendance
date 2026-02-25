@@ -7,7 +7,7 @@ from fastapi.security import OAuth2PasswordBearer
 
 from .config import SECRET_KEY, ALGORITHM, ACCESS_TOKEN_EXPIRE_MINUTES
 from .models import TokenData, User, UserRole
-from .database import get_user
+from .db_wrapper import get_user
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")

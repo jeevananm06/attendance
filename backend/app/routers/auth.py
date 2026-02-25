@@ -11,7 +11,7 @@ from ..auth import (
     get_current_user
 )
 from ..config import ACCESS_TOKEN_EXPIRE_MINUTES
-from ..database import create_user, get_user, get_all_users, update_user
+from ..db_wrapper import create_user, get_user, get_all_users, update_user
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 

@@ -4,7 +4,7 @@ from datetime import date
 
 from ..models import SalaryRecord, SalaryPayment, User
 from ..auth import get_current_manager_or_admin, get_current_admin
-from ..database import get_salary_records, mark_salary_paid, get_all_labours, get_labour
+from ..db_wrapper import get_salary_records, mark_salary_paid, get_all_labours, get_labour
 from ..salary_calculator import (
     calculate_weekly_salary,
     calculate_all_pending_weeks,

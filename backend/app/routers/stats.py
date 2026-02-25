@@ -4,7 +4,7 @@ from datetime import date, timedelta
 
 from ..models import User, LabourStats
 from ..auth import get_current_manager_or_admin
-from ..database import (
+from ..db_wrapper import (
     get_all_labours,
     get_attendance_by_labour,
     get_salary_records
@@ -22,7 +22,7 @@ async def get_labour_stats(
     current_user: User = Depends(get_current_manager_or_admin)
 ):
     """Get detailed statistics for a specific labour"""
-    from ..database import get_labour
+    from ..db_wrapper import get_labour
     
     labour = get_labour(labour_id)
     if not labour:

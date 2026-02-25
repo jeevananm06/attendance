@@ -4,7 +4,7 @@ from datetime import date
 
 from ..models import User
 from ..auth import get_current_manager_or_admin
-from ..database import export_labours_csv, export_attendance_csv, export_salary_csv, export_all_data
+from ..db_wrapper import export_labours_csv, export_attendance_csv, export_salary_csv, export_all_data
 
 router = APIRouter(prefix="/export", tags=["Export"])
 

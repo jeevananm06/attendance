@@ -1,7 +1,7 @@
 from datetime import date, timedelta
 from typing import List, Tuple
 from .models import AttendanceStatus, SalaryRecord
-from .database import (
+from .db_wrapper import (
     get_attendance_by_labour, 
     get_labour, 
     get_salary_records,

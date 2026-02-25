@@ -4,7 +4,7 @@ from datetime import date
 
 from ..models import Advance, AdvanceCreate, User, AuditAction
 from ..auth import get_current_manager_or_admin
-from ..database import (
+from ..db_wrapper import (
     create_advance, get_advances, get_pending_advances, 
     get_labour, create_audit_log, get_all_labours
 )

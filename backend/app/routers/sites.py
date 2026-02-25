@@ -3,7 +3,7 @@ from typing import List
 
 from ..models import Site, SiteCreate, LabourSiteAssignment, User, AuditAction
 from ..auth import get_current_manager_or_admin, get_current_admin
-from ..database import (
+from ..db_wrapper import (
     create_site, get_sites, get_site, assign_labour_to_site,
     get_labours_by_site, get_labour_site, get_labour, create_audit_log,
     get_all_labours

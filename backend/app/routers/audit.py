@@ -4,7 +4,7 @@ from datetime import datetime
 
 from ..models import AuditLog, AuditAction, User
 from ..auth import get_current_admin
-from ..database import get_audit_logs
+from ..db_wrapper import get_audit_logs
 
 router = APIRouter(prefix="/audit", tags=["Audit Logs"])
 

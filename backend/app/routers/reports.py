@@ -6,7 +6,7 @@ import io
 
 from ..models import User
 from ..auth import get_current_manager_or_admin
-from ..database import (
+from ..db_wrapper import (
     get_all_labours, get_attendance_by_labour, get_salary_records,
     get_overtime_records, get_advances, get_leaves
 )
@@ -193,7 +193,7 @@ async def get_labour_report(
     current_user: User = Depends(get_current_manager_or_admin)
 ):
     """Generate detailed report for a specific labour"""
-    from ..database import get_labour
+    from ..db_wrapper import get_labour
     
     labour = get_labour(labour_id)
     if not labour:

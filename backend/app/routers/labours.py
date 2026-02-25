@@ -3,7 +3,7 @@ from typing import List
 
 from ..models import Labour, LabourCreate, LabourUpdate, User, UserRole
 from ..auth import get_current_manager_or_admin, get_current_admin
-from ..database import (
+from ..db_wrapper import (
     get_all_labours, 
     get_labour, 
     create_labour, 

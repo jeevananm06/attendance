@@ -4,7 +4,7 @@ from datetime import date
 
 from ..models import Overtime, OvertimeCreate, User
 from ..auth import get_current_manager_or_admin
-from ..database import create_overtime, get_overtime_records, get_labour, create_audit_log
+from ..db_wrapper import create_overtime, get_overtime_records, get_labour, create_audit_log
 from ..models import AuditAction
 
 router = APIRouter(prefix="/overtime", tags=["Overtime"])

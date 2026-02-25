@@ -4,7 +4,7 @@ from datetime import date
 
 from ..models import Attendance, AttendanceCreate, AttendanceBulkCreate, User, AttendanceStatus
 from ..auth import get_current_manager_or_admin
-from ..database import (
+from ..db_wrapper import (
     get_attendance_by_date,
     get_attendance_by_labour,
     mark_attendance,
