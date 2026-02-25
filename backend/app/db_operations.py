@@ -272,20 +272,25 @@ def get_salary_records_bulk(labour_ids: List[str]) -> dict:
 
 
 def create_salary_records_bulk(records_data: list) -> List[SalaryRecord]:
-    """Upsert multiple salary records in a single DB transaction."""
+    """Upsert multiple salary records in a single DB transaction.
+    Zero-days weeks are deleted if they exist, not saved."""
     db = get_db_session()
     try:
         results = []
         for data in records_data:
+            total_amount = data['days_present'] * data['daily_wage']
             existing = db.query(SalaryDB).filter(
                 and_(SalaryDB.labour_id == data['labour_id'], SalaryDB.week_end == data['week_end'])
             ).first()
-            total_amount = data['days_present'] * data['daily_wage']
+            # Don't store zero-amount records; delete if previously existed
+            if data['days_present'] == 0:
+                if existing and not existing.is_paid:
+                    db.delete(existing)
+                continue
             if existing:
                 existing.days_present = data['days_present']
                 existing.daily_wage = data['daily_wage']
                 existing.total_amount = total_amount
-                rec = existing
             else:
                 rec = SalaryDB(
                     id=str(uuid.uuid4())[:8],
@@ -299,7 +304,7 @@ def create_salary_records_bulk(records_data: list) -> List[SalaryRecord]:
                 )
                 db.add(rec)
             results.append(SalaryRecord(
-                id=rec.id if hasattr(rec, 'id') else data['labour_id'],
+                id=existing.id if existing else data['labour_id'],
                 labour_id=data['labour_id'],
                 week_start=data['week_start'],
                 week_end=data['week_end'],
@@ -361,6 +366,33 @@ def mark_attendance(labour_id: str, target_date: date, status: AttendanceStatus,
         db.close()
 
 
+def purge_absent_attendance_records() -> int:
+    """Delete all attendance records with status 'absent'. One-time cleanup."""
+    db = get_db_session()
+    try:
+        deleted = db.query(AttendanceDB).filter(AttendanceDB.status == "absent").delete()
+        db.commit()
+        return deleted
+    finally:
+        db.close()
+
+
+def delete_attendance(labour_id: str, target_date: date) -> bool:
+    """Delete an attendance record (used when marking absent = unmark)."""
+    db = get_db_session()
+    try:
+        existing = db.query(AttendanceDB).filter(
+            and_(AttendanceDB.labour_id == labour_id, AttendanceDB.date == target_date)
+        ).first()
+        if existing:
+            db.delete(existing)
+            db.commit()
+            return True
+        return False
+    finally:
+        db.close()
+
+
 # ============== SALARY OPERATIONS ==============
 
 def get_salary_records(labour_id: str = None, is_paid: bool = None) -> List[SalaryRecord]:
@@ -395,11 +427,27 @@ def create_salary_record(labour_id: str, week_start: date, week_end: date,
     db = get_db_session()
     try:
         total_amount = days_present * daily_wage
-        
+
         existing = db.query(SalaryDB).filter(
             and_(SalaryDB.labour_id == labour_id, SalaryDB.week_end == week_end)
         ).first()
-        
+
+        # Zero-days week: delete existing unpaid record if any, don't create new
+        if days_present == 0:
+            if existing and not existing.is_paid:
+                db.delete(existing)
+                db.commit()
+            return SalaryRecord(
+                id=existing.id if existing else "",
+                labour_id=labour_id,
+                week_start=week_start,
+                week_end=week_end,
+                days_present=0,
+                daily_wage=daily_wage,
+                total_amount=0,
+                is_paid=False
+            )
+
         if existing:
             existing.days_present = days_present
             existing.daily_wage = daily_wage

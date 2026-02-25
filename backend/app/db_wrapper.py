@@ -14,7 +14,7 @@ if USE_POSTGRES:
         # Labour operations
         get_all_labours, get_labour, create_labour, update_labour, delete_labour,
         # Attendance operations
-        get_attendance_by_date, get_attendance_by_labour, mark_attendance,
+        get_attendance_by_date, get_attendance_by_labour, mark_attendance, delete_attendance, purge_absent_attendance_records,
         # Salary operations
         get_salary_records, create_salary_record, mark_salary_paid,
         # Overtime operations
@@ -64,6 +64,15 @@ else:
         get_all_labours, get_labour, create_labour, update_labour, delete_labour,
         # Attendance operations
         get_attendance_by_date, get_attendance_by_labour, mark_attendance,
+    )
+
+    def delete_attendance(labour_id: str, target_date) -> bool:
+        return False
+
+    def purge_absent_attendance_records() -> int:
+        return 0
+
+    from .database import (
         # Salary operations
         get_salary_records, create_salary_record, mark_salary_paid,
         # Overtime operations

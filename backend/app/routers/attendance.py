@@ -3,11 +3,13 @@ from typing import List
 from datetime import date
 
 from ..models import Attendance, AttendanceCreate, AttendanceBulkCreate, User, AttendanceStatus
-from ..auth import get_current_manager_or_admin
+from ..auth import get_current_manager_or_admin, get_current_admin
 from ..db_wrapper import (
     get_attendance_by_date,
     get_attendance_by_labour,
     mark_attendance,
+    delete_attendance,
+    purge_absent_attendance_records,
     get_all_labours
 )
 
@@ -39,7 +41,17 @@ async def mark_single_attendance(
     attendance_data: AttendanceCreate,
     current_user: User = Depends(get_current_manager_or_admin)
 ):
-    """Mark attendance for a single labour"""
+    """Mark attendance for a single labour. Absent = unmark (deletes record)."""
+    if attendance_data.status == AttendanceStatus.ABSENT:
+        delete_attendance(attendance_data.labour_id, attendance_data.date)
+        return Attendance(
+            id="",
+            labour_id=attendance_data.labour_id,
+            date=attendance_data.date,
+            status=AttendanceStatus.ABSENT,
+            marked_by=current_user.username,
+            marked_at=__import__('datetime').datetime.now()
+        )
     return mark_attendance(
         labour_id=attendance_data.labour_id,
         target_date=attendance_data.date,
@@ -53,17 +65,44 @@ async def mark_bulk_attendance(
     bulk_data: AttendanceBulkCreate,
     current_user: User = Depends(get_current_manager_or_admin)
 ):
-    """Mark attendance for multiple labours at once"""
+    """Mark attendance for multiple labours at once. Absent = unmark (deletes record)."""
+    from datetime import datetime
     results = []
     for record in bulk_data.records:
-        attendance = mark_attendance(
-            labour_id=record["labour_id"],
-            target_date=bulk_data.date,
-            status=AttendanceStatus(record["status"]),
-            marked_by=current_user.username
-        )
-        results.append(attendance)
+        s = AttendanceStatus(record["status"])
+        if s == AttendanceStatus.ABSENT:
+            delete_attendance(record["labour_id"], bulk_data.date)
+            results.append(Attendance(
+                id="",
+                labour_id=record["labour_id"],
+                date=bulk_data.date,
+                status=AttendanceStatus.ABSENT,
+                marked_by=current_user.username,
+                marked_at=datetime.now()
+            ))
+        else:
+            attendance = mark_attendance(
+                labour_id=record["labour_id"],
+                target_date=bulk_data.date,
+                status=s,
+                marked_by=current_user.username
+            )
+            results.append(attendance)
     return results
+
+
+@router.post("/admin/purge-absent")
+async def purge_absent_records(
+    current_user: User = Depends(get_current_admin)
+):
+    """Admin only: Delete all stored absent records and recalculate salaries."""
+    from ..salary_calculator import recalculate_all_salaries
+    deleted = purge_absent_attendance_records()
+    recalculate_all_salaries()
+    return {
+        "deleted_absent_records": deleted,
+        "message": f"Purged {deleted} absent records and recalculated all salaries"
+    }
 
 
 @router.get("/today", response_model=dict)

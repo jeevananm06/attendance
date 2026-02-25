@@ -93,9 +93,9 @@ def calculate_all_pending_weeks(labour_id: str, up_to_date: date = None) -> List
         raise ValueError(f"Labour with id {labour_id} not found")
 
     all_records = get_salary_records(labour_id=labour_id)
-    existing_week_ends = {r.week_end for r in all_records}
-
     paid_records = [r for r in all_records if r.is_paid]
+    paid_week_ends = {r.week_end for r in paid_records}
+
     if paid_records:
         last_paid_week_end = max(r.week_end for r in paid_records)
         start_date = last_paid_week_end + timedelta(days=1)
@@ -106,8 +106,9 @@ def calculate_all_pending_weeks(labour_id: str, up_to_date: date = None) -> List
     current_week_start, current_week_end = get_week_boundaries(start_date)
 
     while current_week_end <= up_to_date:
-        # Skip weeks already calculated (optimization #2)
-        if current_week_end not in existing_week_ends:
+        # Only skip weeks that are already PAID (finalized)
+        # Unpaid weeks are always recalculated to reflect attendance corrections
+        if current_week_end not in paid_week_ends:
             record = calculate_weekly_salary(labour_id, current_week_end)
             records.append(record)
         current_week_start = current_week_end + timedelta(days=1)
@@ -121,8 +122,10 @@ def get_consolidated_pending_salary(labour_id: str) -> dict:
     Get consolidated pending salary for a labour.
     Returns total pending amount across all unpaid weeks.
     """
-    unpaid_records = get_salary_records(labour_id=labour_id, is_paid=False)
-    
+    all_unpaid = get_salary_records(labour_id=labour_id, is_paid=False)
+    # Only include weeks where labour actually worked (days_present > 0)
+    unpaid_records = [r for r in all_unpaid if r.total_amount > 0]
+
     if not unpaid_records:
         return {
             "labour_id": labour_id,
@@ -130,9 +133,9 @@ def get_consolidated_pending_salary(labour_id: str) -> dict:
             "weeks_pending": 0,
             "records": []
         }
-    
+
     total_pending = sum(r.total_amount for r in unpaid_records)
-    
+
     return {
         "labour_id": labour_id,
         "total_pending": total_pending,
@@ -184,8 +187,8 @@ def recalculate_all_salaries(up_to_date: date = None) -> dict:
     for labour in labours:
         try:
             salary_records = all_salary.get(labour.id, [])
-            existing_week_ends = {r.week_end for r in salary_records}
             paid_records = [r for r in salary_records if r.is_paid]
+            paid_week_ends = {r.week_end for r in paid_records}
 
             if paid_records:
                 last_paid_week_end = max(r.week_end for r in paid_records)
@@ -200,7 +203,8 @@ def recalculate_all_salaries(up_to_date: date = None) -> dict:
             current_week_start, current_week_end = get_week_boundaries(start_date)
 
             while current_week_end <= up_to_date:
-                if current_week_end not in existing_week_ends:
+                # Only skip PAID weeks; always recalculate unpaid to reflect corrections
+                if current_week_end not in paid_week_ends:
                     # Calculate days from pre-fetched attendance (no extra DB call)
                     days_present = 0.0
                     d = current_week_start
