@@ -27,7 +27,8 @@ const Labours = () => {
     name: '',
     phone: '',
     daily_wage: '',
-    joined_date: new Date().toISOString().split('T')[0]
+    joined_date: new Date().toISOString().split('T')[0],
+    pay_cycle: 'weekly'
   });
 
   useEffect(() => {
@@ -54,7 +55,8 @@ const Labours = () => {
         const updateData = {
           name: formData.name,
           phone: formData.phone || null,
-          daily_wage: parseFloat(formData.daily_wage)
+          daily_wage: parseFloat(formData.daily_wage),
+          pay_cycle: formData.pay_cycle
         };
         // Only admin can update joined_date
         if (isAdmin && formData.joined_date) {
@@ -66,7 +68,8 @@ const Labours = () => {
           name: formData.name,
           phone: formData.phone || null,
           daily_wage: parseFloat(formData.daily_wage),
-          joined_date: formData.joined_date
+          joined_date: formData.joined_date,
+          pay_cycle: formData.pay_cycle
         });
       }
       setShowModal(false);
@@ -94,7 +97,8 @@ const Labours = () => {
       name: labour.name,
       phone: labour.phone || '',
       daily_wage: labour.daily_wage.toString(),
-      joined_date: labour.joined_date
+      joined_date: labour.joined_date,
+      pay_cycle: labour.pay_cycle || 'weekly'
     });
     setShowModal(true);
   };
@@ -105,7 +109,8 @@ const Labours = () => {
       name: '',
       phone: '',
       daily_wage: '',
-      joined_date: new Date().toISOString().split('T')[0]
+      joined_date: new Date().toISOString().split('T')[0],
+      pay_cycle: 'weekly'
     });
   };
 
@@ -220,6 +225,13 @@ const Labours = () => {
               <div className="flex items-center gap-2 text-gray-600">
                 <IndianRupee size={16} />
                 <span>₹{labour.daily_wage}/day</span>
+                <span className={`ml-auto text-xs px-2 py-0.5 rounded-full font-medium ${
+                  (labour.pay_cycle || 'weekly') === 'monthly'
+                    ? 'bg-purple-100 text-purple-700'
+                    : 'bg-blue-100 text-blue-700'
+                }`}>
+                  {(labour.pay_cycle || 'weekly') === 'monthly' ? 'Monthly' : 'Weekly'}
+                </span>
               </div>
               <div className="flex items-center gap-2 text-gray-600">
                 <Calendar size={16} />
@@ -303,6 +315,42 @@ const Labours = () => {
                   />
                 </div>
               )}
+
+              <div>
+                <label className="label">Pay Cycle *</label>
+                <div className="flex gap-3">
+                  <label className={`flex-1 flex items-center justify-center gap-2 p-3 rounded-lg border-2 cursor-pointer transition-colors ${
+                    formData.pay_cycle === 'weekly'
+                      ? 'border-blue-500 bg-blue-50 text-blue-700'
+                      : 'border-gray-200 text-gray-600 hover:border-gray-300'
+                  }`}>
+                    <input
+                      type="radio"
+                      name="pay_cycle"
+                      value="weekly"
+                      checked={formData.pay_cycle === 'weekly'}
+                      onChange={(e) => setFormData({ ...formData, pay_cycle: e.target.value })}
+                      className="sr-only"
+                    />
+                    <span className="font-medium">Weekly</span>
+                  </label>
+                  <label className={`flex-1 flex items-center justify-center gap-2 p-3 rounded-lg border-2 cursor-pointer transition-colors ${
+                    formData.pay_cycle === 'monthly'
+                      ? 'border-purple-500 bg-purple-50 text-purple-700'
+                      : 'border-gray-200 text-gray-600 hover:border-gray-300'
+                  }`}>
+                    <input
+                      type="radio"
+                      name="pay_cycle"
+                      value="monthly"
+                      checked={formData.pay_cycle === 'monthly'}
+                      onChange={(e) => setFormData({ ...formData, pay_cycle: e.target.value })}
+                      className="sr-only"
+                    />
+                    <span className="font-medium">Monthly</span>
+                  </label>
+                </div>
+              </div>
 
               <div className="flex gap-3 pt-4">
                 <button type="button" onClick={() => setShowModal(false)} className="btn-secondary flex-1">

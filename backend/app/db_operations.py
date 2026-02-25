@@ -102,7 +102,8 @@ def get_all_labours(include_inactive: bool = False) -> List[Labour]:
             phone=l.phone,
             daily_wage=l.daily_wage,
             joined_date=l.joined_date,
-            is_active=l.is_active
+            is_active=l.is_active,
+            pay_cycle=l.pay_cycle or "weekly"
         ) for l in labours]
     finally:
         db.close()
@@ -120,37 +121,40 @@ def get_labour(labour_id: str) -> Optional[Labour]:
             phone=labour.phone,
             daily_wage=labour.daily_wage,
             joined_date=labour.joined_date,
-            is_active=labour.is_active
+            is_active=labour.is_active,
+            pay_cycle=labour.pay_cycle or "weekly"
         )
     finally:
         db.close()
 
 
-def create_labour(name: str, daily_wage: float, phone: str = None, joined_date: date = None) -> Labour:
+def create_labour(name: str, daily_wage: float, phone: str = None, joined_date: date = None, pay_cycle: str = "weekly") -> Labour:
     db = get_db_session()
     try:
         labour_id = str(uuid.uuid4())[:8]
         if joined_date is None:
             joined_date = date.today()
-        
+
         db_labour = LabourDB(
             id=labour_id,
             name=name,
             phone=phone,
             daily_wage=daily_wage,
             joined_date=joined_date,
-            is_active=True
+            is_active=True,
+            pay_cycle=pay_cycle
         )
         db.add(db_labour)
         db.commit()
-        
+
         return Labour(
             id=labour_id,
             name=name,
             phone=phone,
             daily_wage=daily_wage,
             joined_date=joined_date,
-            is_active=True
+            is_active=True,
+            pay_cycle=pay_cycle
         )
     finally:
         db.close()

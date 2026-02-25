@@ -52,6 +52,7 @@ async def get_all_pending_salaries(
     for labour in labours:
         pending = get_consolidated_pending_salary(labour.id)
         pending["name"] = labour.name
+        pending["pay_cycle"] = getattr(labour, "pay_cycle", "weekly") or "weekly"
         results.append(pending)
     
     total_pending = sum(r["total_pending"] for r in results)

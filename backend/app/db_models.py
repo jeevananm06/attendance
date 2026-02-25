@@ -54,6 +54,7 @@ class LabourDB(Base):
     daily_wage = Column(Float, nullable=False)
     joined_date = Column(Date, nullable=False)
     is_active = Column(Boolean, default=True)
+    pay_cycle = Column(String(10), default="weekly")  # "weekly" or "monthly"
     created_at = Column(DateTime, default=datetime.utcnow)
     
     # Relationships

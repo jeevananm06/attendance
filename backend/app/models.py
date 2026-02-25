@@ -44,6 +44,11 @@ class TokenData(BaseModel):
     role: Optional[str] = None
 
 
+class PayCycle(str, Enum):
+    WEEKLY = "weekly"
+    MONTHLY = "monthly"
+
+
 class Labour(BaseModel):
     id: str
     name: str
@@ -51,6 +56,7 @@ class Labour(BaseModel):
     daily_wage: float
     joined_date: date
     is_active: bool = True
+    pay_cycle: PayCycle = PayCycle.WEEKLY
 
 
 class LabourCreate(BaseModel):
@@ -58,6 +64,7 @@ class LabourCreate(BaseModel):
     phone: Optional[str] = None
     daily_wage: float
     joined_date: Optional[date] = None
+    pay_cycle: PayCycle = PayCycle.WEEKLY
 
 
 class LabourUpdate(BaseModel):
@@ -66,6 +73,7 @@ class LabourUpdate(BaseModel):
     daily_wage: Optional[float] = None
     is_active: Optional[bool] = None
     joined_date: Optional[date] = None  # Admin only
+    pay_cycle: Optional[PayCycle] = None
 
 
 class AttendanceStatus(str, Enum):

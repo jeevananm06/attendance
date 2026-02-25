@@ -177,9 +177,18 @@ const Salary = () => {
                     <Wallet className="text-primary-600" size={20} />
                   </div>
                   <div>
-                    <p className="font-semibold text-gray-800">{labour.name}</p>
+                    <div className="flex items-center gap-2">
+                      <p className="font-semibold text-gray-800">{labour.name}</p>
+                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                        labour.pay_cycle === 'monthly'
+                          ? 'bg-purple-100 text-purple-700'
+                          : 'bg-blue-100 text-blue-700'
+                      }`}>
+                        {labour.pay_cycle === 'monthly' ? 'Monthly' : 'Weekly'}
+                      </span>
+                    </div>
                     <p className="text-sm text-gray-500">
-                      {labour.weeks_pending || 0} week(s) pending
+                      {labour.weeks_pending || 0} {labour.pay_cycle === 'monthly' ? 'month(s)' : 'week(s)'} pending
                     </p>
                   </div>
                 </div>
@@ -207,7 +216,7 @@ const Salary = () => {
                       <table className="w-full text-sm mb-4">
                         <thead>
                           <tr className="text-gray-500">
-                            <th className="text-left py-2">Week</th>
+                            <th className="text-left py-2">{labour.pay_cycle === 'monthly' ? 'Month' : 'Week'}</th>
                             <th className="text-center py-2">Days</th>
                             <th className="text-right py-2">Amount</th>
                           </tr>
@@ -216,8 +225,10 @@ const Salary = () => {
                           {labour.records.map((record, idx) => (
                             <tr key={idx} className="border-t">
                               <td className="py-2">
-                                {new Date(record.week_start).toLocaleDateString()} -{' '}
-                                {new Date(record.week_end).toLocaleDateString()}
+                                {labour.pay_cycle === 'monthly'
+                                  ? new Date(record.week_end).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+                                  : `${new Date(record.week_start).toLocaleDateString()} - ${new Date(record.week_end).toLocaleDateString()}`
+                                }
                               </td>
                               <td className="text-center py-2">{record.days_present}</td>
                               <td className="text-right py-2 font-medium">
