@@ -219,6 +219,101 @@ def get_attendance_by_labour(labour_id: str, start_date: date = None, end_date: 
         db.close()
 
 
+def get_attendance_bulk(labour_ids: List[str], start_date: date, end_date: date) -> dict:
+    """Fetch attendance for multiple labours in a single query. Returns dict keyed by labour_id."""
+    db = get_db_session()
+    try:
+        records = db.query(AttendanceDB).filter(
+            and_(
+                AttendanceDB.labour_id.in_(labour_ids),
+                AttendanceDB.date >= start_date,
+                AttendanceDB.date <= end_date
+            )
+        ).all()
+        result = {lid: [] for lid in labour_ids}
+        for r in records:
+            result[r.labour_id].append(Attendance(
+                id=r.id,
+                labour_id=r.labour_id,
+                date=r.date,
+                status=AttendanceStatus(r.status),
+                marked_by=r.marked_by,
+                marked_at=r.created_at
+            ))
+        return result
+    finally:
+        db.close()
+
+
+def get_salary_records_bulk(labour_ids: List[str]) -> dict:
+    """Fetch all salary records for multiple labours in a single query. Returns dict keyed by labour_id."""
+    db = get_db_session()
+    try:
+        records = db.query(SalaryDB).filter(
+            SalaryDB.labour_id.in_(labour_ids)
+        ).all()
+        result = {lid: [] for lid in labour_ids}
+        for r in records:
+            result[r.labour_id].append(SalaryRecord(
+                id=r.id,
+                labour_id=r.labour_id,
+                week_start=r.week_start,
+                week_end=r.week_end,
+                days_present=r.days_present,
+                daily_wage=r.daily_wage,
+                total_amount=r.total_amount,
+                is_paid=r.is_paid,
+                paid_date=r.paid_date,
+                paid_by=r.paid_by
+            ))
+        return result
+    finally:
+        db.close()
+
+
+def create_salary_records_bulk(records_data: list) -> List[SalaryRecord]:
+    """Upsert multiple salary records in a single DB transaction."""
+    db = get_db_session()
+    try:
+        results = []
+        for data in records_data:
+            existing = db.query(SalaryDB).filter(
+                and_(SalaryDB.labour_id == data['labour_id'], SalaryDB.week_end == data['week_end'])
+            ).first()
+            total_amount = data['days_present'] * data['daily_wage']
+            if existing:
+                existing.days_present = data['days_present']
+                existing.daily_wage = data['daily_wage']
+                existing.total_amount = total_amount
+                rec = existing
+            else:
+                rec = SalaryDB(
+                    id=str(uuid.uuid4())[:8],
+                    labour_id=data['labour_id'],
+                    week_start=data['week_start'],
+                    week_end=data['week_end'],
+                    days_present=data['days_present'],
+                    daily_wage=data['daily_wage'],
+                    total_amount=total_amount,
+                    is_paid=False
+                )
+                db.add(rec)
+            results.append(SalaryRecord(
+                id=rec.id if hasattr(rec, 'id') else data['labour_id'],
+                labour_id=data['labour_id'],
+                week_start=data['week_start'],
+                week_end=data['week_end'],
+                days_present=data['days_present'],
+                daily_wage=data['daily_wage'],
+                total_amount=total_amount,
+                is_paid=False
+            ))
+        db.commit()
+        return results
+    finally:
+        db.close()
+
+
 def mark_attendance(labour_id: str, target_date: date, status: AttendanceStatus, marked_by: str) -> Attendance:
     db = get_db_session()
     try:

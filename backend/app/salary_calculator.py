@@ -2,12 +2,17 @@ from datetime import date, timedelta
 from typing import List, Tuple
 from .models import AttendanceStatus, SalaryRecord
 from .db_wrapper import (
-    get_attendance_by_labour, 
-    get_labour, 
+    get_attendance_by_labour,
+    get_labour,
     get_salary_records,
     create_salary_record,
     get_all_labours
 )
+
+USE_POSTGRES = __import__('os').getenv("USE_POSTGRES", "false").lower() == "true"
+
+if USE_POSTGRES:
+    from .db_operations import get_attendance_bulk, get_salary_records_bulk, create_salary_records_bulk
 
 
 def get_week_boundaries(target_date: date) -> Tuple[date, date]:
@@ -78,36 +83,36 @@ def calculate_weekly_salary(labour_id: str, week_end: date = None) -> SalaryReco
 def calculate_all_pending_weeks(labour_id: str, up_to_date: date = None) -> List[SalaryRecord]:
     """
     Calculate salary for all weeks from the last paid week to the current week.
-    If no payment has been made, start from the labour's join date.
+    Skips weeks that already have an unpaid salary record (optimization #2).
     """
     if up_to_date is None:
         up_to_date = get_last_friday()
-    
+
     labour = get_labour(labour_id)
     if not labour:
         raise ValueError(f"Labour with id {labour_id} not found")
-    
-    # Find the last paid week
-    paid_records = get_salary_records(labour_id=labour_id, is_paid=True)
-    
+
+    all_records = get_salary_records(labour_id=labour_id)
+    existing_week_ends = {r.week_end for r in all_records}
+
+    paid_records = [r for r in all_records if r.is_paid]
     if paid_records:
-        # Start from the week after the last paid week
         last_paid_week_end = max(r.week_end for r in paid_records)
         start_date = last_paid_week_end + timedelta(days=1)
     else:
-        # Start from join date
         start_date = labour.joined_date
-    
-    # Calculate for each week
+
     records = []
     current_week_start, current_week_end = get_week_boundaries(start_date)
-    
+
     while current_week_end <= up_to_date:
-        record = calculate_weekly_salary(labour_id, current_week_end)
-        records.append(record)
+        # Skip weeks already calculated (optimization #2)
+        if current_week_end not in existing_week_ends:
+            record = calculate_weekly_salary(labour_id, current_week_end)
+            records.append(record)
         current_week_start = current_week_end + timedelta(days=1)
         current_week_end = current_week_start + timedelta(days=6)
-    
+
     return records
 
 
@@ -148,20 +153,80 @@ def get_consolidated_pending_salary(labour_id: str) -> dict:
 
 def recalculate_all_salaries(up_to_date: date = None) -> dict:
     """
-    Recalculate salaries for all active labours.
+    Recalculate salaries for all active labours using bulk DB queries (optimization #4).
+    - 1 query to get all labours
+    - 1 query to get all salary records for all labours
+    - 1 query to get all attendance records for the full date range
+    - 1 bulk upsert for all new salary records
     """
     if up_to_date is None:
         up_to_date = get_last_friday()
-    
+
     labours = get_all_labours()
+    if not labours:
+        return {}
+
+    labour_ids = [l.id for l in labours]
+    labour_map = {l.id: l for l in labours}
+
+    # Determine overall date range needed (optimization #4 - single attendance query)
+    earliest_join = min(l.joined_date for l in labours)
+    if USE_POSTGRES:
+        all_salary = get_salary_records_bulk(labour_ids)
+        all_attendance = get_attendance_bulk(labour_ids, earliest_join, up_to_date)
+    else:
+        all_salary = {l.id: get_salary_records(labour_id=l.id) for l in labours}
+        all_attendance = {l.id: get_attendance_by_labour(l.id, earliest_join, up_to_date) for l in labours}
+
+    new_records_data = []
     results = {}
-    
+
     for labour in labours:
         try:
-            records = calculate_all_pending_weeks(labour.id, up_to_date)
+            salary_records = all_salary.get(labour.id, [])
+            existing_week_ends = {r.week_end for r in salary_records}
+            paid_records = [r for r in salary_records if r.is_paid]
+
+            if paid_records:
+                last_paid_week_end = max(r.week_end for r in paid_records)
+                start_date = last_paid_week_end + timedelta(days=1)
+            else:
+                start_date = labour.joined_date
+
+            # Build attendance lookup for this labour: date -> status
+            labour_attendance = {r.date: r.status for r in all_attendance.get(labour.id, [])}
+
+            weeks_calculated = 0
+            current_week_start, current_week_end = get_week_boundaries(start_date)
+
+            while current_week_end <= up_to_date:
+                if current_week_end not in existing_week_ends:
+                    # Calculate days from pre-fetched attendance (no extra DB call)
+                    days_present = 0.0
+                    d = current_week_start
+                    while d <= current_week_end:
+                        status = labour_attendance.get(d)
+                        if status == AttendanceStatus.PRESENT:
+                            days_present += 1.0
+                        elif status == AttendanceStatus.HALF_DAY:
+                            days_present += 0.5
+                        d += timedelta(days=1)
+
+                    new_records_data.append({
+                        'labour_id': labour.id,
+                        'week_start': current_week_start,
+                        'week_end': current_week_end,
+                        'days_present': days_present,
+                        'daily_wage': labour.daily_wage
+                    })
+                    weeks_calculated += 1
+
+                current_week_start = current_week_end + timedelta(days=1)
+                current_week_end = current_week_start + timedelta(days=6)
+
             results[labour.id] = {
                 "name": labour.name,
-                "weeks_calculated": len(records),
+                "weeks_calculated": weeks_calculated,
                 "status": "success"
             }
         except Exception as e:
@@ -170,5 +235,13 @@ def recalculate_all_salaries(up_to_date: date = None) -> dict:
                 "error": str(e),
                 "status": "error"
             }
-    
+
+    # Single bulk upsert for all new records (optimization #4)
+    if new_records_data:
+        if USE_POSTGRES:
+            create_salary_records_bulk(new_records_data)
+        else:
+            for data in new_records_data:
+                create_salary_record(**data)
+
     return results

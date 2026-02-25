@@ -33,6 +33,10 @@ if USE_POSTGRES:
         init_db_tables as init_csv_files
     )
 
+    # Bulk functions (PostgreSQL only, already imported above)
+    # get_attendance_bulk, get_salary_records_bulk, create_salary_records_bulk
+    # are imported directly from db_operations in salary_calculator.py
+
     # CSV-only stubs for PostgreSQL mode
     def get_leave_balance(labour_id: str):
         return None
