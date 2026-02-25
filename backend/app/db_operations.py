@@ -1,0 +1,857 @@
+"""
+PostgreSQL Database Operations for Labour Attendance Management System
+This module replaces the CSV-based database.py with SQLAlchemy operations
+"""
+
+from typing import List, Optional
+from datetime import date, datetime
+import uuid
+from sqlalchemy.orm import Session
+from sqlalchemy import and_, or_
+
+from .db_models import (
+    UserDB, LabourDB, AttendanceDB, SalaryDB, OvertimeDB,
+    AdvanceDB, LeaveDB, SiteDB, SiteAssignmentDB, AuditLogDB, BackupDB
+)
+from .models import (
+    User, Labour, Attendance, SalaryRecord, UserRole, AttendanceStatus,
+    Overtime, Advance, Leave, LeaveType, LeaveStatus,
+    Site, LabourSiteAssignment, AuditLog, AuditAction
+)
+from .db_connection import get_db_session
+
+
+# ============== USER OPERATIONS ==============
+
+def get_user(username: str) -> Optional[User]:
+    db = get_db_session()
+    try:
+        user = db.query(UserDB).filter(UserDB.username == username).first()
+        if not user:
+            return None
+        return User(
+            username=user.username,
+            role=UserRole(user.role),
+            hashed_password=user.hashed_password,
+            is_active=user.is_active
+        )
+    finally:
+        db.close()
+
+
+def create_user(user: User) -> User:
+    db = get_db_session()
+    try:
+        db_user = UserDB(
+            username=user.username,
+            role=user.role.value,
+            hashed_password=user.hashed_password,
+            is_active=getattr(user, 'is_active', True)
+        )
+        db.add(db_user)
+        db.commit()
+        return user
+    finally:
+        db.close()
+
+
+def get_all_users() -> List[dict]:
+    db = get_db_session()
+    try:
+        users = db.query(UserDB).all()
+        return [{"username": u.username, "role": u.role, "is_active": u.is_active} for u in users]
+    finally:
+        db.close()
+
+
+def update_user(username: str, **kwargs) -> bool:
+    db = get_db_session()
+    try:
+        user = db.query(UserDB).filter(UserDB.username == username).first()
+        if not user:
+            return False
+        
+        for key, value in kwargs.items():
+            if value is not None:
+                if key == 'role' and hasattr(value, 'value'):
+                    value = value.value
+                if key == 'hashed_password':
+                    setattr(user, 'hashed_password', value)
+                elif hasattr(user, key):
+                    setattr(user, key, value)
+        
+        db.commit()
+        return True
+    finally:
+        db.close()
+
+
+# ============== LABOUR OPERATIONS ==============
+
+def get_all_labours(include_inactive: bool = False) -> List[Labour]:
+    db = get_db_session()
+    try:
+        query = db.query(LabourDB)
+        if not include_inactive:
+            query = query.filter(LabourDB.is_active == True)
+        
+        labours = query.all()
+        return [Labour(
+            id=l.id,
+            name=l.name,
+            phone=l.phone,
+            daily_wage=l.daily_wage,
+            joined_date=l.joined_date,
+            is_active=l.is_active
+        ) for l in labours]
+    finally:
+        db.close()
+
+
+def get_labour(labour_id: str) -> Optional[Labour]:
+    db = get_db_session()
+    try:
+        labour = db.query(LabourDB).filter(LabourDB.id == labour_id).first()
+        if not labour:
+            return None
+        return Labour(
+            id=labour.id,
+            name=labour.name,
+            phone=labour.phone,
+            daily_wage=labour.daily_wage,
+            joined_date=labour.joined_date,
+            is_active=labour.is_active
+        )
+    finally:
+        db.close()
+
+
+def create_labour(name: str, daily_wage: float, phone: str = None, joined_date: date = None) -> Labour:
+    db = get_db_session()
+    try:
+        labour_id = str(uuid.uuid4())[:8]
+        if joined_date is None:
+            joined_date = date.today()
+        
+        db_labour = LabourDB(
+            id=labour_id,
+            name=name,
+            phone=phone,
+            daily_wage=daily_wage,
+            joined_date=joined_date,
+            is_active=True
+        )
+        db.add(db_labour)
+        db.commit()
+        
+        return Labour(
+            id=labour_id,
+            name=name,
+            phone=phone,
+            daily_wage=daily_wage,
+            joined_date=joined_date,
+            is_active=True
+        )
+    finally:
+        db.close()
+
+
+def update_labour(labour_id: str, **kwargs) -> Optional[Labour]:
+    db = get_db_session()
+    try:
+        labour = db.query(LabourDB).filter(LabourDB.id == labour_id).first()
+        if not labour:
+            return None
+        
+        for key, value in kwargs.items():
+            if value is not None and hasattr(labour, key):
+                setattr(labour, key, value)
+        
+        db.commit()
+        return get_labour(labour_id)
+    finally:
+        db.close()
+
+
+def delete_labour(labour_id: str) -> bool:
+    result = update_labour(labour_id, is_active=False)
+    return result is not None
+
+
+# ============== ATTENDANCE OPERATIONS ==============
+
+def get_attendance_by_date(target_date: date) -> List[Attendance]:
+    db = get_db_session()
+    try:
+        records = db.query(AttendanceDB).filter(AttendanceDB.date == target_date).all()
+        return [Attendance(
+            id=r.id,
+            labour_id=r.labour_id,
+            date=r.date,
+            status=AttendanceStatus(r.status),
+            marked_by=r.marked_by,
+            marked_at=r.created_at
+        ) for r in records]
+    finally:
+        db.close()
+
+
+def get_attendance_by_labour(labour_id: str, start_date: date = None, end_date: date = None) -> List[Attendance]:
+    db = get_db_session()
+    try:
+        query = db.query(AttendanceDB).filter(AttendanceDB.labour_id == labour_id)
+        
+        if start_date:
+            query = query.filter(AttendanceDB.date >= start_date)
+        if end_date:
+            query = query.filter(AttendanceDB.date <= end_date)
+        
+        records = query.all()
+        return [Attendance(
+            id=r.id,
+            labour_id=r.labour_id,
+            date=r.date,
+            status=AttendanceStatus(r.status),
+            marked_by=r.marked_by,
+            marked_at=r.created_at
+        ) for r in records]
+    finally:
+        db.close()
+
+
+def mark_attendance(labour_id: str, target_date: date, status: AttendanceStatus, marked_by: str) -> Attendance:
+    db = get_db_session()
+    try:
+        existing = db.query(AttendanceDB).filter(
+            and_(AttendanceDB.labour_id == labour_id, AttendanceDB.date == target_date)
+        ).first()
+        
+        now = datetime.now()
+        
+        if existing:
+            existing.status = status.value
+            existing.marked_by = marked_by
+            existing.created_at = now
+            db.commit()
+            return Attendance(
+                id=existing.id,
+                labour_id=labour_id,
+                date=target_date,
+                status=status,
+                marked_by=marked_by,
+                marked_at=now
+            )
+        
+        attendance_id = str(uuid.uuid4())[:8]
+        db_attendance = AttendanceDB(
+            id=attendance_id,
+            labour_id=labour_id,
+            date=target_date,
+            status=status.value,
+            marked_by=marked_by,
+            created_at=now
+        )
+        db.add(db_attendance)
+        db.commit()
+        
+        return Attendance(
+            id=attendance_id,
+            labour_id=labour_id,
+            date=target_date,
+            status=status,
+            marked_by=marked_by,
+            marked_at=now
+        )
+    finally:
+        db.close()
+
+
+# ============== SALARY OPERATIONS ==============
+
+def get_salary_records(labour_id: str = None, is_paid: bool = None) -> List[SalaryRecord]:
+    db = get_db_session()
+    try:
+        query = db.query(SalaryDB)
+        
+        if labour_id:
+            query = query.filter(SalaryDB.labour_id == labour_id)
+        if is_paid is not None:
+            query = query.filter(SalaryDB.is_paid == is_paid)
+        
+        records = query.all()
+        return [SalaryRecord(
+            id=r.id,
+            labour_id=r.labour_id,
+            week_start=r.week_start,
+            week_end=r.week_end,
+            days_present=r.days_present,
+            daily_wage=r.daily_wage,
+            total_amount=r.total_amount,
+            is_paid=r.is_paid,
+            paid_date=r.paid_date,
+            paid_by=r.paid_by
+        ) for r in records]
+    finally:
+        db.close()
+
+
+def create_salary_record(labour_id: str, week_start: date, week_end: date,
+                         days_present: float, daily_wage: float) -> SalaryRecord:
+    db = get_db_session()
+    try:
+        total_amount = days_present * daily_wage
+        
+        existing = db.query(SalaryDB).filter(
+            and_(SalaryDB.labour_id == labour_id, SalaryDB.week_end == week_end)
+        ).first()
+        
+        if existing:
+            existing.days_present = days_present
+            existing.daily_wage = daily_wage
+            existing.total_amount = total_amount
+            db.commit()
+            return SalaryRecord(
+                id=existing.id,
+                labour_id=labour_id,
+                week_start=week_start,
+                week_end=week_end,
+                days_present=days_present,
+                daily_wage=daily_wage,
+                total_amount=total_amount,
+                is_paid=existing.is_paid
+            )
+        
+        salary_id = str(uuid.uuid4())[:8]
+        db_salary = SalaryDB(
+            id=salary_id,
+            labour_id=labour_id,
+            week_start=week_start,
+            week_end=week_end,
+            days_present=days_present,
+            daily_wage=daily_wage,
+            total_amount=total_amount,
+            is_paid=False
+        )
+        db.add(db_salary)
+        db.commit()
+        
+        return SalaryRecord(
+            id=salary_id,
+            labour_id=labour_id,
+            week_start=week_start,
+            week_end=week_end,
+            days_present=days_present,
+            daily_wage=daily_wage,
+            total_amount=total_amount,
+            is_paid=False
+        )
+    finally:
+        db.close()
+
+
+def mark_salary_paid(labour_id: str, week_end: date, paid_by: str) -> Optional[SalaryRecord]:
+    db = get_db_session()
+    try:
+        records = db.query(SalaryDB).filter(
+            and_(
+                SalaryDB.labour_id == labour_id,
+                SalaryDB.is_paid == False,
+                SalaryDB.week_end <= week_end
+            )
+        ).all()
+        
+        if not records:
+            return None
+        
+        today = date.today()
+        for record in records:
+            record.is_paid = True
+            record.paid_date = today
+            record.paid_by = paid_by
+        
+        db.commit()
+        
+        latest = records[-1]
+        return SalaryRecord(
+            id=latest.id,
+            labour_id=latest.labour_id,
+            week_start=latest.week_start,
+            week_end=latest.week_end,
+            days_present=latest.days_present,
+            daily_wage=latest.daily_wage,
+            total_amount=latest.total_amount,
+            is_paid=True,
+            paid_date=today,
+            paid_by=paid_by
+        )
+    finally:
+        db.close()
+
+
+# ============== OVERTIME OPERATIONS ==============
+
+def create_overtime(labour_id: str, target_date: date, hours: float, rate_multiplier: float, approved_by: str) -> Overtime:
+    db = get_db_session()
+    try:
+        labour = get_labour(labour_id)
+        if not labour:
+            raise ValueError(f"Labour {labour_id} not found")
+        
+        hourly_rate = labour.daily_wage / 8
+        amount = hours * hourly_rate * rate_multiplier
+        
+        overtime_id = str(uuid.uuid4())[:8]
+        now = datetime.now()
+        
+        db_overtime = OvertimeDB(
+            id=overtime_id,
+            labour_id=labour_id,
+            date=target_date,
+            hours=hours,
+            rate_multiplier=rate_multiplier,
+            created_by=approved_by,
+            created_at=now
+        )
+        db.add(db_overtime)
+        db.commit()
+        
+        return Overtime(
+            id=overtime_id,
+            labour_id=labour_id,
+            date=target_date,
+            hours=hours,
+            rate_multiplier=rate_multiplier,
+            amount=amount,
+            approved_by=approved_by,
+            created_at=now
+        )
+    finally:
+        db.close()
+
+
+def get_overtime_records(labour_id: str = None, start_date: date = None, end_date: date = None) -> List[Overtime]:
+    db = get_db_session()
+    try:
+        query = db.query(OvertimeDB)
+        
+        if labour_id:
+            query = query.filter(OvertimeDB.labour_id == labour_id)
+        if start_date:
+            query = query.filter(OvertimeDB.date >= start_date)
+        if end_date:
+            query = query.filter(OvertimeDB.date <= end_date)
+        
+        records = query.all()
+        result = []
+        for r in records:
+            labour = get_labour(r.labour_id)
+            hourly_rate = labour.daily_wage / 8 if labour else 0
+            amount = r.hours * hourly_rate * r.rate_multiplier
+            result.append(Overtime(
+                id=r.id,
+                labour_id=r.labour_id,
+                date=r.date,
+                hours=r.hours,
+                rate_multiplier=r.rate_multiplier,
+                amount=amount,
+                approved_by=r.created_by,
+                created_at=r.created_at
+            ))
+        return result
+    finally:
+        db.close()
+
+
+# ============== ADVANCE OPERATIONS ==============
+
+def create_advance(labour_id: str, amount: float, reason: str, given_by: str) -> Advance:
+    db = get_db_session()
+    try:
+        advance_id = str(uuid.uuid4())[:8]
+        now = datetime.now()
+        today = date.today()
+        
+        db_advance = AdvanceDB(
+            id=advance_id,
+            labour_id=labour_id,
+            amount=amount,
+            date=today,
+            reason=reason,
+            is_deducted=False,
+            created_by=given_by,
+            created_at=now
+        )
+        db.add(db_advance)
+        db.commit()
+        
+        return Advance(
+            id=advance_id,
+            labour_id=labour_id,
+            amount=amount,
+            date=today,
+            reason=reason,
+            is_deducted=False,
+            deducted_from_week=None,
+            given_by=given_by,
+            created_at=now
+        )
+    finally:
+        db.close()
+
+
+def get_advances(labour_id: str = None, is_deducted: bool = None) -> List[Advance]:
+    db = get_db_session()
+    try:
+        query = db.query(AdvanceDB)
+        
+        if labour_id:
+            query = query.filter(AdvanceDB.labour_id == labour_id)
+        if is_deducted is not None:
+            query = query.filter(AdvanceDB.is_deducted == is_deducted)
+        
+        records = query.all()
+        return [Advance(
+            id=r.id,
+            labour_id=r.labour_id,
+            amount=r.amount,
+            date=r.date,
+            reason=r.reason,
+            is_deducted=r.is_deducted,
+            deducted_from_week=None,
+            given_by=r.created_by,
+            created_at=r.created_at
+        ) for r in records]
+    finally:
+        db.close()
+
+
+def get_pending_advances(labour_id: str) -> float:
+    advances = get_advances(labour_id=labour_id, is_deducted=False)
+    return sum(a.amount for a in advances)
+
+
+# ============== LEAVE OPERATIONS ==============
+
+def create_leave(labour_id: str, leave_type: LeaveType, start_date: date, end_date: date, reason: str = None) -> Leave:
+    db = get_db_session()
+    try:
+        leave_id = str(uuid.uuid4())[:8]
+        now = datetime.now()
+        days = (end_date - start_date).days + 1
+        
+        db_leave = LeaveDB(
+            id=leave_id,
+            labour_id=labour_id,
+            start_date=start_date,
+            end_date=end_date,
+            leave_type=leave_type.value,
+            reason=reason,
+            status=LeaveStatus.PENDING.value,
+            created_at=now
+        )
+        db.add(db_leave)
+        db.commit()
+        
+        return Leave(
+            id=leave_id,
+            labour_id=labour_id,
+            leave_type=leave_type,
+            start_date=start_date,
+            end_date=end_date,
+            days=days,
+            reason=reason,
+            status=LeaveStatus.PENDING,
+            approved_by=None,
+            created_at=now
+        )
+    finally:
+        db.close()
+
+
+def get_leaves(labour_id: str = None, status: LeaveStatus = None) -> List[Leave]:
+    db = get_db_session()
+    try:
+        query = db.query(LeaveDB)
+        
+        if labour_id:
+            query = query.filter(LeaveDB.labour_id == labour_id)
+        if status:
+            query = query.filter(LeaveDB.status == status.value)
+        
+        records = query.all()
+        return [Leave(
+            id=r.id,
+            labour_id=r.labour_id,
+            leave_type=LeaveType(r.leave_type),
+            start_date=r.start_date,
+            end_date=r.end_date,
+            days=(r.end_date - r.start_date).days + 1,
+            reason=r.reason,
+            status=LeaveStatus(r.status),
+            approved_by=r.approved_by,
+            created_at=r.created_at
+        ) for r in records]
+    finally:
+        db.close()
+
+
+def approve_leave(leave_id: str, approved_by: str, approve: bool = True) -> Optional[Leave]:
+    db = get_db_session()
+    try:
+        leave = db.query(LeaveDB).filter(LeaveDB.id == leave_id).first()
+        if not leave:
+            return None
+        
+        new_status = LeaveStatus.APPROVED if approve else LeaveStatus.REJECTED
+        leave.status = new_status.value
+        leave.approved_by = approved_by
+        db.commit()
+        
+        return Leave(
+            id=leave.id,
+            labour_id=leave.labour_id,
+            leave_type=LeaveType(leave.leave_type),
+            start_date=leave.start_date,
+            end_date=leave.end_date,
+            days=(leave.end_date - leave.start_date).days + 1,
+            reason=leave.reason,
+            status=new_status,
+            approved_by=approved_by,
+            created_at=leave.created_at
+        )
+    finally:
+        db.close()
+
+
+# ============== SITE OPERATIONS ==============
+
+def create_site(name: str, address: str = None) -> Site:
+    db = get_db_session()
+    try:
+        site_id = str(uuid.uuid4())[:8]
+        now = datetime.now()
+        
+        db_site = SiteDB(
+            id=site_id,
+            name=name,
+            address=address,
+            is_active=True,
+            created_at=now
+        )
+        db.add(db_site)
+        db.commit()
+        
+        return Site(id=site_id, name=name, address=address, is_active=True, created_at=now)
+    finally:
+        db.close()
+
+
+def get_sites(include_inactive: bool = False) -> List[Site]:
+    db = get_db_session()
+    try:
+        query = db.query(SiteDB)
+        if not include_inactive:
+            query = query.filter(SiteDB.is_active == True)
+        
+        sites = query.all()
+        return [Site(
+            id=s.id,
+            name=s.name,
+            address=s.address,
+            is_active=s.is_active,
+            created_at=s.created_at
+        ) for s in sites]
+    finally:
+        db.close()
+
+
+def get_site(site_id: str) -> Optional[Site]:
+    db = get_db_session()
+    try:
+        site = db.query(SiteDB).filter(SiteDB.id == site_id).first()
+        if not site:
+            return None
+        return Site(
+            id=site.id,
+            name=site.name,
+            address=site.address,
+            is_active=site.is_active,
+            created_at=site.created_at
+        )
+    finally:
+        db.close()
+
+
+def assign_labour_to_site(labour_id: str, site_id: str, assigned_by: str) -> LabourSiteAssignment:
+    db = get_db_session()
+    try:
+        today = date.today()
+        
+        # Remove existing assignment
+        db.query(SiteAssignmentDB).filter(SiteAssignmentDB.labour_id == labour_id).delete()
+        
+        assignment_id = str(uuid.uuid4())[:8]
+        db_assignment = SiteAssignmentDB(
+            id=assignment_id,
+            labour_id=labour_id,
+            site_id=site_id,
+            assigned_date=today,
+            is_active=True
+        )
+        db.add(db_assignment)
+        db.commit()
+        
+        return LabourSiteAssignment(
+            labour_id=labour_id,
+            site_id=site_id,
+            assigned_date=today,
+            assigned_by=assigned_by
+        )
+    finally:
+        db.close()
+
+
+def get_labours_by_site(site_id: str) -> List[str]:
+    db = get_db_session()
+    try:
+        assignments = db.query(SiteAssignmentDB).filter(
+            and_(SiteAssignmentDB.site_id == site_id, SiteAssignmentDB.is_active == True)
+        ).all()
+        return [a.labour_id for a in assignments]
+    finally:
+        db.close()
+
+
+def get_labour_site(labour_id: str) -> Optional[str]:
+    db = get_db_session()
+    try:
+        assignment = db.query(SiteAssignmentDB).filter(
+            and_(SiteAssignmentDB.labour_id == labour_id, SiteAssignmentDB.is_active == True)
+        ).first()
+        return assignment.site_id if assignment else None
+    finally:
+        db.close()
+
+
+# ============== AUDIT LOG OPERATIONS ==============
+
+def create_audit_log(user: str, action: AuditAction, entity_type: str, entity_id: str = None,
+                     old_value: str = None, new_value: str = None, ip_address: str = None) -> AuditLog:
+    db = get_db_session()
+    try:
+        log_id = str(uuid.uuid4())[:8]
+        now = datetime.now()
+        
+        db_log = AuditLogDB(
+            id=log_id,
+            action=action.value,
+            entity_type=entity_type,
+            entity_id=entity_id,
+            user=user,
+            details=new_value,
+            timestamp=now
+        )
+        db.add(db_log)
+        db.commit()
+        
+        return AuditLog(
+            id=log_id,
+            timestamp=now,
+            user=user,
+            action=action,
+            entity_type=entity_type,
+            entity_id=entity_id,
+            old_value=old_value,
+            new_value=new_value,
+            ip_address=ip_address
+        )
+    finally:
+        db.close()
+
+
+def get_audit_logs(user: str = None, action: AuditAction = None, entity_type: str = None,
+                   start_date: datetime = None, end_date: datetime = None, limit: int = 100) -> List[AuditLog]:
+    db = get_db_session()
+    try:
+        query = db.query(AuditLogDB)
+        
+        if user:
+            query = query.filter(AuditLogDB.user == user)
+        if action:
+            query = query.filter(AuditLogDB.action == action.value)
+        if entity_type:
+            query = query.filter(AuditLogDB.entity_type == entity_type)
+        if start_date:
+            query = query.filter(AuditLogDB.timestamp >= start_date)
+        if end_date:
+            query = query.filter(AuditLogDB.timestamp <= end_date)
+        
+        logs = query.order_by(AuditLogDB.timestamp.desc()).limit(limit).all()
+        return [AuditLog(
+            id=l.id,
+            timestamp=l.timestamp,
+            user=l.user,
+            action=AuditAction(l.action),
+            entity_type=l.entity_type,
+            entity_id=l.entity_id,
+            old_value=None,
+            new_value=l.details,
+            ip_address=None
+        ) for l in logs]
+    finally:
+        db.close()
+
+
+# ============== EXPORT OPERATIONS ==============
+
+def export_labours_csv() -> str:
+    labours = get_all_labours(include_inactive=True)
+    if not labours:
+        return "id,name,phone,daily_wage,joined_date,is_active\n"
+    
+    lines = ["id,name,phone,daily_wage,joined_date,is_active"]
+    for l in labours:
+        lines.append(f"{l.id},{l.name},{l.phone or ''},{l.daily_wage},{l.joined_date},{l.is_active}")
+    return "\n".join(lines)
+
+
+def export_attendance_csv() -> str:
+    db = get_db_session()
+    try:
+        records = db.query(AttendanceDB).all()
+        if not records:
+            return "id,labour_id,date,status,marked_by,marked_at\n"
+        
+        lines = ["id,labour_id,date,status,marked_by,marked_at"]
+        for r in records:
+            lines.append(f"{r.id},{r.labour_id},{r.date},{r.status},{r.marked_by or ''},{r.created_at}")
+        return "\n".join(lines)
+    finally:
+        db.close()
+
+
+def export_salary_csv() -> str:
+    records = get_salary_records()
+    if not records:
+        return "id,labour_id,week_start,week_end,days_present,daily_wage,total_amount,is_paid,paid_date,paid_by\n"
+    
+    lines = ["id,labour_id,week_start,week_end,days_present,daily_wage,total_amount,is_paid,paid_date,paid_by"]
+    for r in records:
+        lines.append(f"{r.id},{r.labour_id},{r.week_start},{r.week_end},{r.days_present},{r.daily_wage},{r.total_amount},{r.is_paid},{r.paid_date or ''},{r.paid_by or ''}")
+    return "\n".join(lines)
+
+
+def export_all_data() -> dict:
+    return {
+        "labours": export_labours_csv(),
+        "attendance": export_attendance_csv(),
+        "salary": export_salary_csv()
+    }
+
+
+# ============== INITIALIZATION ==============
+
+def init_db_tables():
+    """Initialize database tables"""
+    from .db_connection import init_db
+    init_db()
