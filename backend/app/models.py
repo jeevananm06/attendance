@@ -118,6 +118,7 @@ class SalaryRecord(BaseModel):
 class SalaryPayment(BaseModel):
     labour_id: str
     week_end: date  # Friday of the week
+    amount_paid: Optional[float] = None  # None = pay full amount; otherwise partial
 
 
 class LabourStats(BaseModel):

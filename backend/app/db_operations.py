@@ -496,7 +496,7 @@ def create_salary_record(labour_id: str, week_start: date, week_end: date,
         db.close()
 
 
-def mark_salary_paid(labour_id: str, week_end: date, paid_by: str) -> Optional[SalaryRecord]:
+def mark_salary_paid(labour_id: str, week_end: date, paid_by: str, amount_paid: float = None) -> Optional[dict]:
     db = get_db_session()
     try:
         records = db.query(SalaryDB).filter(
@@ -505,32 +505,46 @@ def mark_salary_paid(labour_id: str, week_end: date, paid_by: str) -> Optional[S
                 SalaryDB.is_paid == False,
                 SalaryDB.week_end <= week_end
             )
-        ).all()
-        
+        ).order_by(SalaryDB.week_end).all()
+
         if not records:
             return None
-        
+
         today = date.today()
+        total_due = sum(r.total_amount for r in records)
+
+        # Full payment
+        if amount_paid is None or amount_paid >= total_due:
+            for record in records:
+                record.is_paid = True
+                record.paid_date = today
+                record.paid_by = paid_by
+            db.commit()
+            return {
+                "weeks_paid": len(records),
+                "amount_paid": total_due,
+                "remaining": 0.0,
+            }
+
+        # Partial payment — mark whole weeks oldest-first until budget runs out
+        remaining_budget = amount_paid
+        weeks_paid = 0
         for record in records:
-            record.is_paid = True
-            record.paid_date = today
-            record.paid_by = paid_by
-        
+            if remaining_budget >= record.total_amount:
+                record.is_paid = True
+                record.paid_date = today
+                record.paid_by = paid_by
+                remaining_budget -= record.total_amount
+                weeks_paid += 1
+            else:
+                break
+
         db.commit()
-        
-        latest = records[-1]
-        return SalaryRecord(
-            id=latest.id,
-            labour_id=latest.labour_id,
-            week_start=latest.week_start,
-            week_end=latest.week_end,
-            days_present=latest.days_present,
-            daily_wage=latest.daily_wage,
-            total_amount=latest.total_amount,
-            is_paid=True,
-            paid_date=today,
-            paid_by=paid_by
-        )
+        return {
+            "weeks_paid": weeks_paid,
+            "amount_paid": amount_paid - remaining_budget,
+            "remaining": total_due - (amount_paid - remaining_budget),
+        }
     finally:
         db.close()
 

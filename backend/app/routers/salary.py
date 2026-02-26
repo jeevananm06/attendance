@@ -150,30 +150,40 @@ async def pay_salary(
     payment: SalaryPayment,
     current_user: User = Depends(get_current_manager_or_admin)
 ):
-    """Mark salary as paid for a labour up to a specific week"""
+    """Mark salary as paid for a labour up to a specific week.
+    If amount_paid is provided and less than total due, marks oldest weeks paid first."""
     labour = get_labour(payment.labour_id)
     if not labour:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Labour with id {payment.labour_id} not found"
         )
-    
+
+    if payment.amount_paid is not None and payment.amount_paid <= 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="amount_paid must be greater than 0"
+        )
+
     result = mark_salary_paid(
         labour_id=payment.labour_id,
         week_end=payment.week_end,
-        paid_by=current_user.username
+        paid_by=current_user.username,
+        amount_paid=payment.amount_paid
     )
-    
+
     if not result:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="No unpaid salary records found for this period"
         )
-    
+
     return {
         "message": f"Salary paid for {labour.name}",
         "paid_by": current_user.username,
-        "record": result
+        "weeks_paid": result["weeks_paid"],
+        "amount_paid": result["amount_paid"],
+        "remaining": result["remaining"],
     }
 
 

@@ -23,6 +23,8 @@ const Salary = () => {
   const [success, setSuccess] = useState('');
   const [expandedLabour, setExpandedLabour] = useState(null);
   const [payingLabour, setPayingLabour] = useState(null);
+  const [payPanel, setPayPanel] = useState(null); // { labourId, weekEnd, total }
+  const [payAmount, setPayAmount] = useState('');
 
   useEffect(() => {
     fetchData();
@@ -76,13 +78,25 @@ const Salary = () => {
     }
   };
 
-  const handlePay = async (labourId, weekEnd) => {
+  const openPayPanel = (labour) => {
+    setPayPanel({ labourId: labour.labour_id, weekEnd: getLatestWeekEnd(labour.records), total: labour.total_pending });
+    setPayAmount(String(labour.total_pending));
+  };
+
+  const closePayPanel = () => { setPayPanel(null); setPayAmount(''); };
+
+  const handlePay = async () => {
+    const { labourId, weekEnd, total } = payPanel;
+    const entered = parseFloat(payAmount);
+    if (isNaN(entered) || entered <= 0) { setError('Enter a valid amount'); return; }
     try {
       setPayingLabour(labourId);
       setError('');
-      await salaryAPI.pay(labourId, weekEnd);
-      setSuccess('Salary paid successfully!');
-      setTimeout(() => setSuccess(''), 3000);
+      const res = await salaryAPI.pay(labourId, weekEnd, entered >= total ? null : entered);
+      const { amount_paid, remaining, weeks_paid } = res.data;
+      setSuccess(`Paid ₹${amount_paid.toLocaleString()} (${weeks_paid} week${weeks_paid !== 1 ? 's' : ''})${ remaining > 0 ? ` · ₹${remaining.toLocaleString()} still pending` : ' · fully cleared'}`);
+      setTimeout(() => setSuccess(''), 5000);
+      closePayPanel();
       fetchData(true);
     } catch (err) {
       setError(err.response?.data?.detail || 'Failed to pay salary');
@@ -237,7 +251,7 @@ const Salary = () => {
                         </tbody>
                       </table>
 
-                      <div className="flex gap-3">
+                      <div className="flex gap-3 flex-wrap">
                         <button
                           onClick={() => handleCalculateOne(labour.labour_id)}
                           className="btn-secondary flex items-center gap-2"
@@ -246,20 +260,59 @@ const Salary = () => {
                           Recalculate
                         </button>
                         {labour.total_pending > 0 && (
-                          <button
-                            onClick={() =>
-                              handlePay(labour.labour_id, getLatestWeekEnd(labour.records))
-                            }
-                            disabled={payingLabour === labour.labour_id}
-                            className="btn-success flex items-center gap-2"
-                          >
-                            {payingLabour === labour.labour_id ? (
-                              <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                            ) : (
+                          payPanel?.labourId === labour.labour_id ? (
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <div className="flex flex-col">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-sm text-gray-600">₹</span>
+                                  <input
+                                    type="number"
+                                    min="1"
+                                    max={labour.total_pending}
+                                    value={payAmount}
+                                    onChange={(e) => setPayAmount(e.target.value)}
+                                    className="w-32 border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                    autoFocus
+                                  />
+                                  <button
+                                    onClick={handlePay}
+                                    disabled={payingLabour === labour.labour_id}
+                                    className="btn-success flex items-center gap-1.5"
+                                  >
+                                    {payingLabour === labour.labour_id ? (
+                                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                    ) : (
+                                      <CreditCard size={16} />
+                                    )}
+                                    Confirm Pay
+                                  </button>
+                                  <button onClick={closePayPanel} className="text-gray-400 hover:text-gray-600">
+                                    <X size={18} />
+                                  </button>
+                                </div>
+                                {(() => {
+                                  const entered = parseFloat(payAmount);
+                                  const remaining = isNaN(entered) ? labour.total_pending : Math.max(0, labour.total_pending - entered);
+                                  const color = remaining === 0 ? 'text-green-600' : 'text-orange-500';
+                                  return (
+                                    <p className={`text-xs mt-1 ml-5 font-medium ${color}`}>
+                                      {remaining === 0
+                                        ? '✓ Full payment — all weeks cleared'
+                                        : `₹${remaining.toLocaleString()} will remain pending`}
+                                    </p>
+                                  );
+                                })()}
+                              </div>
+                            </div>
+                          ) : (
+                            <button
+                              onClick={() => openPayPanel(labour)}
+                              className="btn-success flex items-center gap-2"
+                            >
                               <CreditCard size={18} />
-                            )}
-                            Pay ₹{labour.total_pending.toLocaleString()}
-                          </button>
+                              Pay ₹{labour.total_pending.toLocaleString()}
+                            </button>
+                          )
                         )}
                       </div>
                     </>

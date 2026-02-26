@@ -74,7 +74,7 @@ async def fill_month_attendance(
     labour_id: str,
     year: int,
     month: int,
-    status: AttendanceStatus = AttendanceStatus.present,
+    status: AttendanceStatus = AttendanceStatus.PRESENT,
     skip_sundays: bool = True,
     overwrite: bool = False,
     current_user: User = Depends(get_current_manager_or_admin)
@@ -83,7 +83,7 @@ async def fill_month_attendance(
     If overwrite=False (default), only fills dates that have no record yet."""
     labour = get_labour(labour_id)
     if not labour:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Labour not found")
+        raise HTTPException(status_code=404, detail="Labour not found")
 
     _, days_in_month = calendar.monthrange(year, month)
     existing_records = get_attendance_by_labour(

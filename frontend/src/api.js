@@ -148,10 +148,12 @@ export const salaryAPI = {
     if (weekEnd) url += `?week_end=${weekEnd}`;
     return api.post(url);
   },
-  pay: (labourId, weekEnd) => {
+  pay: (labourId, weekEnd, amountPaid = null) => {
     invalidateCache('salary:pending:all', `salary:pending:${labourId}`, 'salary:summary');
     invalidateCache(...Object.keys(_cache).filter((k) => k.startsWith('salary:records:')));
-    return api.post('/salary/pay', { labour_id: labourId, week_end: weekEnd });
+    const body = { labour_id: labourId, week_end: weekEnd };
+    if (amountPaid !== null) body.amount_paid = amountPaid;
+    return api.post('/salary/pay', body);
   },
   getSummary: () =>
     cached('salary:summary', () => api.get('/salary/summary'), 60_000),
