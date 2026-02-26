@@ -74,7 +74,8 @@ async def get_all_pending_salaries(
                 "records": []
             }
         else:
-            total_pending = sum(r.total_amount for r in unpaid)
+            # Calculate remaining = total_amount - paid_amount for each week
+            total_pending = sum(r.total_amount - r.paid_amount for r in unpaid)
             sorted_unpaid = sorted(unpaid, key=lambda x: x.week_end)
             pending = {
                 "labour_id": labour.id,
@@ -87,7 +88,9 @@ async def get_all_pending_salaries(
                         "week_start": r.week_start.isoformat(),
                         "week_end": r.week_end.isoformat(),
                         "days_present": r.days_present,
-                        "amount": r.total_amount
+                        "amount": r.total_amount - r.paid_amount,  # Show remaining, not total
+                        "total_amount": r.total_amount,
+                        "paid_amount": r.paid_amount
                     }
                     for r in sorted_unpaid
                 ]

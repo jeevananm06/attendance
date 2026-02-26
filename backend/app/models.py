@@ -110,6 +110,7 @@ class SalaryRecord(BaseModel):
     days_present: float
     daily_wage: float
     total_amount: float
+    paid_amount: float = 0.0  # Tracks partial payments
     is_paid: bool = False
     paid_date: Optional[date] = None
     paid_by: Optional[str] = None

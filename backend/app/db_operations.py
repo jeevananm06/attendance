@@ -266,6 +266,7 @@ def get_salary_records_bulk(labour_ids: List[str]) -> dict:
                 days_present=r.days_present,
                 daily_wage=r.daily_wage,
                 total_amount=r.total_amount,
+                paid_amount=r.paid_amount or 0.0,
                 is_paid=r.is_paid,
                 paid_date=r.paid_date,
                 paid_by=r.paid_by
@@ -418,6 +419,7 @@ def get_salary_records(labour_id: str = None, is_paid: bool = None) -> List[Sala
             days_present=r.days_present,
             daily_wage=r.daily_wage,
             total_amount=r.total_amount,
+            paid_amount=r.paid_amount or 0.0,
             is_paid=r.is_paid,
             paid_date=r.paid_date,
             paid_by=r.paid_by
@@ -511,11 +513,13 @@ def mark_salary_paid(labour_id: str, week_end: date, paid_by: str, amount_paid: 
             return None
 
         today = date.today()
-        total_due = sum(r.total_amount for r in records)
+        # Calculate total still owed (total_amount - paid_amount for each record)
+        total_due = sum(r.total_amount - (r.paid_amount or 0) for r in records)
 
         # Full payment
         if amount_paid is None or amount_paid >= total_due:
             for record in records:
+                record.paid_amount = record.total_amount
                 record.is_paid = True
                 record.paid_date = today
                 record.paid_by = paid_by
@@ -526,33 +530,34 @@ def mark_salary_paid(labour_id: str, week_end: date, paid_by: str, amount_paid: 
                 "remaining": 0.0,
             }
 
-        # Partial payment — mark whole weeks oldest-first until budget runs out
-        # If amount doesn't cover even one full week, still mark the oldest week paid
-        # (employer paid part of it; remaining balance tracked as difference)
+        # Partial payment — allocate to oldest weeks first
         remaining_budget = amount_paid
         weeks_paid = 0
         for record in records:
-            if remaining_budget >= record.total_amount:
+            week_remaining = record.total_amount - (record.paid_amount or 0)
+            if remaining_budget >= week_remaining:
+                # Fully pay this week
+                record.paid_amount = record.total_amount
                 record.is_paid = True
                 record.paid_date = today
                 record.paid_by = paid_by
-                remaining_budget -= record.total_amount
+                remaining_budget -= week_remaining
                 weeks_paid += 1
-            else:
-                # Pay the oldest unpaid week regardless (partial week payment)
-                record.is_paid = True
-                record.paid_date = today
+            elif remaining_budget > 0:
+                # Partial payment toward this week — don't mark as paid
+                record.paid_amount = (record.paid_amount or 0) + remaining_budget
                 record.paid_by = paid_by
-                weeks_paid += 1
                 remaining_budget = 0
+                break
+            else:
                 break
 
         db.commit()
-        actual_paid = amount_paid
+        actual_paid = amount_paid - remaining_budget
         return {
             "weeks_paid": weeks_paid,
             "amount_paid": actual_paid,
-            "remaining": max(0.0, total_due - actual_paid),
+            "remaining": total_due - actual_paid,
         }
     finally:
         db.close()

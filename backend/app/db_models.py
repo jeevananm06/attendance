@@ -89,6 +89,7 @@ class SalaryDB(Base):
     days_present = Column(Float, default=0.0)
     daily_wage = Column(Float, nullable=False)
     total_amount = Column(Float, default=0.0)
+    paid_amount = Column(Float, default=0.0)  # Tracks partial payments
     is_paid = Column(Boolean, default=False)
     paid_date = Column(Date, nullable=True)
     paid_by = Column(String(100), nullable=True)
