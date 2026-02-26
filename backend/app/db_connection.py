@@ -26,7 +26,15 @@ connect_args = {}
 if "supabase" in DATABASE_URL or "render.com" in DATABASE_URL:
     connect_args["sslmode"] = "require"
 
-engine = create_engine(DATABASE_URL, pool_pre_ping=True, connect_args=connect_args)
+engine = create_engine(
+    DATABASE_URL,
+    pool_pre_ping=True,
+    pool_size=5,
+    max_overflow=10,
+    pool_timeout=30,
+    pool_recycle=300,       # recycle connections every 5 min to avoid stale SSL
+    connect_args=connect_args,
+)
 
 # Create session factory
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
