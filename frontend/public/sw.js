@@ -50,16 +50,14 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Skip API requests from caching (always fetch fresh)
-  if (url.pathname.startsWith('/api') || url.origin !== location.origin) {
-    event.respondWith(
-      fetch(request).catch(() => {
-        return new Response(JSON.stringify({ error: 'Offline' }), {
-          status: 503,
-          headers: { 'Content-Type': 'application/json' }
-        });
-      })
-    );
+  // Skip cross-origin requests entirely (API calls to Render backend, etc.)
+  // Do NOT call event.respondWith — let the browser handle them natively
+  if (url.origin !== location.origin) {
+    return;
+  }
+
+  // Skip same-origin API routes from caching
+  if (url.pathname.startsWith('/api')) {
     return;
   }
 
