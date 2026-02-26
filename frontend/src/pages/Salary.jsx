@@ -23,6 +23,7 @@ const Salary = () => {
   const [success, setSuccess] = useState('');
   const [expandedLabour, setExpandedLabour] = useState(null);
   const [payingLabour, setPayingLabour] = useState(null);
+  const [calculatingLabour, setCalculatingLabour] = useState(null);
   const [payPanel, setPayPanel] = useState(null); // { labourId, weekEnd, total }
   const [payAmount, setPayAmount] = useState('');
 
@@ -68,6 +69,7 @@ const Salary = () => {
 
   const handleCalculateOne = async (labourId) => {
     try {
+      setCalculatingLabour(labourId);
       setError('');
       await salaryAPI.calculate(labourId);
       setSuccess('Salary calculated successfully!');
@@ -75,6 +77,8 @@ const Salary = () => {
       fetchData(true);
     } catch (err) {
       setError(err.response?.data?.detail || 'Failed to calculate salary');
+    } finally {
+      setCalculatingLabour(null);
     }
   };
 
@@ -254,9 +258,14 @@ const Salary = () => {
                       <div className="flex gap-3 flex-wrap">
                         <button
                           onClick={() => handleCalculateOne(labour.labour_id)}
+                          disabled={calculatingLabour === labour.labour_id}
                           className="btn-secondary flex items-center gap-2"
                         >
-                          <Calculator size={18} />
+                          {calculatingLabour === labour.labour_id ? (
+                            <div className="w-4 h-4 border-2 border-gray-500 border-t-transparent rounded-full animate-spin" />
+                          ) : (
+                            <Calculator size={18} />
+                          )}
                           Recalculate
                         </button>
                         {labour.total_pending > 0 && (

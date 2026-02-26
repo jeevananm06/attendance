@@ -75,7 +75,7 @@ async def fill_month_attendance(
     year: int,
     month: int,
     status: AttendanceStatus = AttendanceStatus.PRESENT,
-    skip_sundays: bool = True,
+    skip_sundays: bool = False,
     overwrite: bool = False,
     current_user: User = Depends(get_current_manager_or_admin)
 ):

@@ -527,6 +527,8 @@ def mark_salary_paid(labour_id: str, week_end: date, paid_by: str, amount_paid: 
             }
 
         # Partial payment — mark whole weeks oldest-first until budget runs out
+        # If amount doesn't cover even one full week, still mark the oldest week paid
+        # (employer paid part of it; remaining balance tracked as difference)
         remaining_budget = amount_paid
         weeks_paid = 0
         for record in records:
@@ -537,13 +539,20 @@ def mark_salary_paid(labour_id: str, week_end: date, paid_by: str, amount_paid: 
                 remaining_budget -= record.total_amount
                 weeks_paid += 1
             else:
+                # Pay the oldest unpaid week regardless (partial week payment)
+                record.is_paid = True
+                record.paid_date = today
+                record.paid_by = paid_by
+                weeks_paid += 1
+                remaining_budget = 0
                 break
 
         db.commit()
+        actual_paid = amount_paid
         return {
             "weeks_paid": weeks_paid,
-            "amount_paid": amount_paid - remaining_budget,
-            "remaining": total_due - (amount_paid - remaining_budget),
+            "amount_paid": actual_paid,
+            "remaining": max(0.0, total_due - actual_paid),
         }
     finally:
         db.close()
