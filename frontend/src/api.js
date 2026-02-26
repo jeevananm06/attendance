@@ -2,6 +2,34 @@ import axios from 'axios';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
+// ─── Simple in-memory cache with TTL ────────────────────────────────────────
+const _cache = {};
+
+function cacheGet(key) {
+  const entry = _cache[key];
+  if (!entry) return null;
+  if (Date.now() > entry.expiresAt) { delete _cache[key]; return null; }
+  return entry.promise;
+}
+
+function cacheSet(key, promise, ttlMs) {
+  _cache[key] = { promise, expiresAt: Date.now() + ttlMs };
+  promise.catch(() => delete _cache[key]);
+  return promise;
+}
+
+export function invalidateCache(...keys) {
+  if (keys.length === 0) { Object.keys(_cache).forEach((k) => delete _cache[k]); return; }
+  keys.forEach((k) => delete _cache[k]);
+}
+
+function cached(key, fn, ttlMs) {
+  const hit = cacheGet(key);
+  if (hit) return hit;
+  return cacheSet(key, fn(), ttlMs);
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
 const api = axios.create({
   baseURL: API_BASE_URL,
   headers: {
@@ -23,6 +51,7 @@ api.interceptors.response.use(
     if (error.response?.status === 401) {
       localStorage.removeItem('token');
       localStorage.removeItem('user');
+      invalidateCache();
       window.location.href = '/login';
     }
     return Promise.reject(error);
@@ -45,65 +74,98 @@ export const authAPI = {
 };
 
 export const laboursAPI = {
-  getAll: (includeInactive = false) => api.get(`/labours/?include_inactive=${includeInactive}`),
-  getById: (id) => api.get(`/labours/${id}`),
-  create: (data) => api.post('/labours/', data),
-  update: (id, data) => api.put(`/labours/${id}`, data),
-  delete: (id) => api.delete(`/labours/${id}`),
+  getAll: (includeInactive = false) =>
+    includeInactive
+      ? api.get(`/labours/?include_inactive=true`)
+      : cached('labours:all', () => api.get('/labours/?include_inactive=false'), 60_000),
+  getById: (id) => cached(`labours:${id}`, () => api.get(`/labours/${id}`), 60_000),
+  create: (data) => { invalidateCache('labours:all'); return api.post('/labours/', data); },
+  update: (id, data) => { invalidateCache('labours:all', `labours:${id}`); return api.put(`/labours/${id}`, data); },
+  delete: (id) => { invalidateCache('labours:all', `labours:${id}`); return api.delete(`/labours/${id}`); },
 };
 
 export const attendanceAPI = {
-  getByDate: (date) => api.get(`/attendance/date/${date}`),
+  getByDate: (date) =>
+    cached(`attendance:date:${date}`, () => api.get(`/attendance/date/${date}`), 30_000),
   getByLabour: (labourId, startDate, endDate) => {
-    let url = `/attendance/labour/${labourId}`;
-    const params = [];
-    if (startDate) params.push(`start_date=${startDate}`);
-    if (endDate) params.push(`end_date=${endDate}`);
-    if (params.length) url += `?${params.join('&')}`;
-    return api.get(url);
+    const key = `attendance:labour:${labourId}:${startDate}:${endDate}`;
+    return cached(key, () => {
+      let url = `/attendance/labour/${labourId}`;
+      const params = [];
+      if (startDate) params.push(`start_date=${startDate}`);
+      if (endDate) params.push(`end_date=${endDate}`);
+      if (params.length) url += `?${params.join('&')}`;
+      return api.get(url);
+    }, 60_000);
   },
-  markSingle: (data) => api.post('/attendance/', data),
-  markBulk: (data) => api.post('/attendance/bulk', data),
-  getToday: () => api.get('/attendance/today'),
+  markSingle: (data) => {
+    invalidateCache(`attendance:date:${data.date}`, 'attendance:today');
+    invalidateCache(...Object.keys(_cache).filter((k) => k.startsWith(`attendance:labour:${data.labour_id}`)));
+    return api.post('/attendance/', data);
+  },
+  markBulk: (data) => {
+    invalidateCache(`attendance:date:${data.date}`, 'attendance:today');
+    (data.records || []).forEach((r) => {
+      invalidateCache(...Object.keys(_cache).filter((k) => k.startsWith(`attendance:labour:${r.labour_id}`)));
+    });
+    return api.post('/attendance/bulk', data);
+  },
+  getToday: () => cached('attendance:today', () => api.get('/attendance/today'), 30_000),
 };
 
 export const salaryAPI = {
   getRecords: (labourId, isPaid) => {
-    let url = '/salary/records';
-    const params = [];
-    if (labourId) params.push(`labour_id=${labourId}`);
-    if (isPaid !== undefined) params.push(`is_paid=${isPaid}`);
-    if (params.length) url += `?${params.join('&')}`;
-    return api.get(url);
+    const key = `salary:records:${labourId}:${isPaid}`;
+    return cached(key, () => {
+      let url = '/salary/records';
+      const params = [];
+      if (labourId) params.push(`labour_id=${labourId}`);
+      if (isPaid !== undefined) params.push(`is_paid=${isPaid}`);
+      if (params.length) url += `?${params.join('&')}`;
+      return api.get(url);
+    }, 30_000);
   },
-  getPending: (labourId) => api.get(`/salary/pending/${labourId}`),
-  getAllPending: () => api.get('/salary/pending'),
+  getPending: (labourId) =>
+    cached(`salary:pending:${labourId}`, () => api.get(`/salary/pending/${labourId}`), 30_000),
+  getAllPending: () =>
+    cached('salary:pending:all', () => api.get('/salary/pending'), 30_000),
   calculate: (labourId, weekEnd) => {
+    invalidateCache('salary:pending:all', `salary:pending:${labourId}`, 'salary:summary');
+    invalidateCache(...Object.keys(_cache).filter((k) => k.startsWith('salary:records:')));
     let url = `/salary/calculate/${labourId}`;
     if (weekEnd) url += `?week_end=${weekEnd}`;
     return api.post(url);
   },
   calculateAll: (weekEnd) => {
+    invalidateCache(...Object.keys(_cache).filter((k) => k.startsWith('salary:')));
     let url = '/salary/calculate-all';
     if (weekEnd) url += `?week_end=${weekEnd}`;
     return api.post(url);
   },
-  pay: (labourId, weekEnd) => api.post('/salary/pay', { labour_id: labourId, week_end: weekEnd }),
-  getSummary: () => api.get('/salary/summary'),
+  pay: (labourId, weekEnd) => {
+    invalidateCache('salary:pending:all', `salary:pending:${labourId}`, 'salary:summary');
+    invalidateCache(...Object.keys(_cache).filter((k) => k.startsWith('salary:records:')));
+    return api.post('/salary/pay', { labour_id: labourId, week_end: weekEnd });
+  },
+  getSummary: () =>
+    cached('salary:summary', () => api.get('/salary/summary'), 60_000),
 };
 
 export const statsAPI = {
   getLabourStats: (labourId, startDate, endDate) => {
-    let url = `/stats/labour/${labourId}`;
-    const params = [];
-    if (startDate) params.push(`start_date=${startDate}`);
-    if (endDate) params.push(`end_date=${endDate}`);
-    if (params.length) url += `?${params.join('&')}`;
-    return api.get(url);
+    const key = `stats:labour:${labourId}:${startDate}:${endDate}`;
+    return cached(key, () => {
+      let url = `/stats/labour/${labourId}`;
+      const params = [];
+      if (startDate) params.push(`start_date=${startDate}`);
+      if (endDate) params.push(`end_date=${endDate}`);
+      if (params.length) url += `?${params.join('&')}`;
+      return api.get(url);
+    }, 60_000);
   },
-  getOverview: () => api.get('/stats/overview'),
-  getWeekly: (weeks = 4) => api.get(`/stats/weekly?weeks=${weeks}`),
-  getAllLabourStats: () => api.get('/stats/all-labours'),
+  getOverview: () => cached('stats:overview', () => api.get('/stats/overview'), 60_000),
+  getWeekly: (weeks = 4) => cached(`stats:weekly:${weeks}`, () => api.get(`/stats/weekly?weeks=${weeks}`), 60_000),
+  getAllLabourStats: () => cached('stats:all-labours', () => api.get('/stats/all-labours'), 60_000),
 };
 
 export const exportAPI = {
