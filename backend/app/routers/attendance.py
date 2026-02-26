@@ -46,7 +46,8 @@ async def mark_single_attendance(
         labour_id=attendance_data.labour_id,
         target_date=attendance_data.date,
         status=attendance_data.status,
-        marked_by=current_user.username
+        marked_by=current_user.username,
+        comment=attendance_data.comment
     )
 
 
@@ -62,7 +63,8 @@ async def mark_bulk_attendance(
             labour_id=record["labour_id"],
             target_date=bulk_data.date,
             status=AttendanceStatus(record["status"]),
-            marked_by=current_user.username
+            marked_by=current_user.username,
+            comment=record.get("comment")
         )
         results.append(attendance)
     return results

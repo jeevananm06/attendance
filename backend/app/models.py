@@ -87,6 +87,7 @@ class Attendance(BaseModel):
     labour_id: str
     date: date
     status: AttendanceStatus
+    comment: Optional[str] = None
     marked_by: str
     marked_at: datetime
 
@@ -95,11 +96,12 @@ class AttendanceCreate(BaseModel):
     labour_id: str
     date: date
     status: AttendanceStatus
+    comment: Optional[str] = None
 
 
 class AttendanceBulkCreate(BaseModel):
     date: date
-    records: List[dict]  # [{labour_id: str, status: AttendanceStatus}]
+    records: List[dict]  # [{labour_id: str, status: AttendanceStatus, comment?: str}]
 
 
 class SalaryRecord(BaseModel):

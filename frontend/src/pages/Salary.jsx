@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { salaryAPI, laboursAPI } from '../api';
 import {
   Wallet,
@@ -26,6 +26,9 @@ const Salary = () => {
   const [calculatingLabour, setCalculatingLabour] = useState(null);
   const [payPanel, setPayPanel] = useState(null); // { labourId, weekEnd, total }
   const [payAmount, setPayAmount] = useState('');
+  const [refreshing, setRefreshing] = useState(false);
+  const touchStartY = useRef(0);
+  const containerRef = useRef(null);
 
   useEffect(() => {
     fetchData();
@@ -49,7 +52,21 @@ const Salary = () => {
       console.error(err);
     } finally {
       if (!silent) setLoading(false);
+      setRefreshing(false);
     }
+  };
+
+  const handlePullToRefresh = () => {
+    if (refreshing) return;
+    setRefreshing(true);
+    fetchData(true);
+  };
+
+  const handleTouchStart = (e) => { touchStartY.current = e.touches[0].clientY; };
+  const handleTouchMove = (e) => {
+    if (containerRef.current?.scrollTop > 0) return;
+    const diff = e.touches[0].clientY - touchStartY.current;
+    if (diff > 80) handlePullToRefresh();
   };
 
   const handleCalculateAll = async () => {
@@ -123,7 +140,17 @@ const Salary = () => {
   }
 
   return (
-    <div className="space-y-6">
+    <div
+      className="space-y-6"
+      ref={containerRef}
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+    >
+      {refreshing && (
+        <div className="flex justify-center py-2">
+          <div className="w-5 h-5 border-2 border-primary-600 border-t-transparent rounded-full animate-spin" />
+        </div>
+      )}
       {error && (
         <div className="p-4 bg-red-50 border border-red-200 rounded-lg flex items-center gap-3 text-red-700">
           <AlertCircle size={20} />
@@ -330,8 +357,14 @@ const Salary = () => {
                       <p>No pending salary records</p>
                       <button
                         onClick={() => handleCalculateOne(labour.labour_id)}
-                        className="btn-secondary mt-2"
+                        disabled={calculatingLabour === labour.labour_id}
+                        className="btn-secondary mt-2 flex items-center gap-2 mx-auto"
                       >
+                        {calculatingLabour === labour.labour_id ? (
+                          <div className="w-4 h-4 border-2 border-gray-500 border-t-transparent rounded-full animate-spin" />
+                        ) : (
+                          <Calculator size={18} />
+                        )}
                         Calculate Salary
                       </button>
                     </div>

@@ -72,6 +72,7 @@ class AttendanceDB(Base):
     labour_id = Column(String(36), ForeignKey("labours.id"), nullable=False)
     date = Column(Date, nullable=False)
     status = Column(String(20), default="present")
+    comment = Column(String(500), nullable=True)
     marked_by = Column(String(100), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     

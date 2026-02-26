@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { attendanceAPI, laboursAPI } from '../api';
 import {
   Calendar,
@@ -198,16 +198,23 @@ const MonthlyLabourCard = ({ labour, year, month }) => {
   );
 };
 
+const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+const DAY_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
 const Attendance = () => {
   const [view, setView] = useState('daily');
 
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [labours, setLabours] = useState([]);
   const [attendance, setAttendance] = useState({});
+  const [comments, setComments] = useState({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [refreshing, setRefreshing] = useState(false);
+  const touchStartY = useRef(0);
+  const containerRef = useRef(null);
 
   const now = new Date();
   const [selectedYear, setSelectedYear] = useState(now.getFullYear());
@@ -230,22 +237,42 @@ const Attendance = () => {
     }
   };
 
-  const fetchDailyData = async () => {
+  const fetchDailyData = async (silent = false) => {
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
       const [laboursRes, attendanceRes] = await Promise.all([
         laboursAPI.getAll(),
         attendanceAPI.getByDate(selectedDate)
       ]);
       setLabours([...laboursRes.data].sort((a, b) => a.name.localeCompare(b.name)));
-      const map = {};
-      attendanceRes.data.forEach((r) => { map[r.labour_id] = r.status; });
-      setAttendance(map);
+      const statusMap = {};
+      const commentMap = {};
+      attendanceRes.data.forEach((r) => {
+        statusMap[r.labour_id] = r.status;
+        if (r.comment) commentMap[r.labour_id] = r.comment;
+      });
+      setAttendance(statusMap);
+      setComments(commentMap);
     } catch (err) {
       setError('Failed to load data');
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
+      setRefreshing(false);
     }
+  };
+
+  const handlePullToRefresh = () => {
+    if (refreshing) return;
+    setRefreshing(true);
+    if (view === 'daily') fetchDailyData(true);
+    else fetchLaboursOnly();
+  };
+
+  const handleTouchStart = (e) => { touchStartY.current = e.touches[0].clientY; };
+  const handleTouchMove = (e) => {
+    if (containerRef.current?.scrollTop > 0) return;
+    const diff = e.touches[0].clientY - touchStartY.current;
+    if (diff > 80) handlePullToRefresh();
   };
 
   const handleStatusChange = (labourId, status) => {
@@ -255,13 +282,17 @@ const Attendance = () => {
     }));
   };
 
+  const handleCommentChange = (labourId, comment) => {
+    setComments((prev) => ({ ...prev, [labourId]: comment }));
+  };
+
   const handleSaveAll = async () => {
     try {
       setSaving(true);
       setError('');
       const records = Object.entries(attendance)
         .filter(([_, s]) => s)
-        .map(([labour_id, status]) => ({ labour_id, status }));
+        .map(([labour_id, status]) => ({ labour_id, status, comment: comments[labour_id] || null }));
       if (records.length === 0) { setError('No attendance marked'); return; }
       await attendanceAPI.markBulk({ date: selectedDate, records });
       setSuccess('Attendance saved successfully!');
@@ -283,6 +314,11 @@ const Attendance = () => {
     const map = {};
     labours.forEach((l) => { map[l.id] = 'present'; });
     setAttendance(map);
+  };
+
+  const getSelectedDayName = () => {
+    const d = new Date(selectedDate);
+    return DAY_NAMES[d.getDay()];
   };
 
   const changeMonth = (delta) => {
@@ -313,7 +349,17 @@ const Attendance = () => {
   }
 
   return (
-    <div className="space-y-6">
+    <div
+      className="space-y-6"
+      ref={containerRef}
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+    >
+      {refreshing && (
+        <div className="flex justify-center py-2">
+          <div className="w-5 h-5 border-2 border-primary-600 border-t-transparent rounded-full animate-spin" />
+        </div>
+      )}
       {error && (
         <div className="p-4 bg-red-50 border border-red-200 rounded-lg flex items-center gap-3 text-red-700">
           <AlertCircle size={20} /><span>{error}</span>
@@ -354,14 +400,17 @@ const Attendance = () => {
                 <button onClick={() => changeDate(-1)} className="p-2 hover:bg-gray-100 rounded-lg">
                   <ChevronLeft size={22} />
                 </button>
-                <div className="flex items-center gap-2">
-                  <Calendar className="text-primary-600" size={20} />
-                  <input
-                    type="date"
-                    value={selectedDate}
-                    onChange={(e) => setSelectedDate(e.target.value)}
-                    className="input w-auto"
-                  />
+                <div className="flex flex-col items-center">
+                  <div className="flex items-center gap-2">
+                    <Calendar className="text-primary-600" size={20} />
+                    <input
+                      type="date"
+                      value={selectedDate}
+                      onChange={(e) => setSelectedDate(e.target.value)}
+                      className="input w-auto"
+                    />
+                  </div>
+                  <span className="text-xs text-gray-500 font-medium">{getSelectedDayName()}</span>
                 </div>
                 <button onClick={() => changeDate(1)} className="p-2 hover:bg-gray-100 rounded-lg">
                   <ChevronRight size={22} />
@@ -419,8 +468,8 @@ const Attendance = () => {
                 <thead>
                   <tr className="border-b">
                     <th className="text-left py-3 px-4 font-semibold text-gray-700">Name</th>
-                    <th className="text-left py-3 px-4 font-semibold text-gray-700">Daily Wage</th>
                     <th className="text-center py-3 px-4 font-semibold text-gray-700">Status</th>
+                    <th className="text-left py-3 px-4 font-semibold text-gray-700">Comment</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -430,7 +479,6 @@ const Attendance = () => {
                         <p className="font-medium text-gray-800">{labour.name}</p>
                         {labour.phone && <p className="text-sm text-gray-500">{labour.phone}</p>}
                       </td>
-                      <td className="py-4 px-4 text-gray-600">₹{labour.daily_wage}</td>
                       <td className="py-4 px-4">
                         <div className="flex justify-center gap-2">
                           {[
@@ -452,6 +500,15 @@ const Attendance = () => {
                             </button>
                           ))}
                         </div>
+                      </td>
+                      <td className="py-4 px-4">
+                        <input
+                          type="text"
+                          placeholder="Add comment..."
+                          value={comments[labour.id] || ''}
+                          onChange={(e) => handleCommentChange(labour.id, e.target.value)}
+                          className="w-full border border-gray-200 rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-primary-500"
+                        />
                       </td>
                     </tr>
                   ))}

@@ -193,6 +193,7 @@ def get_attendance_by_date(target_date: date) -> List[Attendance]:
             labour_id=r.labour_id,
             date=r.date,
             status=AttendanceStatus(r.status),
+            comment=r.comment,
             marked_by=r.marked_by,
             marked_at=r.created_at
         ) for r in records]
@@ -216,6 +217,7 @@ def get_attendance_by_labour(labour_id: str, start_date: date = None, end_date: 
             labour_id=r.labour_id,
             date=r.date,
             status=AttendanceStatus(r.status),
+            comment=r.comment,
             marked_by=r.marked_by,
             marked_at=r.created_at
         ) for r in records]
@@ -324,7 +326,7 @@ def create_salary_records_bulk(records_data: list) -> List[SalaryRecord]:
         db.close()
 
 
-def mark_attendance(labour_id: str, target_date: date, status: AttendanceStatus, marked_by: str) -> Attendance:
+def mark_attendance(labour_id: str, target_date: date, status: AttendanceStatus, marked_by: str, comment: str = None) -> Attendance:
     db = get_db_session()
     try:
         existing = db.query(AttendanceDB).filter(
@@ -335,6 +337,7 @@ def mark_attendance(labour_id: str, target_date: date, status: AttendanceStatus,
         
         if existing:
             existing.status = status.value
+            existing.comment = comment
             existing.marked_by = marked_by
             existing.created_at = now
             db.commit()
@@ -343,6 +346,7 @@ def mark_attendance(labour_id: str, target_date: date, status: AttendanceStatus,
                 labour_id=labour_id,
                 date=target_date,
                 status=status,
+                comment=comment,
                 marked_by=marked_by,
                 marked_at=now
             )
@@ -353,6 +357,7 @@ def mark_attendance(labour_id: str, target_date: date, status: AttendanceStatus,
             labour_id=labour_id,
             date=target_date,
             status=status.value,
+            comment=comment,
             marked_by=marked_by,
             created_at=now
         )
@@ -364,6 +369,7 @@ def mark_attendance(labour_id: str, target_date: date, status: AttendanceStatus,
             labour_id=labour_id,
             date=target_date,
             status=status,
+            comment=comment,
             marked_by=marked_by,
             marked_at=now
         )
