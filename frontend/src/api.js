@@ -111,6 +111,12 @@ export const attendanceAPI = {
     return api.post('/attendance/bulk', data);
   },
   getToday: () => cached('attendance:today', () => api.get('/attendance/today'), 30_000),
+  fillMonth: (labourId, year, month, status = 'present', overwrite = false) => {
+    invalidateCache(...Object.keys(_cache).filter((k) => k.startsWith(`attendance:labour:${labourId}`)));
+    return api.post(
+      `/attendance/fill-month?labour_id=${labourId}&year=${year}&month=${month}&status=${status}&overwrite=${overwrite}`
+    );
+  },
 };
 
 export const salaryAPI = {

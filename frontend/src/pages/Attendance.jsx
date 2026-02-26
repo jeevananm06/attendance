@@ -10,7 +10,8 @@ import {
   ChevronRight,
   Save,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  CalendarCheck
 } from 'lucide-react';
 
 const STATUS_META = {
@@ -34,9 +35,29 @@ const MonthlyLabourCard = ({ labour, year, month }) => {
   const [monthAttendance, setMonthAttendance] = useState({});
   const [expanded, setExpanded] = useState(false);
   const [loadingMonth, setLoadingMonth] = useState(false);
+  const [filling, setFilling] = useState(false);
+  const [fillStatus, setFillStatus] = useState('present');
+  const [fillResult, setFillResult] = useState(null);
 
   const daysInMonth = getDaysInMonth(year, month);
   const today = new Date().toISOString().split('T')[0];
+
+  const handleFillMonth = async (e) => {
+    e.stopPropagation();
+    if (!window.confirm(`Fill all working days of this month as "${fillStatus}" for ${labour.name}? Sundays will be skipped. Already-marked days will NOT be overwritten.`)) return;
+    setFilling(true);
+    setFillResult(null);
+    try {
+      const res = await attendanceAPI.fillMonth(labour.id, year, month + 1, fillStatus, false);
+      setFillResult(`✓ Filled ${res.data.filled_count} days as ${fillStatus}`);
+      if (expanded) fetchMonthData();
+    } catch (err) {
+      setFillResult('✗ ' + (err.response?.data?.detail || 'Failed to fill month'));
+    } finally {
+      setFilling(false);
+      setTimeout(() => setFillResult(null), 4000);
+    }
+  };
 
   const fetchMonthData = useCallback(async () => {
     setLoadingMonth(true);
@@ -79,11 +100,31 @@ const MonthlyLabourCard = ({ labour, year, month }) => {
             <p className="text-xs text-gray-500">₹{labour.daily_wage}/day</p>
           </div>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3">
           <div className="hidden sm:flex gap-2 text-xs font-semibold">
             <span className="px-2 py-0.5 rounded bg-green-100 text-green-700">P {present}</span>
             <span className="px-2 py-0.5 rounded bg-yellow-100 text-yellow-700">H {halfDay}</span>
             <span className="px-2 py-0.5 rounded bg-red-100 text-red-700">A {absent}</span>
+          </div>
+          <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+            <select
+              value={fillStatus}
+              onChange={(e) => setFillStatus(e.target.value)}
+              className="text-xs border border-gray-300 rounded px-1 py-0.5 bg-white"
+            >
+              <option value="present">Present</option>
+              <option value="half_day">Half Day</option>
+              <option value="absent">Absent</option>
+            </select>
+            <button
+              onClick={handleFillMonth}
+              disabled={filling}
+              title="Fill whole month"
+              className="flex items-center gap-1 px-2 py-0.5 rounded bg-primary-600 hover:bg-primary-700 text-white text-xs font-medium disabled:opacity-50"
+            >
+              {filling ? <span className="w-3 h-3 border border-white border-t-transparent rounded-full animate-spin inline-block" /> : <CalendarCheck size={12} />}
+              Fill
+            </button>
           </div>
           <div className="text-right">
             <p className="font-bold text-gray-800">₹{earned.toLocaleString()}</p>
@@ -94,6 +135,12 @@ const MonthlyLabourCard = ({ labour, year, month }) => {
             : <ChevronDown size={18} className="text-gray-400 flex-shrink-0" />}
         </div>
       </div>
+
+      {fillResult && (
+        <div className={`px-4 py-2 text-xs font-medium ${fillResult.startsWith('✓') ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
+          {fillResult}
+        </div>
+      )}
 
       {expanded && (
         <div className="border-t bg-gray-50 p-4">
