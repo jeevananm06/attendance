@@ -58,11 +58,23 @@ const Labours = () => {
     fetchLabours(true);
   };
 
-  const handleTouchStart = (e) => { touchStartY.current = e.touches[0].clientY; };
+  const pullTriggered = useRef(false);
+  const handleTouchStart = (e) => {
+    touchStartY.current = e.touches[0].clientY;
+    pullTriggered.current = false;
+  };
   const handleTouchMove = (e) => {
-    if (containerRef.current?.scrollTop > 0) return;
+    if (pullTriggered.current || refreshing) return;
+    const container = containerRef.current;
+    if (!container || container.scrollTop > 5) return;
     const diff = e.touches[0].clientY - touchStartY.current;
-    if (diff > 80) handlePullToRefresh();
+    if (diff > 120) {
+      pullTriggered.current = true;
+      handlePullToRefresh();
+    }
+  };
+  const handleTouchEnd = () => {
+    pullTriggered.current = false;
   };
 
   const handleSubmit = async (e) => {
@@ -150,6 +162,7 @@ const Labours = () => {
       ref={containerRef}
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
     >
       {refreshing && (
         <div className="flex justify-center py-2">
