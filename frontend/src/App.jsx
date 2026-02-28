@@ -53,7 +53,7 @@ const App = () => {
           <Route
             path="/labours"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute allowedRoles={['admin', 'manager']}>
                 <Labours />
               </ProtectedRoute>
             }
@@ -61,7 +61,7 @@ const App = () => {
           <Route
             path="/attendance"
             element={
-              <ProtectedRoute allowedRoles={['admin', 'manager']}>
+              <ProtectedRoute>
                 <Attendance />
               </ProtectedRoute>
             }
@@ -69,7 +69,7 @@ const App = () => {
           <Route
             path="/salary"
             element={
-              <ProtectedRoute allowedRoles={['admin', 'manager']}>
+              <ProtectedRoute allowedRoles={['admin']}>
                 <Salary />
               </ProtectedRoute>
             }
@@ -77,7 +77,7 @@ const App = () => {
           <Route
             path="/stats"
             element={
-              <ProtectedRoute allowedRoles={['admin', 'manager']}>
+              <ProtectedRoute allowedRoles={['admin']}>
                 <Stats />
               </ProtectedRoute>
             }
@@ -85,7 +85,7 @@ const App = () => {
           <Route
             path="/export"
             element={
-              <ProtectedRoute allowedRoles={['admin', 'manager']}>
+              <ProtectedRoute allowedRoles={['admin']}>
                 <Export />
               </ProtectedRoute>
             }
@@ -93,7 +93,7 @@ const App = () => {
           <Route
             path="/more"
             element={
-              <ProtectedRoute allowedRoles={['admin', 'manager']}>
+              <ProtectedRoute allowedRoles={['admin']}>
                 <More />
               </ProtectedRoute>
             }

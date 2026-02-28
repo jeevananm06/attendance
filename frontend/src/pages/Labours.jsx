@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { laboursAPI } from '../api';
 import { useAuth } from '../context/AuthContext';
 import {
@@ -23,6 +23,9 @@ const Labours = () => {
   const [showInactive, setShowInactive] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [editingLabour, setEditingLabour] = useState(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const touchStartY = useRef(0);
+  const containerRef = useRef(null);
   const [formData, setFormData] = useState({
     name: '',
     phone: '',
@@ -35,17 +38,31 @@ const Labours = () => {
     fetchLabours();
   }, [showInactive]);
 
-  const fetchLabours = async () => {
+  const fetchLabours = async (silent = false) => {
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
       const response = await laboursAPI.getAll(showInactive);
       setLabours([...response.data].sort((a, b) => a.name.localeCompare(b.name)));
     } catch (err) {
       setError('Failed to load labours');
       console.error(err);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
+      setRefreshing(false);
     }
+  };
+
+  const handlePullToRefresh = () => {
+    if (refreshing) return;
+    setRefreshing(true);
+    fetchLabours(true);
+  };
+
+  const handleTouchStart = (e) => { touchStartY.current = e.touches[0].clientY; };
+  const handleTouchMove = (e) => {
+    if (containerRef.current?.scrollTop > 0) return;
+    const diff = e.touches[0].clientY - touchStartY.current;
+    if (diff > 80) handlePullToRefresh();
   };
 
   const handleSubmit = async (e) => {
@@ -128,7 +145,17 @@ const Labours = () => {
   }
 
   return (
-    <div className="space-y-6">
+    <div
+      className="space-y-6"
+      ref={containerRef}
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+    >
+      {refreshing && (
+        <div className="flex justify-center py-2">
+          <div className="w-5 h-5 border-2 border-primary-600 border-t-transparent rounded-full animate-spin" />
+        </div>
+      )}
       {error && (
         <div className="p-4 bg-red-50 border border-red-200 rounded-lg flex items-center gap-3 text-red-700">
           <AlertCircle size={20} />

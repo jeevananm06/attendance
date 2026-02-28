@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { statsAPI, salaryAPI } from '../api';
+import { useAuth } from '../context/AuthContext';
 import {
   Users,
   CalendarCheck,
@@ -28,30 +29,52 @@ const StatCard = ({ icon: Icon, label, value, subValue, color, link }) => (
 );
 
 const Dashboard = () => {
+  const { isAdmin } = useAuth();
   const [stats, setStats] = useState(null);
   const [salaryStats, setSalaryStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [refreshing, setRefreshing] = useState(false);
+  const touchStartY = useRef(0);
+  const containerRef = useRef(null);
 
   useEffect(() => {
     fetchData();
   }, []);
 
-  const fetchData = async () => {
+  const fetchData = async (silent = false) => {
     try {
-      setLoading(true);
-      const [statsRes, salaryRes] = await Promise.all([
-        statsAPI.getOverview(),
-        salaryAPI.getSummary()
-      ]);
-      setStats(statsRes.data);
-      setSalaryStats(salaryRes.data);
+      if (!silent) setLoading(true);
+      // Only fetch salary summary if admin
+      const requests = [statsAPI.getOverview()];
+      if (isAdmin) {
+        requests.push(salaryAPI.getSummary());
+      }
+      const results = await Promise.all(requests);
+      setStats(results[0].data);
+      if (isAdmin && results[1]) {
+        setSalaryStats(results[1].data);
+      }
     } catch (err) {
       setError('Failed to load dashboard data');
       console.error(err);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
+      setRefreshing(false);
     }
+  };
+
+  const handlePullToRefresh = () => {
+    if (refreshing) return;
+    setRefreshing(true);
+    fetchData(true);
+  };
+
+  const handleTouchStart = (e) => { touchStartY.current = e.touches[0].clientY; };
+  const handleTouchMove = (e) => {
+    if (containerRef.current?.scrollTop > 0) return;
+    const diff = e.touches[0].clientY - touchStartY.current;
+    if (diff > 80) handlePullToRefresh();
   };
 
   if (loading) {
@@ -72,15 +95,25 @@ const Dashboard = () => {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+    <div
+      className="space-y-6"
+      ref={containerRef}
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+    >
+      {refreshing && (
+        <div className="flex justify-center py-2">
+          <div className="w-5 h-5 border-2 border-primary-600 border-t-transparent rounded-full animate-spin" />
+        </div>
+      )}
+      <div className={`grid grid-cols-1 md:grid-cols-2 ${isAdmin ? 'lg:grid-cols-4' : 'lg:grid-cols-2'} gap-4`}>
         <StatCard
           icon={Users}
           label="Total Labours"
           value={stats?.labours?.total || 0}
           subValue={`${stats?.labours?.active || 0} active`}
           color="bg-blue-500"
-          link="/labours"
+          link={isAdmin ? "/labours" : "/attendance"}
         />
         <StatCard
           icon={CalendarCheck}
@@ -90,20 +123,24 @@ const Dashboard = () => {
           color="bg-green-500"
           link="/attendance"
         />
-        <StatCard
-          icon={Wallet}
-          label="Total Paid"
-          value={`₹${(stats?.salary?.total_paid || 0).toLocaleString()}`}
-          color="bg-purple-500"
-          link="/salary"
-        />
-        <StatCard
-          icon={TrendingUp}
-          label="Pending Salary"
-          value={`₹${(stats?.salary?.total_pending || 0).toLocaleString()}`}
-          color="bg-orange-500"
-          link="/salary"
-        />
+        {isAdmin && (
+          <>
+            <StatCard
+              icon={Wallet}
+              label="Total Paid"
+              value={`₹${(stats?.salary?.total_paid || 0).toLocaleString()}`}
+              color="bg-purple-500"
+              link="/salary"
+            />
+            <StatCard
+              icon={TrendingUp}
+              label="Pending Salary"
+              value={`₹${(stats?.salary?.total_pending || 0).toLocaleString()}`}
+              color="bg-orange-500"
+              link="/salary"
+            />
+          </>
+        )}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -156,65 +193,69 @@ const Dashboard = () => {
           </Link>
         </div>
 
-        {/* Salary Summary */}
-        <div className="card">
-          <h3 className="text-lg font-semibold text-gray-800 mb-4">Salary Overview</h3>
-          <div className="space-y-4">
-            <div className="p-4 bg-gray-50 rounded-lg">
-              <div className="flex justify-between items-center mb-2">
-                <span className="text-gray-600">Total Earned</span>
-                <span className="font-semibold text-gray-800">
-                  ₹{(stats?.salary?.total_earned || 0).toLocaleString()}
-                </span>
+        {/* Salary Summary - Admin only */}
+        {isAdmin && (
+          <div className="card">
+            <h3 className="text-lg font-semibold text-gray-800 mb-4">Salary Overview</h3>
+            <div className="space-y-4">
+              <div className="p-4 bg-gray-50 rounded-lg">
+                <div className="flex justify-between items-center mb-2">
+                  <span className="text-gray-600">Total Earned</span>
+                  <span className="font-semibold text-gray-800">
+                    ₹{(stats?.salary?.total_earned || 0).toLocaleString()}
+                  </span>
+                </div>
+                <div className="w-full bg-gray-200 rounded-full h-2">
+                  <div
+                    className="bg-green-500 h-2 rounded-full"
+                    style={{
+                      width: `${
+                        stats?.salary?.total_earned
+                          ? (stats.salary.total_paid / stats.salary.total_earned) * 100
+                          : 0
+                      }%`
+                    }}
+                  />
+                </div>
               </div>
-              <div className="w-full bg-gray-200 rounded-full h-2">
-                <div
-                  className="bg-green-500 h-2 rounded-full"
-                  style={{
-                    width: `${
-                      stats?.salary?.total_earned
-                        ? (stats.salary.total_paid / stats.salary.total_earned) * 100
-                        : 0
-                    }%`
-                  }}
-                />
+              <div className="grid grid-cols-2 gap-4">
+                <div className="p-4 bg-green-50 rounded-lg text-center">
+                  <p className="text-sm text-gray-600 mb-1">Paid</p>
+                  <p className="text-xl font-bold text-green-600">
+                    ₹{(stats?.salary?.total_paid || 0).toLocaleString()}
+                  </p>
+                </div>
+                <div className="p-4 bg-orange-50 rounded-lg text-center">
+                  <p className="text-sm text-gray-600 mb-1">Pending</p>
+                  <p className="text-xl font-bold text-orange-600">
+                    ₹{(stats?.salary?.total_pending || 0).toLocaleString()}
+                  </p>
+                </div>
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="p-4 bg-green-50 rounded-lg text-center">
-                <p className="text-sm text-gray-600 mb-1">Paid</p>
-                <p className="text-xl font-bold text-green-600">
-                  ₹{(stats?.salary?.total_paid || 0).toLocaleString()}
-                </p>
-              </div>
-              <div className="p-4 bg-orange-50 rounded-lg text-center">
-                <p className="text-sm text-gray-600 mb-1">Pending</p>
-                <p className="text-xl font-bold text-orange-600">
-                  ₹{(stats?.salary?.total_pending || 0).toLocaleString()}
-                </p>
-              </div>
-            </div>
+            <Link
+              to="/salary"
+              className="mt-4 block text-center text-primary-600 hover:text-primary-700 font-medium"
+            >
+              Manage Salary →
+            </Link>
           </div>
-          <Link
-            to="/salary"
-            className="mt-4 block text-center text-primary-600 hover:text-primary-700 font-medium"
-          >
-            Manage Salary →
-          </Link>
-        </div>
+        )}
       </div>
 
       {/* Quick Actions */}
       <div className="card">
         <h3 className="text-lg font-semibold text-gray-800 mb-4">Quick Actions</h3>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <Link
-            to="/labours"
-            className="p-4 bg-blue-50 rounded-lg text-center hover:bg-blue-100 transition-colors"
-          >
-            <Users className="mx-auto mb-2 text-blue-600" size={24} />
-            <span className="text-sm font-medium text-gray-700">Add Labour</span>
-          </Link>
+        <div className={`grid grid-cols-2 ${isAdmin ? 'md:grid-cols-4' : 'md:grid-cols-2'} gap-4`}>
+          {isAdmin && (
+            <Link
+              to="/labours"
+              className="p-4 bg-blue-50 rounded-lg text-center hover:bg-blue-100 transition-colors"
+            >
+              <Users className="mx-auto mb-2 text-blue-600" size={24} />
+              <span className="text-sm font-medium text-gray-700">Add Labour</span>
+            </Link>
+          )}
           <Link
             to="/attendance"
             className="p-4 bg-green-50 rounded-lg text-center hover:bg-green-100 transition-colors"
@@ -222,20 +263,24 @@ const Dashboard = () => {
             <CalendarCheck className="mx-auto mb-2 text-green-600" size={24} />
             <span className="text-sm font-medium text-gray-700">Mark Attendance</span>
           </Link>
-          <Link
-            to="/salary"
-            className="p-4 bg-purple-50 rounded-lg text-center hover:bg-purple-100 transition-colors"
-          >
-            <Wallet className="mx-auto mb-2 text-purple-600" size={24} />
-            <span className="text-sm font-medium text-gray-700">Pay Salary</span>
-          </Link>
-          <Link
-            to="/export"
-            className="p-4 bg-orange-50 rounded-lg text-center hover:bg-orange-100 transition-colors"
-          >
-            <TrendingUp className="mx-auto mb-2 text-orange-600" size={24} />
-            <span className="text-sm font-medium text-gray-700">Export Data</span>
-          </Link>
+          {isAdmin && (
+            <>
+              <Link
+                to="/salary"
+                className="p-4 bg-purple-50 rounded-lg text-center hover:bg-purple-100 transition-colors"
+              >
+                <Wallet className="mx-auto mb-2 text-purple-600" size={24} />
+                <span className="text-sm font-medium text-gray-700">Pay Salary</span>
+              </Link>
+              <Link
+                to="/export"
+                className="p-4 bg-orange-50 rounded-lg text-center hover:bg-orange-100 transition-colors"
+              >
+                <TrendingUp className="mx-auto mb-2 text-orange-600" size={24} />
+                <span className="text-sm font-medium text-gray-700">Export Data</span>
+              </Link>
+            </>
+          )}
         </div>
       </div>
     </div>

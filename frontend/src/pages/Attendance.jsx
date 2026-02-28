@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { attendanceAPI, laboursAPI } from '../api';
+import { useAuth } from '../context/AuthContext';
 import {
   Calendar,
   Check,
@@ -202,6 +203,10 @@ const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Frid
 const DAY_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 const Attendance = () => {
+  const { isAdmin, isManager, isLabour } = useAuth();
+  const canEditAttendance = isAdmin || isManager;
+  const canViewMonthly = isAdmin || isManager;
+  
   const [view, setView] = useState('daily');
 
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
@@ -375,24 +380,29 @@ const Attendance = () => {
       {/* Top bar */}
       <div className="card">
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="flex bg-gray-100 rounded-lg p-1 gap-1">
-            <button
-              onClick={() => setView('daily')}
-              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                view === 'daily' ? 'bg-white shadow text-primary-600' : 'text-gray-500 hover:text-gray-700'
-              }`}
-            >
-              Daily
-            </button>
-            <button
-              onClick={() => setView('monthly')}
-              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                view === 'monthly' ? 'bg-white shadow text-primary-600' : 'text-gray-500 hover:text-gray-700'
-              }`}
-            >
-              Monthly
-            </button>
-          </div>
+          {/* Only show view toggle if user can view monthly */}
+          {canViewMonthly ? (
+            <div className="flex bg-gray-100 rounded-lg p-1 gap-1">
+              <button
+                onClick={() => setView('daily')}
+                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                  view === 'daily' ? 'bg-white shadow text-primary-600' : 'text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                Daily
+              </button>
+              <button
+                onClick={() => setView('monthly')}
+                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                  view === 'monthly' ? 'bg-white shadow text-primary-600' : 'text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                Monthly
+              </button>
+            </div>
+          ) : (
+            <h3 className="text-lg font-semibold text-gray-800">Daily Attendance</h3>
+          )}
 
           {view === 'daily' && (
             <div className="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto">
@@ -416,15 +426,17 @@ const Attendance = () => {
                   <ChevronRight size={22} />
                 </button>
               </div>
-              <div className="flex gap-2">
-                <button onClick={markAllPresent} className="btn-secondary">Mark All Present</button>
-                <button onClick={handleSaveAll} disabled={saving} className="btn-primary flex items-center gap-2">
-                  {saving
-                    ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    : <Save size={18} />}
-                  Save
-                </button>
-              </div>
+              {canEditAttendance && (
+                <div className="flex gap-2">
+                  <button onClick={markAllPresent} className="btn-secondary">Mark All Present</button>
+                  <button onClick={handleSaveAll} disabled={saving} className="btn-primary flex items-center gap-2">
+                    {saving
+                      ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      : <Save size={18} />}
+                    Save
+                  </button>
+                </div>
+              )}
             </div>
           )}
 

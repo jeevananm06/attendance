@@ -2,8 +2,8 @@ from fastapi import APIRouter, Depends
 from typing import List
 from datetime import date, timedelta
 
-from ..models import User, LabourStats
-from ..auth import get_current_manager_or_admin
+from ..models import User, LabourStats, UserRole
+from ..auth import get_current_manager_or_admin, get_current_authenticated_user, get_current_admin
 from ..db_wrapper import (
     get_all_labours,
     get_attendance_by_labour,
@@ -59,18 +59,13 @@ async def get_labour_stats(
 
 @router.get("/overview")
 async def get_overview_stats(
-    current_user: User = Depends(get_current_manager_or_admin)
+    current_user: User = Depends(get_current_authenticated_user)
 ):
-    """Get overall statistics for the organization"""
+    """Get overall statistics for the organization. Salary info only shown to admin."""
     labours = get_all_labours()
-    all_salary_records = get_salary_records()
     
     total_labours = len(labours)
     active_labours = sum(1 for l in labours if l.is_active)
-    
-    total_earned = sum(r.total_amount for r in all_salary_records)
-    total_paid = sum(r.total_amount for r in all_salary_records if r.is_paid)
-    total_pending = total_earned - total_paid
     
     # Get today's attendance
     today = date.today()
@@ -85,7 +80,7 @@ async def get_overview_stats(
     absent_today = sum(1 for a in today_attendance if a.status == AttendanceStatus.ABSENT)
     not_marked = total_labours - len(today_attendance)
     
-    return {
+    result = {
         "labours": {
             "total": total_labours,
             "active": active_labours,
@@ -97,13 +92,22 @@ async def get_overview_stats(
             "half_day": half_day_today,
             "absent": absent_today,
             "not_marked": not_marked
-        },
-        "salary": {
+        }
+    }
+    
+    # Only include salary info for admin
+    if current_user.role == UserRole.ADMIN:
+        all_salary_records = get_salary_records()
+        total_earned = sum(r.total_amount for r in all_salary_records)
+        total_paid = sum(r.total_amount for r in all_salary_records if r.is_paid)
+        total_pending = total_earned - total_paid
+        result["salary"] = {
             "total_earned": total_earned,
             "total_paid": total_paid,
             "total_pending": total_pending
         }
-    }
+    
+    return result
 
 
 @router.get("/weekly")

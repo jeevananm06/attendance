@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { salaryAPI, laboursAPI } from '../api';
+import { salaryAPI, laboursAPI, advancesAPI } from '../api';
 import {
   Wallet,
   Calculator,
@@ -9,7 +9,8 @@ import {
   Check,
   ChevronDown,
   ChevronUp,
-  RefreshCw
+  RefreshCw,
+  Banknote
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
@@ -17,6 +18,7 @@ const Salary = () => {
   const { isAdmin } = useAuth();
   const [pendingSalaries, setPendingSalaries] = useState(null);
   const [labours, setLabours] = useState([]);
+  const [advances, setAdvances] = useState({}); // { labourId: { pending_amount, advances: [] } }
   const [loading, setLoading] = useState(true);
   const [calculating, setCalculating] = useState(false);
   const [error, setError] = useState('');
@@ -37,9 +39,10 @@ const Salary = () => {
   const fetchData = async (silent = false) => {
     try {
       if (!silent) setLoading(true);
-      const [pendingRes, laboursRes] = await Promise.all([
+      const [pendingRes, laboursRes, advancesRes] = await Promise.all([
         salaryAPI.getAllPending(),
-        laboursAPI.getAll()
+        laboursAPI.getAll(),
+        advancesAPI.getAllPending()
       ]);
       const data = pendingRes.data;
       if (data?.labours) {
@@ -47,6 +50,13 @@ const Salary = () => {
       }
       setPendingSalaries(data);
       setLabours([...laboursRes.data].sort((a, b) => a.name.localeCompare(b.name)));
+      
+      // Build advances map by labour_id
+      const advMap = {};
+      (advancesRes.data?.labours || []).forEach((adv) => {
+        advMap[adv.labour_id] = adv.pending_amount;
+      });
+      setAdvances(advMap);
     } catch (err) {
       setError('Failed to load salary data');
       console.error(err);
@@ -231,6 +241,12 @@ const Salary = () => {
                       }`}>
                         {labour.pay_cycle === 'monthly' ? 'Monthly' : 'Weekly'}
                       </span>
+                      {advances[labour.labour_id] > 0 && (
+                        <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-red-100 text-red-700 flex items-center gap-1">
+                          <Banknote size={12} />
+                          Adv: ₹{advances[labour.labour_id].toLocaleString()}
+                        </span>
+                      )}
                     </div>
                     <p className="text-sm text-gray-500">
                       {labour.weeks_pending || 0} {labour.pay_cycle === 'monthly' ? 'month(s)' : 'week(s)'} pending
@@ -245,6 +261,11 @@ const Salary = () => {
                     }`}>
                       ₹{(labour.total_pending || 0).toLocaleString()}
                     </p>
+                    {advances[labour.labour_id] > 0 && (
+                      <p className="text-xs text-red-600">
+                        Net: ₹{Math.max(0, (labour.total_pending || 0) - advances[labour.labour_id]).toLocaleString()}
+                      </p>
+                    )}
                   </div>
                   {expandedLabour === labour.labour_id ? (
                     <ChevronUp size={20} className="text-gray-400" />

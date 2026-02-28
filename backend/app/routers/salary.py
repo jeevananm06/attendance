@@ -26,16 +26,16 @@ router = APIRouter(prefix="/salary", tags=["Salary"])
 async def list_salary_records(
     labour_id: str = None,
     is_paid: bool = None,
-    current_user: User = Depends(get_current_manager_or_admin)
+    current_user: User = Depends(get_current_admin)
 ):
-    """Get salary records with optional filters"""
+    """Get salary records with optional filters (Admin only)"""
     return get_salary_records(labour_id=labour_id, is_paid=is_paid)
 
 
 @router.get("/pending/{labour_id}")
 async def get_pending_salary(
     labour_id: str,
-    current_user: User = Depends(get_current_manager_or_admin)
+    current_user: User = Depends(get_current_admin)
 ):
     """Get consolidated pending salary for a labour"""
     labour = get_labour(labour_id)
@@ -49,7 +49,7 @@ async def get_pending_salary(
 
 @router.get("/pending")
 async def get_all_pending_salaries(
-    current_user: User = Depends(get_current_manager_or_admin)
+    current_user: User = Depends(get_current_admin)
 ):
     """Get pending salaries for all labours"""
     labours = get_all_labours()
@@ -110,7 +110,7 @@ async def get_all_pending_salaries(
 async def calculate_salary_for_labour(
     labour_id: str,
     week_end: date = None,
-    current_user: User = Depends(get_current_manager_or_admin)
+    current_user: User = Depends(get_current_admin)
 ):
     """Calculate salary for a specific labour up to a given week"""
     labour = get_labour(labour_id)
@@ -151,7 +151,7 @@ async def calculate_all_salaries(
 @router.post("/pay")
 async def pay_salary(
     payment: SalaryPayment,
-    current_user: User = Depends(get_current_manager_or_admin)
+    current_user: User = Depends(get_current_admin)
 ):
     """Mark salary as paid for a labour up to a specific week.
     If amount_paid is provided and less than total due, marks oldest weeks paid first."""
@@ -192,7 +192,7 @@ async def pay_salary(
 
 @router.get("/summary")
 async def get_salary_summary(
-    current_user: User = Depends(get_current_manager_or_admin)
+    current_user: User = Depends(get_current_admin)
 ):
     """Get overall salary summary"""
     all_records = get_salary_records()

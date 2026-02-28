@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from typing import List
 
 from ..models import Labour, LabourCreate, LabourUpdate, User, UserRole
-from ..auth import get_current_manager_or_admin, get_current_admin
+from ..auth import get_current_manager_or_admin, get_current_admin, get_current_authenticated_user
 from ..db_wrapper import (
     get_all_labours, 
     get_labour, 
@@ -17,9 +17,9 @@ router = APIRouter(prefix="/labours", tags=["Labours"])
 @router.get("/", response_model=List[Labour])
 async def list_labours(
     include_inactive: bool = False,
-    current_user: User = Depends(get_current_manager_or_admin)
+    current_user: User = Depends(get_current_authenticated_user)
 ):
-    """Get all labours"""
+    """Get all labours. All authenticated users can view."""
     return get_all_labours(include_inactive=include_inactive)
 
 

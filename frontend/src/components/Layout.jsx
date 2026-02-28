@@ -18,12 +18,12 @@ import {
 
 const navItems = [
   { path: '/', icon: LayoutDashboard, label: 'Dashboard' },
-  { path: '/labours', icon: Users, label: 'Labours' },
-  { path: '/attendance', icon: CalendarCheck, label: 'Attendance', roles: ['admin', 'manager'] },
-  { path: '/salary', icon: Wallet, label: 'Salary', roles: ['admin', 'manager'] },
-  { path: '/stats', icon: BarChart3, label: 'Statistics', roles: ['admin', 'manager'] },
-  { path: '/export', icon: Download, label: 'Export', roles: ['admin', 'manager'] },
-  { path: '/more', icon: MoreHorizontal, label: 'More', roles: ['admin', 'manager'] },
+  { path: '/labours', icon: Users, label: 'Labours', roles: ['admin', 'manager'] },
+  { path: '/attendance', icon: CalendarCheck, label: 'Attendance' },
+  { path: '/salary', icon: Wallet, label: 'Salary', roles: ['admin'] },
+  { path: '/stats', icon: BarChart3, label: 'Statistics', roles: ['admin'] },
+  { path: '/export', icon: Download, label: 'Export', roles: ['admin'] },
+  { path: '/more', icon: MoreHorizontal, label: 'More', roles: ['admin'] },
   { path: '/users', icon: UserCog, label: 'Users', roles: ['admin'] },
 ];
 

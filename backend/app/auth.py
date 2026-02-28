@@ -79,3 +79,8 @@ async def get_current_manager_or_admin(current_user: User = Depends(get_current_
             detail="Manager or Admin access required"
         )
     return current_user
+
+
+async def get_current_authenticated_user(current_user: User = Depends(get_current_user)) -> User:
+    """Any authenticated user (admin, manager, or labour) can access"""
+    return current_user

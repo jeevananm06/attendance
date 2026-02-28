@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { statsAPI } from '../api';
 import {
   BarChart3,
@@ -32,14 +32,17 @@ const Stats = () => {
   const [error, setError] = useState('');
   const [selectedLabour, setSelectedLabour] = useState(null);
   const [labourDetail, setLabourDetail] = useState(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const touchStartY = useRef(0);
+  const containerRef = useRef(null);
 
   useEffect(() => {
     fetchData();
   }, []);
 
-  const fetchData = async () => {
+  const fetchData = async (silent = false) => {
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
       const [overviewRes, weeklyRes, labourRes] = await Promise.all([
         statsAPI.getOverview(),
         statsAPI.getWeekly(8),
@@ -52,8 +55,22 @@ const Stats = () => {
       setError('Failed to load statistics');
       console.error(err);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
+      setRefreshing(false);
     }
+  };
+
+  const handlePullToRefresh = () => {
+    if (refreshing) return;
+    setRefreshing(true);
+    fetchData(true);
+  };
+
+  const handleTouchStart = (e) => { touchStartY.current = e.touches[0].clientY; };
+  const handleTouchMove = (e) => {
+    if (containerRef.current?.scrollTop > 0) return;
+    const diff = e.touches[0].clientY - touchStartY.current;
+    if (diff > 80) handlePullToRefresh();
   };
 
   const fetchLabourDetail = async (labourId) => {
@@ -97,7 +114,17 @@ const Stats = () => {
   }
 
   return (
-    <div className="space-y-6">
+    <div
+      className="space-y-6"
+      ref={containerRef}
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+    >
+      {refreshing && (
+        <div className="flex justify-center py-2">
+          <div className="w-5 h-5 border-2 border-primary-600 border-t-transparent rounded-full animate-spin" />
+        </div>
+      )}
       {error && (
         <div className="p-4 bg-red-50 border border-red-200 rounded-lg flex items-center gap-3 text-red-700">
           <AlertCircle size={20} />

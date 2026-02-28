@@ -3,8 +3,8 @@ from typing import List, Optional
 from datetime import date, timedelta
 import calendar
 
-from ..models import Attendance, AttendanceCreate, AttendanceBulkCreate, User, AttendanceStatus
-from ..auth import get_current_manager_or_admin
+from ..models import Attendance, AttendanceCreate, AttendanceBulkCreate, User, AttendanceStatus, UserRole
+from ..auth import get_current_manager_or_admin, get_current_authenticated_user
 from ..db_wrapper import (
     get_attendance_by_date,
     get_attendance_by_labour,
@@ -19,9 +19,9 @@ router = APIRouter(prefix="/attendance", tags=["Attendance"])
 @router.get("/date/{target_date}", response_model=List[Attendance])
 async def get_attendance_for_date(
     target_date: date,
-    current_user: User = Depends(get_current_manager_or_admin)
+    current_user: User = Depends(get_current_authenticated_user)
 ):
-    """Get attendance records for a specific date"""
+    """Get attendance records for a specific date. All authenticated users can view."""
     return get_attendance_by_date(target_date)
 
 
@@ -130,7 +130,7 @@ async def fill_month_attendance(
 
 @router.get("/today", response_model=dict)
 async def get_today_attendance_status(
-    current_user: User = Depends(get_current_manager_or_admin)
+    current_user: User = Depends(get_current_authenticated_user)
 ):
     """Get today's attendance status with all labours"""
     today = date.today()
