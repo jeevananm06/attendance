@@ -218,6 +218,7 @@ const AdvancesTab = ({ labours, setError, setSuccess }) => {
   const [records, setRecords] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
+  const [deducting, setDeducting] = useState(null);
   const [formData, setFormData] = useState({ labour_id: '', amount: '', reason: '' });
 
   useEffect(() => { fetchRecords(); }, []);
@@ -245,6 +246,20 @@ const AdvancesTab = ({ labours, setError, setSuccess }) => {
       setTimeout(() => setSuccess(''), 3000);
     } catch (err) {
       setError(err.response?.data?.detail || 'Failed to give advance');
+    }
+  };
+
+  const handleMarkDeducted = async (advanceId) => {
+    try {
+      setDeducting(advanceId);
+      await advancesAPI.markDeducted(advanceId);
+      setSuccess('Advance marked as deducted');
+      fetchRecords();
+      setTimeout(() => setSuccess(''), 3000);
+    } catch (err) {
+      setError(err.response?.data?.detail || 'Failed to mark as deducted');
+    } finally {
+      setDeducting(null);
     }
   };
 
@@ -284,6 +299,7 @@ const AdvancesTab = ({ labours, setError, setSuccess }) => {
             <th className="text-right py-3 px-4">Amount</th>
             <th className="text-left py-3 px-4">Reason</th>
             <th className="text-center py-3 px-4">Status</th>
+            <th className="text-center py-3 px-4">Action</th>
           </tr></thead>
           <tbody>
             {records.map((r) => {
@@ -298,6 +314,22 @@ const AdvancesTab = ({ labours, setError, setSuccess }) => {
                     <span className={`px-2 py-1 rounded-full text-xs ${r.is_deducted ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'}`}>
                       {r.is_deducted ? 'Deducted' : 'Pending'}
                     </span>
+                  </td>
+                  <td className="py-3 px-4 text-center">
+                    {!r.is_deducted && (
+                      <button
+                        onClick={() => handleMarkDeducted(r.id)}
+                        disabled={deducting === r.id}
+                        className="px-3 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50 flex items-center gap-1 mx-auto"
+                      >
+                        {deducting === r.id ? (
+                          <RefreshCw className="animate-spin" size={12} />
+                        ) : (
+                          <Check size={12} />
+                        )}
+                        Mark Deducted
+                      </button>
+                    )}
                   </td>
                 </tr>
               );

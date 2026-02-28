@@ -5,7 +5,7 @@ from datetime import date
 from ..models import Advance, AdvanceCreate, User, AuditAction
 from ..auth import get_current_manager_or_admin
 from ..db_wrapper import (
-    create_advance, get_advances, get_pending_advances, 
+    create_advance, get_advances, get_pending_advances, mark_advance_deducted,
     get_labour, create_audit_log, get_all_labours
 )
 
@@ -101,3 +101,28 @@ async def get_all_pending_advances(
         "total_pending": total_pending,
         "labours": results
     }
+
+
+@router.post("/{advance_id}/deduct", response_model=Advance)
+async def mark_advance_as_deducted(
+    advance_id: str,
+    current_user: User = Depends(get_current_manager_or_admin)
+):
+    """Mark an advance as deducted/paid"""
+    advance = mark_advance_deducted(advance_id)
+    if not advance:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Advance with id {advance_id} not found"
+        )
+    
+    labour = get_labour(advance.labour_id)
+    create_audit_log(
+        user=current_user.username,
+        action=AuditAction.UPDATE,
+        entity_type="advance",
+        entity_id=advance_id,
+        new_value=f"Marked ₹{advance.amount} as deducted for {labour.name if labour else advance.labour_id}"
+    )
+    
+    return advance

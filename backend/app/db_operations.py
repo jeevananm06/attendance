@@ -711,6 +711,33 @@ def get_pending_advances(labour_id: str) -> float:
     return sum(a.amount for a in advances)
 
 
+def mark_advance_deducted(advance_id: str) -> Advance:
+    """Mark an advance as deducted"""
+    db = get_db_session()
+    try:
+        advance = db.query(AdvanceDB).filter(AdvanceDB.id == advance_id).first()
+        if not advance:
+            return None
+        
+        advance.is_deducted = True
+        db.commit()
+        db.refresh(advance)
+        
+        return Advance(
+            id=advance.id,
+            labour_id=advance.labour_id,
+            amount=advance.amount,
+            date=advance.date,
+            reason=advance.reason,
+            is_deducted=advance.is_deducted,
+            deducted_from_week=None,
+            given_by=advance.created_by,
+            created_at=advance.created_at
+        )
+    finally:
+        db.close()
+
+
 # ============== LEAVE OPERATIONS ==============
 
 def create_leave(labour_id: str, leave_type: LeaveType, start_date: date, end_date: date, reason: str = None) -> Leave:

@@ -218,6 +218,7 @@ export const advancesAPI = {
   create: (data) => api.post('/advances/', data),
   getPending: (labourId) => api.get(`/advances/pending/${labourId}`),
   getAllPending: () => api.get('/advances/pending'),
+  markDeducted: (advanceId) => api.post(`/advances/${advanceId}/deduct`),
 };
 
 export const leavesAPI = {

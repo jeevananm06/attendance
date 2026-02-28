@@ -205,7 +205,7 @@ const DAY_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const Attendance = () => {
   const { isAdmin, isManager, isLabour } = useAuth();
   const canEditAttendance = isAdmin || isManager;
-  const canViewMonthly = isAdmin || isManager;
+  const canViewMonthly = isAdmin; // Only admin can see monthly view
   
   const [view, setView] = useState('daily');
 

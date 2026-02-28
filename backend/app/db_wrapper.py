@@ -20,7 +20,7 @@ if USE_POSTGRES:
         # Overtime operations
         create_overtime, get_overtime_records,
         # Advance operations
-        create_advance, get_advances, get_pending_advances,
+        create_advance, get_advances, get_pending_advances, mark_advance_deducted,
         # Leave operations
         create_leave, get_leaves, approve_leave,
         # Site operations
