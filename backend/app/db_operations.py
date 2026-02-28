@@ -695,6 +695,7 @@ def get_advances(labour_id: str = None, is_deducted: bool = None) -> List[Advanc
             id=r.id,
             labour_id=r.labour_id,
             amount=r.amount,
+            repaid_amount=r.repaid_amount or 0.0,
             date=r.date,
             reason=r.reason,
             is_deducted=r.is_deducted,
@@ -708,7 +709,7 @@ def get_advances(labour_id: str = None, is_deducted: bool = None) -> List[Advanc
 
 def get_pending_advances(labour_id: str) -> float:
     advances = get_advances(labour_id=labour_id, is_deducted=False)
-    return sum(a.amount for a in advances)
+    return sum(a.amount - (a.repaid_amount or 0.0) for a in advances)
 
 
 def mark_advance_deducted(advance_id: str) -> Advance:
