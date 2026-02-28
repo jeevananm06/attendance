@@ -8,7 +8,7 @@ import httpx
 from .models import User, UserRole
 from .auth import get_password_hash
 from .routers import auth, labours, attendance, salary, stats, export
-from .routers import overtime, advances, leaves, sites, audit, backup, reports
+from .routers import overtime, advances, leaves, sites, audit, backup, reports, notifications, push, documents
 
 # Use PostgreSQL if enabled, otherwise CSV
 USE_POSTGRES = os.getenv("USE_POSTGRES", "false").lower() == "true"
@@ -61,6 +61,9 @@ app.include_router(sites.router)
 app.include_router(audit.router)
 app.include_router(backup.router)
 app.include_router(reports.router)
+app.include_router(notifications.router)
+app.include_router(push.router)
+app.include_router(documents.router)
 
 
 async def keep_alive():

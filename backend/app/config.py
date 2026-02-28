@@ -24,6 +24,16 @@ SITE_ASSIGNMENTS_FILE = DATA_DIR / "site_assignments.csv"
 AUDIT_LOG_FILE = DATA_DIR / "audit_log.csv"
 BACKUPS_FILE = DATA_DIR / "backups.csv"
 
+# Notification CSV
+NOTIFICATIONS_FILE = DATA_DIR / "notifications.csv"
+
+# Push subscription CSV
+PUSH_SUBSCRIPTIONS_FILE = DATA_DIR / "push_subscriptions.csv"
+
+# Document uploads directory
+DOCUMENTS_DIR = DATA_DIR / "documents"
+DOCUMENTS_DIR.mkdir(exist_ok=True)
+
 # Backup directory
 BACKUP_DIR = BASE_DIR / "backups"
 BACKUP_DIR.mkdir(exist_ok=True)

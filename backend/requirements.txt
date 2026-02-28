@@ -10,3 +10,4 @@ sqlalchemy==2.0.25
 psycopg2-binary==2.9.9
 python-dotenv==1.0.0
 httpx==0.26.0
+pywebpush==2.0.0

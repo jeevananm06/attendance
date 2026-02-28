@@ -10,12 +10,20 @@ import {
   ChevronDown,
   ChevronUp,
   RefreshCw,
-  Banknote
+  Banknote,
+  FileText
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import SalarySlip from '../components/SalarySlip';
+
+const MONTHS = [
+  'January','February','March','April','May','June',
+  'July','August','September','October','November','December'
+];
 
 const Salary = () => {
   const { isAdmin } = useAuth();
+  const [tab, setTab] = useState('pending'); // 'pending' | 'register'
   const [pendingSalaries, setPendingSalaries] = useState(null);
   const [labours, setLabours] = useState([]);
   const [advances, setAdvances] = useState({}); // { labourId: { pending_amount, advances: [] } }
@@ -28,6 +36,13 @@ const Salary = () => {
   const [calculatingLabour, setCalculatingLabour] = useState(null);
   const [payPanel, setPayPanel] = useState(null); // { labourId, weekEnd, total }
   const [payAmount, setPayAmount] = useState('');
+  const [slip, setSlip] = useState(null);
+
+  const now = new Date();
+  const [regYear, setRegYear] = useState(now.getFullYear());
+  const [regMonth, setRegMonth] = useState(now.getMonth() + 1);
+  const [register, setRegister] = useState(null);
+  const [regLoading, setRegLoading] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -99,6 +114,29 @@ const Salary = () => {
 
   const closePayPanel = () => { setPayPanel(null); setPayAmount(''); };
 
+  const handleOpenSlip = async (labour) => {
+    try {
+      const weekEnd = getLatestWeekEnd(labour.records);
+      const res = await salaryAPI.getSlip(labour.labour_id, weekEnd);
+      setSlip(res.data);
+    } catch (err) {
+      setError(err.response?.data?.detail || 'Failed to load salary slip');
+    }
+  };
+
+  const handleLoadRegister = async () => {
+    try {
+      setRegLoading(true);
+      setError('');
+      const res = await salaryAPI.getRegister(regYear, regMonth);
+      setRegister(res.data);
+    } catch (err) {
+      setError(err.response?.data?.detail || 'Failed to load register');
+    } finally {
+      setRegLoading(false);
+    }
+  };
+
   const handlePay = async () => {
     const { labourId, weekEnd, total } = payPanel;
     const entered = parseFloat(payAmount);
@@ -134,6 +172,28 @@ const Salary = () => {
 
   return (
     <div className="space-y-6">
+      {slip && <SalarySlip slip={slip} onClose={() => setSlip(null)} />}
+
+      {/* Tabs */}
+      <div className="flex gap-1 bg-gray-100 p-1 rounded-lg w-fit">
+        <button
+          onClick={() => setTab('pending')}
+          className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+            tab === 'pending' ? 'bg-white text-primary-600 shadow-sm' : 'text-gray-600 hover:text-gray-800'
+          }`}
+        >
+          Pending Payments
+        </button>
+        <button
+          onClick={() => setTab('register')}
+          className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+            tab === 'register' ? 'bg-white text-primary-600 shadow-sm' : 'text-gray-600 hover:text-gray-800'
+          }`}
+        >
+          Pay Register
+        </button>
+      </div>
+
       {error && (
         <div className="p-4 bg-red-50 border border-red-200 rounded-lg flex items-center gap-3 text-red-700">
           <AlertCircle size={20} />
@@ -151,6 +211,7 @@ const Salary = () => {
         </div>
       )}
 
+      {tab === 'pending' && <>
       {/* Summary Card */}
       <div className="card bg-gradient-to-r from-primary-500 to-primary-600 text-white">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -278,6 +339,13 @@ const Salary = () => {
 
                       <div className="flex gap-3 flex-wrap">
                         <button
+                          onClick={() => handleOpenSlip(labour)}
+                          className="btn-secondary flex items-center gap-2"
+                        >
+                          <FileText size={18} />
+                          Slip
+                        </button>
+                        <button
                           onClick={() => handleCalculateOne(labour.labour_id)}
                           disabled={calculatingLabour === labour.labour_id}
                           className="btn-secondary flex items-center gap-2"
@@ -376,6 +444,98 @@ const Salary = () => {
           </div>
         )}
       </div>
+      </>}
+
+      {tab === 'register' && (
+        <div className="card space-y-4">
+          <h3 className="text-lg font-semibold text-gray-800">Monthly Pay Register</h3>
+          <div className="flex flex-wrap gap-3 items-end">
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Year</label>
+              <input
+                type="number"
+                value={regYear}
+                onChange={(e) => setRegYear(Number(e.target.value))}
+                className="border border-gray-300 rounded-lg px-3 py-2 text-sm w-24 focus:outline-none focus:ring-2 focus:ring-primary-500"
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Month</label>
+              <select
+                value={regMonth}
+                onChange={(e) => setRegMonth(Number(e.target.value))}
+                className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+              >
+                {MONTHS.map((m, i) => (
+                  <option key={i + 1} value={i + 1}>{m}</option>
+                ))}
+              </select>
+            </div>
+            <button
+              onClick={handleLoadRegister}
+              disabled={regLoading}
+              className="btn-primary flex items-center gap-2"
+            >
+              {regLoading ? (
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              ) : (
+                <RefreshCw size={16} />
+              )}
+              Load
+            </button>
+          </div>
+
+          {register && (
+            <>
+              <p className="text-sm text-gray-500">
+                {MONTHS[register.month - 1]} {register.year} —{' '}
+                <span className="font-medium text-gray-700">{register.labours.length} labours</span>
+              </p>
+              {register.labours.length === 0 ? (
+                <p className="text-center py-8 text-gray-400">No salary records for this period</p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="text-left px-3 py-2 text-gray-600">Labour</th>
+                        <th className="text-center px-3 py-2 text-gray-600">Weeks</th>
+                        <th className="text-right px-3 py-2 text-gray-600">Earned</th>
+                        <th className="text-right px-3 py-2 text-gray-600">Paid</th>
+                        <th className="text-right px-3 py-2 text-gray-600">Balance</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {register.labours.map((l) => (
+                        <tr key={l.labour_id} className="border-t">
+                          <td className="px-3 py-2 font-medium text-gray-900">{l.labour_name}</td>
+                          <td className="px-3 py-2 text-center text-gray-600">{l.weeks.length}</td>
+                          <td className="px-3 py-2 text-right text-gray-800">₹{l.total_earned.toLocaleString()}</td>
+                          <td className="px-3 py-2 text-right text-green-700">₹{l.total_paid.toLocaleString()}</td>
+                          <td className={`px-3 py-2 text-right font-semibold ${l.balance > 0 ? 'text-orange-600' : 'text-green-600'}`}>
+                            ₹{l.balance.toLocaleString()}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot className="border-t-2 border-gray-300 bg-gray-50">
+                      <tr>
+                        <td className="px-3 py-2 font-bold text-gray-800">Total</td>
+                        <td />
+                        <td className="px-3 py-2 text-right font-bold text-gray-800">₹{register.grand_total_earned.toLocaleString()}</td>
+                        <td className="px-3 py-2 text-right font-bold text-green-700">₹{register.grand_total_paid.toLocaleString()}</td>
+                        <td className="px-3 py-2 text-right font-bold text-orange-600">
+                          ₹{(register.grand_total_earned - register.grand_total_paid).toLocaleString()}
+                        </td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      )}
     </div>
   );
 };

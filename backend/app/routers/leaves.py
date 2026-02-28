@@ -1,12 +1,14 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from typing import List
 
 from ..models import Leave, LeaveCreate, LeaveBalance, LeaveStatus, User, AuditAction
 from ..auth import get_current_manager_or_admin
 from ..db_wrapper import (
     create_leave, get_leaves, approve_leave, get_leave_balance,
-    init_leave_balance, get_labour, create_audit_log
+    init_leave_balance, get_labour, create_audit_log, create_notification
 )
+from ..whatsapp_service import send_whatsapp_message
+from ..push_service import send_push_to_user
 
 router = APIRouter(prefix="/leaves", tags=["Leave Management"])
 
@@ -62,6 +64,7 @@ async def apply_leave(
 @router.post("/{leave_id}/approve")
 async def approve_leave_request(
     leave_id: str,
+    background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_manager_or_admin)
 ):
     """Approve a leave request"""
@@ -78,13 +81,37 @@ async def approve_leave_request(
         entity_type="leave",
         entity_id=leave_id
     )
-    
+
+    try:
+        labour = get_labour(leave.labour_id)
+        labour_name = labour.name if labour else leave.labour_id
+        create_notification(
+            user=current_user.username,
+            notif_type="leave_approved",
+            title="Leave Approved",
+            message=f"Leave for {labour_name} ({leave.start_date} to {leave.end_date}) approved",
+            labour_id=leave.labour_id
+        )
+        if labour and labour.phone:
+            msg = (
+                f"Dear {labour_name}, your leave request ({leave.start_date} to {leave.end_date}) "
+                f"has been approved. - AttendanceMS"
+            )
+            background_tasks.add_task(send_whatsapp_message, labour.phone, msg)
+        background_tasks.add_task(
+            send_push_to_user, current_user.username,
+            "Leave Approved", f"Leave for {labour_name} approved"
+        )
+    except Exception:
+        pass
+
     return {"message": "Leave approved", "leave": leave}
 
 
 @router.post("/{leave_id}/reject")
 async def reject_leave_request(
     leave_id: str,
+    background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_manager_or_admin)
 ):
     """Reject a leave request"""
@@ -94,14 +121,37 @@ async def reject_leave_request(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Leave with id {leave_id} not found"
         )
-    
+
     create_audit_log(
         user=current_user.username,
         action=AuditAction.REJECT,
         entity_type="leave",
         entity_id=leave_id
     )
-    
+
+    try:
+        labour = get_labour(leave.labour_id)
+        labour_name = labour.name if labour else leave.labour_id
+        create_notification(
+            user=current_user.username,
+            notif_type="leave_rejected",
+            title="Leave Rejected",
+            message=f"Leave for {labour_name} ({leave.start_date} to {leave.end_date}) rejected",
+            labour_id=leave.labour_id
+        )
+        if labour and labour.phone:
+            msg = (
+                f"Dear {labour_name}, your leave request ({leave.start_date} to {leave.end_date}) "
+                f"has been rejected. - AttendanceMS"
+            )
+            background_tasks.add_task(send_whatsapp_message, labour.phone, msg)
+        background_tasks.add_task(
+            send_push_to_user, current_user.username,
+            "Leave Rejected", f"Leave for {labour_name} rejected"
+        )
+    except Exception:
+        pass
+
     return {"message": "Leave rejected", "leave": leave}
 
 

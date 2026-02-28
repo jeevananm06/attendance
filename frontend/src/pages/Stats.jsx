@@ -1,16 +1,20 @@
 import { useState, useEffect, useRef } from 'react';
 import { statsAPI } from '../api';
+import { useAuth } from '../context/AuthContext';
 import {
   BarChart3,
   TrendingUp,
   Users,
   Calendar,
   AlertCircle,
-  X
+  X,
+  MapPin
 } from 'lucide-react';
 import {
   LineChart,
   Line,
+  BarChart,
+  Bar,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -25,13 +29,16 @@ import {
 const COLORS = ['#22c55e', '#eab308', '#ef4444', '#6b7280'];
 
 const Stats = () => {
+  const { isAdmin } = useAuth();
   const [overview, setOverview] = useState(null);
   const [weeklyStats, setWeeklyStats] = useState(null);
   const [labourStats, setLabourStats] = useState(null);
+  const [siteCosts, setSiteCosts] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [selectedLabour, setSelectedLabour] = useState(null);
   const [labourDetail, setLabourDetail] = useState(null);
+  const [labourTrend, setLabourTrend] = useState(null);
 
   useEffect(() => {
     fetchData();
@@ -40,14 +47,17 @@ const Stats = () => {
   const fetchData = async (silent = false) => {
     try {
       if (!silent) setLoading(true);
-      const [overviewRes, weeklyRes, labourRes] = await Promise.all([
+      const requests = [
         statsAPI.getOverview(),
         statsAPI.getWeekly(8),
         statsAPI.getAllLabourStats()
-      ]);
+      ];
+      if (isAdmin) requests.push(statsAPI.getSiteCosts());
+      const [overviewRes, weeklyRes, labourRes, siteRes] = await Promise.all(requests);
       setOverview(overviewRes.data);
       setWeeklyStats(weeklyRes.data);
       setLabourStats(labourRes.data);
+      if (siteRes) setSiteCosts(siteRes.data);
     } catch (err) {
       setError('Failed to load statistics');
       console.error(err);
@@ -58,8 +68,11 @@ const Stats = () => {
 
   const fetchLabourDetail = async (labourId) => {
     try {
-      const response = await statsAPI.getLabourStats(labourId);
-      setLabourDetail(response.data);
+      const requests = [statsAPI.getLabourStats(labourId)];
+      if (isAdmin) requests.push(statsAPI.getTrends(labourId, 12));
+      const [detailRes, trendRes] = await Promise.all(requests);
+      setLabourDetail(detailRes.data);
+      setLabourTrend(trendRes?.data || null);
       setSelectedLabour(labourId);
     } catch (err) {
       setError('Failed to load labour details');
@@ -200,6 +213,28 @@ const Stats = () => {
         </div>
       </div>
 
+      {/* Site-wise Cost Stats (Admin only) */}
+      {isAdmin && siteCosts && siteCosts.sites.length > 0 && (
+        <div className="card">
+          <div className="flex items-center gap-2 mb-4">
+            <MapPin className="text-primary-600" size={20} />
+            <h3 className="text-lg font-semibold text-gray-800">Site-wise Cost</h3>
+          </div>
+          <ResponsiveContainer width="100%" height={280}>
+            <BarChart data={siteCosts.sites} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="site_name" tick={{ fontSize: 12 }} />
+              <YAxis tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`} />
+              <Tooltip formatter={(value) => `₹${value.toLocaleString()}`} />
+              <Legend />
+              <Bar dataKey="total_earned" name="Earned" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="total_paid" name="Paid" fill="#22c55e" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="balance" name="Balance" fill="#f97316" radius={[4, 4, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      )}
+
       {/* Labour Stats Table */}
       <div className="card">
         <h3 className="text-lg font-semibold text-gray-800 mb-4">Labour Statistics</h3>
@@ -281,6 +316,7 @@ const Stats = () => {
                 onClick={() => {
                   setSelectedLabour(null);
                   setLabourDetail(null);
+                  setLabourTrend(null);
                 }}
                 className="p-2 hover:bg-gray-100 rounded-lg"
               >
@@ -288,7 +324,7 @@ const Stats = () => {
               </button>
             </div>
 
-            <div className="p-6 space-y-6">
+            <div className="p-6 space-y-6 overflow-y-auto max-h-[70vh]">
               <div>
                 <p className="text-sm text-gray-500 mb-1">Daily Wage</p>
                 <p className="text-2xl font-bold text-gray-800">₹{labourDetail.daily_wage}</p>
@@ -348,6 +384,28 @@ const Stats = () => {
                   </div>
                 </div>
               </div>
+
+              {isAdmin && labourTrend && labourTrend.trend.length > 0 && (
+                <div>
+                  <h4 className="font-semibold text-gray-700 mb-3">Attendance Trend (Last 12 Weeks)</h4>
+                  <ResponsiveContainer width="100%" height={200}>
+                    <LineChart data={labourTrend.trend} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="label" tick={{ fontSize: 10 }} />
+                      <YAxis domain={[0, 100]} tickFormatter={(v) => `${v}%`} tick={{ fontSize: 10 }} />
+                      <Tooltip formatter={(v) => `${v}%`} />
+                      <Line
+                        type="monotone"
+                        dataKey="attendance_pct"
+                        name="Attendance %"
+                        stroke="#3b82f6"
+                        strokeWidth={2}
+                        dot={{ r: 3 }}
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
             </div>
           </div>
         </div>

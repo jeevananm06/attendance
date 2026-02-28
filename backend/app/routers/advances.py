@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from typing import List
 from datetime import date
 
@@ -6,8 +6,10 @@ from ..models import Advance, AdvanceCreate, AdvanceRepay, User, AuditAction
 from ..auth import get_current_manager_or_admin
 from ..db_wrapper import (
     create_advance, get_advances, get_pending_advances, mark_advance_deducted, repay_advance_partial,
-    get_labour, create_audit_log, get_all_labours
+    get_labour, create_audit_log, get_all_labours, create_notification
 )
+from ..whatsapp_service import send_whatsapp_message
+from ..push_service import send_push_to_user
 
 router = APIRouter(prefix="/advances", tags=["Advances"])
 
@@ -25,6 +27,7 @@ async def list_advances(
 @router.post("/", response_model=Advance)
 async def give_advance(
     data: AdvanceCreate,
+    background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_manager_or_admin)
 ):
     """Give advance payment to a labour"""
@@ -47,9 +50,30 @@ async def give_advance(
         action=AuditAction.CREATE,
         entity_type="advance",
         entity_id=advance.id,
-        new_value=f"₹{data.amount} to {labour.name}"
+        new_value=f"\u20b9{data.amount} to {labour.name}"
     )
-    
+
+    try:
+        create_notification(
+            user=current_user.username,
+            notif_type="advance_given",
+            title="Advance Given",
+            message=f"Advance of \u20b9{data.amount:.0f} given to {labour.name}",
+            labour_id=data.labour_id
+        )
+        if labour.phone:
+            msg = (
+                f"Dear {labour.name}, an advance of \u20b9{data.amount:.0f} has been recorded "
+                f"for you. - AttendanceMS"
+            )
+            background_tasks.add_task(send_whatsapp_message, labour.phone, msg)
+        background_tasks.add_task(
+            send_push_to_user, current_user.username,
+            "Advance Given", f"Advance of \u20b9{data.amount:.0f} given to {labour.name}"
+        )
+    except Exception:
+        pass
+
     return advance
 
 

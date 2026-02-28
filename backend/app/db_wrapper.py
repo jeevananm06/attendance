@@ -29,6 +29,10 @@ if USE_POSTGRES:
         create_audit_log, get_audit_logs,
         # Export operations
         export_labours_csv, export_attendance_csv, export_salary_csv, export_all_data,
+        # Notification operations
+        create_notification, get_notifications, get_unread_count, mark_notifications_read,
+        # Push subscription operations
+        save_push_subscription, delete_push_subscription, get_push_subscriptions,
         # Init
         init_db_tables as init_csv_files
     )
@@ -90,6 +94,55 @@ else:
         create_backup, get_backups, restore_backup, get_backup_file_path,
         # Export operations
         export_labours_csv, export_attendance_csv, export_salary_csv, export_all_data,
+        # Notification operations
+        create_notification, get_notifications, get_unread_count, mark_notifications_read,
+        # Push subscription operations
+        save_push_subscription, delete_push_subscription, get_push_subscriptions,
         # Init
         init_csv_files
     )
+
+    def mark_advance_deducted(advance_id: str):
+        from .database import get_advances
+        import pandas as pd
+        from .config import ADVANCES_FILE
+        from datetime import date
+        if not ADVANCES_FILE.exists():
+            return None
+        df = pd.read_csv(ADVANCES_FILE)
+        idx = df[df["id"] == advance_id].index
+        if len(idx) == 0:
+            return None
+        df.loc[idx, "is_deducted"] = True
+        df.loc[idx, "deducted_from_week"] = date.today().isoformat()
+        df.to_csv(ADVANCES_FILE, index=False)
+        advances = get_advances()
+        for a in advances:
+            if a.id == advance_id:
+                return a
+        return None
+
+    def repay_advance_partial(advance_id: str, repay_amount: float):
+        from .database import get_advances
+        import pandas as pd
+        from .config import ADVANCES_FILE
+        if not ADVANCES_FILE.exists():
+            return None
+        df = pd.read_csv(ADVANCES_FILE)
+        idx = df[df["id"] == advance_id].index
+        if len(idx) == 0:
+            return None
+        if "repaid_amount" not in df.columns:
+            df["repaid_amount"] = 0.0
+        current = float(df.loc[idx[0], "repaid_amount"]) if pd.notna(df.loc[idx[0], "repaid_amount"]) else 0.0
+        total_amount = float(df.loc[idx[0], "amount"])
+        new_repaid = current + repay_amount
+        df.loc[idx, "repaid_amount"] = new_repaid
+        if new_repaid >= total_amount:
+            df.loc[idx, "is_deducted"] = True
+        df.to_csv(ADVANCES_FILE, index=False)
+        advances = get_advances()
+        for a in advances:
+            if a.id == advance_id:
+                return a
+        return None

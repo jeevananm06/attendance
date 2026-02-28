@@ -1,11 +1,14 @@
 import os
-from fastapi import APIRouter, Depends, HTTPException, status
+import calendar as cal_module
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from typing import List
 from datetime import date
 
 from ..models import SalaryRecord, SalaryPayment, User
 from ..auth import get_current_manager_or_admin, get_current_admin
-from ..db_wrapper import get_salary_records, mark_salary_paid, get_all_labours, get_labour
+from ..db_wrapper import get_salary_records, mark_salary_paid, get_all_labours, get_labour, create_notification, get_pending_advances
+from ..whatsapp_service import send_whatsapp_message
+from ..push_service import send_push_to_user
 
 USE_POSTGRES = os.getenv("USE_POSTGRES", "false").lower() == "true"
 if USE_POSTGRES:
@@ -151,6 +154,7 @@ async def calculate_all_salaries(
 @router.post("/pay")
 async def pay_salary(
     payment: SalaryPayment,
+    background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_admin)
 ):
     """Mark salary as paid for a labour up to a specific week.
@@ -181,12 +185,154 @@ async def pay_salary(
             detail="No unpaid salary records found for this period"
         )
 
+    # In-app notification
+    try:
+        create_notification(
+            user=current_user.username,
+            notif_type="salary_paid",
+            title="Salary Paid",
+            message=f"Paid \u20b9{result['amount_paid']:.0f} to {labour.name}",
+            labour_id=payment.labour_id
+        )
+    except Exception:
+        pass
+
+    # WhatsApp notification to labour
+    if labour.phone:
+        msg = (
+            f"Dear {labour.name}, your salary of \u20b9{result['amount_paid']:.0f} "
+            f"has been paid. - AttendanceMS"
+        )
+        background_tasks.add_task(send_whatsapp_message, labour.phone, msg)
+
+    # Push notification to the user who paid
+    background_tasks.add_task(
+        send_push_to_user,
+        current_user.username,
+        "Salary Paid",
+        f"Paid \u20b9{result['amount_paid']:.0f} to {labour.name}"
+    )
+
     return {
         "message": f"Salary paid for {labour.name}",
         "paid_by": current_user.username,
         "weeks_paid": result["weeks_paid"],
         "amount_paid": result["amount_paid"],
         "remaining": result["remaining"],
+    }
+
+
+@router.get("/slip/{labour_id}")
+async def get_salary_slip(
+    labour_id: str,
+    week_end: date = None,
+    current_user: User = Depends(get_current_admin)
+):
+    """Get salary slip data for a specific week (Admin only)"""
+    labour = get_labour(labour_id)
+    if not labour:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Labour with id {labour_id} not found"
+        )
+
+    records = get_salary_records(labour_id=labour_id)
+    if not records:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No salary records found for this labour"
+        )
+
+    if week_end:
+        record = next((r for r in records if r.week_end == week_end), None)
+    else:
+        record = max(records, key=lambda r: r.week_end)
+
+    if not record:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No salary record found for the requested period"
+        )
+
+    advance_pending = get_pending_advances(labour_id)
+    net_salary = max(0.0, record.total_amount - advance_pending)
+
+    return {
+        "labour_id": labour.id,
+        "labour_name": labour.name,
+        "daily_wage": labour.daily_wage,
+        "pay_cycle": getattr(labour, "pay_cycle", "weekly") or "weekly",
+        "week_start": record.week_start.isoformat(),
+        "week_end": record.week_end.isoformat(),
+        "days_present": record.days_present,
+        "gross_salary": record.total_amount,
+        "advance_pending": advance_pending,
+        "net_salary": net_salary,
+        "is_paid": record.is_paid,
+        "paid_amount": record.paid_amount,
+        "paid_date": record.paid_date.isoformat() if record.paid_date else None,
+        "paid_by": record.paid_by,
+        "generated_at": date.today().isoformat(),
+    }
+
+
+@router.get("/register")
+async def get_pay_register(
+    year: int,
+    month: int,
+    current_user: User = Depends(get_current_admin)
+):
+    """Monthly pay register for all labours (Admin only)"""
+    if not (1 <= month <= 12):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="month must be between 1 and 12"
+        )
+
+    from_date = date(year, month, 1)
+    to_date = date(year, month, cal_module.monthrange(year, month)[1])
+
+    labours = get_all_labours()
+    all_records = get_salary_records()
+
+    result = []
+    for labour in labours:
+        labour_records = [
+            r for r in all_records
+            if r.labour_id == labour.id and from_date <= r.week_end <= to_date
+        ]
+        if not labour_records:
+            continue
+
+        total_earned = sum(r.total_amount for r in labour_records)
+        total_paid = sum(r.paid_amount for r in labour_records)
+        result.append({
+            "labour_id": labour.id,
+            "labour_name": labour.name,
+            "daily_wage": labour.daily_wage,
+            "weeks": [
+                {
+                    "week_start": r.week_start.isoformat(),
+                    "week_end": r.week_end.isoformat(),
+                    "days_present": r.days_present,
+                    "total_amount": r.total_amount,
+                    "paid_amount": r.paid_amount,
+                    "is_paid": r.is_paid,
+                }
+                for r in sorted(labour_records, key=lambda x: x.week_end)
+            ],
+            "total_earned": total_earned,
+            "total_paid": total_paid,
+            "balance": total_earned - total_paid,
+        })
+
+    result.sort(key=lambda x: x["labour_name"])
+    return {
+        "year": year,
+        "month": month,
+        "labours": result,
+        "grand_total_earned": sum(r["total_earned"] for r in result),
+        "grand_total_paid": sum(r["total_paid"] for r in result),
     }
 
 

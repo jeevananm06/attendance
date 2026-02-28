@@ -11,12 +11,14 @@ from sqlalchemy import and_, or_
 
 from .db_models import (
     UserDB, LabourDB, AttendanceDB, SalaryDB, OvertimeDB,
-    AdvanceDB, LeaveDB, SiteDB, SiteAssignmentDB, AuditLogDB, BackupDB
+    AdvanceDB, LeaveDB, SiteDB, SiteAssignmentDB, AuditLogDB, BackupDB,
+    NotificationDB, PushSubscriptionDB
 )
 from .models import (
     User, Labour, Attendance, SalaryRecord, UserRole, AttendanceStatus,
     Overtime, Advance, Leave, LeaveType, LeaveStatus,
-    Site, LabourSiteAssignment, AuditLog, AuditAction
+    Site, LabourSiteAssignment, AuditLog, AuditAction,
+    Notification, NotificationType
 )
 from .db_connection import get_db_session
 
@@ -1093,6 +1095,118 @@ def export_all_data() -> dict:
         "attendance": export_attendance_csv(),
         "salary": export_salary_csv()
     }
+
+
+# ============== NOTIFICATION OPERATIONS ==============
+
+def create_notification(user: str, notif_type: str, title: str, message: str,
+                        labour_id: str = None) -> Notification:
+    db = get_db_session()
+    try:
+        notif_id = str(uuid.uuid4())[:8]
+        now = datetime.utcnow()
+        db_notif = NotificationDB(
+            id=notif_id, user=user, labour_id=labour_id,
+            type=notif_type, title=title, message=message,
+            is_read=False, created_at=now
+        )
+        db.add(db_notif)
+        db.commit()
+        return Notification(
+            id=notif_id, user=user, labour_id=labour_id,
+            type=NotificationType(notif_type), title=title, message=message,
+            is_read=False, created_at=now
+        )
+    finally:
+        db.close()
+
+
+def get_notifications(user: str, unread_only: bool = False, limit: int = 50) -> List[Notification]:
+    db = get_db_session()
+    try:
+        q = db.query(NotificationDB).filter(NotificationDB.user == user)
+        if unread_only:
+            q = q.filter(NotificationDB.is_read == False)
+        rows = q.order_by(NotificationDB.created_at.desc()).limit(limit).all()
+        return [
+            Notification(
+                id=r.id, user=r.user, labour_id=r.labour_id,
+                type=NotificationType(r.type), title=r.title, message=r.message,
+                is_read=r.is_read, created_at=r.created_at
+            ) for r in rows
+        ]
+    finally:
+        db.close()
+
+
+def get_unread_count(user: str) -> int:
+    db = get_db_session()
+    try:
+        return db.query(NotificationDB).filter(
+            NotificationDB.user == user, NotificationDB.is_read == False
+        ).count()
+    finally:
+        db.close()
+
+
+def mark_notifications_read(user: str, notification_ids: List[str] = None) -> int:
+    db = get_db_session()
+    try:
+        q = db.query(NotificationDB).filter(
+            NotificationDB.user == user, NotificationDB.is_read == False
+        )
+        if notification_ids:
+            q = q.filter(NotificationDB.id.in_(notification_ids))
+        count = q.count()
+        q.update({"is_read": True}, synchronize_session=False)
+        db.commit()
+        return count
+    finally:
+        db.close()
+
+
+# ============== PUSH SUBSCRIPTION OPERATIONS ==============
+
+def save_push_subscription(user: str, endpoint: str, p256dh: str, auth: str) -> bool:
+    db = get_db_session()
+    try:
+        existing = db.query(PushSubscriptionDB).filter(
+            PushSubscriptionDB.endpoint == endpoint
+        ).first()
+        if existing:
+            existing.user = user
+            existing.p256dh = p256dh
+            existing.auth = auth
+        else:
+            db.add(PushSubscriptionDB(
+                id=str(uuid.uuid4())[:8], user=user,
+                endpoint=endpoint, p256dh=p256dh, auth=auth
+            ))
+        db.commit()
+        return True
+    finally:
+        db.close()
+
+
+def delete_push_subscription(endpoint: str) -> bool:
+    db = get_db_session()
+    try:
+        deleted = db.query(PushSubscriptionDB).filter(
+            PushSubscriptionDB.endpoint == endpoint
+        ).delete()
+        db.commit()
+        return deleted > 0
+    finally:
+        db.close()
+
+
+def get_push_subscriptions(user: str) -> List[dict]:
+    db = get_db_session()
+    try:
+        rows = db.query(PushSubscriptionDB).filter(PushSubscriptionDB.user == user).all()
+        return [{"endpoint": r.endpoint, "keys": {"p256dh": r.p256dh, "auth": r.auth}} for r in rows]
+    finally:
+        db.close()
 
 
 # ============== INITIALIZATION ==============

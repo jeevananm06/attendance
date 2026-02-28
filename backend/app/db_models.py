@@ -184,8 +184,32 @@ class AuditLogDB(Base):
 
 class BackupDB(Base):
     __tablename__ = "backups"
-    
+
     id = Column(String(36), primary_key=True, index=True)
     filename = Column(String(255), nullable=False)
     created_by = Column(String(100), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class NotificationDB(Base):
+    __tablename__ = "notifications"
+
+    id = Column(String(36), primary_key=True, index=True)
+    user = Column(String(100), nullable=False, index=True)  # recipient username
+    labour_id = Column(String(36), nullable=True)
+    type = Column(String(30), nullable=False)
+    title = Column(String(200), nullable=False)
+    message = Column(Text, nullable=False)
+    is_read = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class PushSubscriptionDB(Base):
+    __tablename__ = "push_subscriptions"
+
+    id = Column(String(36), primary_key=True, index=True)
+    user = Column(String(100), nullable=False, index=True)
+    endpoint = Column(Text, nullable=False, unique=True)
+    p256dh = Column(Text, nullable=False)
+    auth = Column(Text, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)

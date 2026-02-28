@@ -7,7 +7,9 @@ from ..auth import get_current_manager_or_admin, get_current_authenticated_user,
 from ..db_wrapper import (
     get_all_labours,
     get_attendance_by_labour,
-    get_salary_records
+    get_salary_records,
+    get_sites,
+    get_labours_by_site
 )
 from ..models import AttendanceStatus
 
@@ -182,3 +184,78 @@ async def get_all_labour_stats(
         })
     
     return {"labours": stats}
+
+
+@router.get("/sites")
+async def get_site_cost_stats(
+    current_user: User = Depends(get_current_admin)
+):
+    """Get cost statistics per site (Admin only)"""
+    sites = get_sites()
+    all_salary = get_salary_records()
+
+    result = []
+    for site in sites:
+        labours = get_labours_by_site(site.id)
+        labour_ids = {l.id for l in labours}
+
+        site_records = [r for r in all_salary if r.labour_id in labour_ids]
+        total_earned = sum(r.total_amount for r in site_records)
+        total_paid = sum(r.paid_amount for r in site_records)
+
+        result.append({
+            "site_id": site.id,
+            "site_name": site.name,
+            "labour_count": len(labours),
+            "total_earned": total_earned,
+            "total_paid": total_paid,
+            "balance": total_earned - total_paid,
+        })
+
+    result.sort(key=lambda x: x["total_earned"], reverse=True)
+    return {
+        "sites": result,
+        "grand_total_earned": sum(r["total_earned"] for r in result),
+        "grand_total_paid": sum(r["total_paid"] for r in result),
+    }
+
+
+@router.get("/trends")
+async def get_attendance_trends(
+    labour_id: str,
+    weeks: int = 12,
+    current_user: User = Depends(get_current_admin)
+):
+    """Get weekly attendance percentage trend for a labour (Admin only)"""
+    from ..db_wrapper import get_labour
+    from ..salary_calculator import get_week_boundaries
+
+    labour = get_labour(labour_id)
+    if not labour:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail="Labour not found")
+
+    today = date.today()
+    trend = []
+
+    for i in range(weeks - 1, -1, -1):
+        target = today - timedelta(weeks=i)
+        week_start, week_end = get_week_boundaries(target)
+
+        attendance = get_attendance_by_labour(labour_id, week_start, week_end)
+        present = sum(1.0 if a.status == AttendanceStatus.PRESENT else 0.5
+                      for a in attendance if a.status != AttendanceStatus.ABSENT)
+        pct = round((present / 6) * 100, 1)  # 6-day work week
+
+        salary_records = get_salary_records(labour_id=labour_id)
+        week_record = next((r for r in salary_records if r.week_end == week_end), None)
+
+        trend.append({
+            "week_end": week_end.isoformat(),
+            "label": week_end.strftime("%d %b"),
+            "attendance_pct": pct,
+            "days_present": present,
+            "earnings": week_record.total_amount if week_record else 0.0,
+        })
+
+    return {"labour_id": labour_id, "labour_name": labour.name, "trend": trend}

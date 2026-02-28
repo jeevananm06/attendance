@@ -157,6 +157,13 @@ export const salaryAPI = {
   },
   getSummary: () =>
     cached('salary:summary', () => api.get('/salary/summary'), 60_000),
+  getSlip: (labourId, weekEnd) => {
+    let url = `/salary/slip/${labourId}`;
+    if (weekEnd) url += `?week_end=${weekEnd}`;
+    return api.get(url);
+  },
+  getRegister: (year, month) =>
+    api.get(`/salary/register?year=${year}&month=${month}`),
 };
 
 export const statsAPI = {
@@ -174,6 +181,9 @@ export const statsAPI = {
   getOverview: () => cached('stats:overview', () => api.get('/stats/overview'), 60_000),
   getWeekly: (weeks = 4) => cached(`stats:weekly:${weeks}`, () => api.get(`/stats/weekly?weeks=${weeks}`), 60_000),
   getAllLabourStats: () => cached('stats:all-labours', () => api.get('/stats/all-labours'), 60_000),
+  getSiteCosts: () => cached('stats:sites', () => api.get('/stats/sites'), 60_000),
+  getTrends: (labourId, weeks = 12) =>
+    api.get(`/stats/trends?labour_id=${labourId}&weeks=${weeks}`),
 };
 
 export const exportAPI = {
@@ -284,6 +294,42 @@ export const reportsAPI = {
     return api.get(url, { responseType: 'text' });
   },
   getSummary: () => api.get('/reports/summary', { responseType: 'text' }),
+  getPayroll: (year, month) => api.get(`/reports/payroll?year=${year}&month=${month}`, { responseType: 'text' }),
+};
+
+export const pushAPI = {
+  getVapidPublicKey: () => api.get('/push/vapid-public-key'),
+  subscribe: (subscription) => api.post('/push/subscribe', subscription),
+  unsubscribe: (endpoint) => api.delete('/push/unsubscribe', { data: { endpoint } }),
+};
+
+export const notificationsAPI = {
+  getAll: (unreadOnly = false) =>
+    api.get(`/notifications/?unread_only=${unreadOnly}`),
+  getUnreadCount: () =>
+    cached('notifications:count', () => api.get('/notifications/unread-count'), 30_000),
+  markRead: (ids) => {
+    invalidateCache('notifications:count');
+    return api.post('/notifications/mark-read', { notification_ids: ids });
+  },
+  markAllRead: () => {
+    invalidateCache('notifications:count');
+    return api.post('/notifications/mark-all-read');
+  },
+};
+
+export const documentsAPI = {
+  list: (labourId) => api.get(`/documents/${labourId}`),
+  upload: (labourId, file, docType) => {
+    const form = new FormData();
+    form.append('file', file);
+    form.append('doc_type', docType);
+    return api.post(`/documents/${labourId}`, form, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
+  },
+  getDownloadUrl: (labourId, docId) => `${api.defaults.baseURL}/documents/${labourId}/${docId}/download`,
+  delete: (labourId, docId) => api.delete(`/documents/${labourId}/${docId}`),
 };
 
 export default api;

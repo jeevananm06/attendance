@@ -2,11 +2,12 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import {
   overtimeAPI, advancesAPI, leavesAPI, sitesAPI,
-  auditAPI, backupAPI, reportsAPI, laboursAPI
+  auditAPI, backupAPI, reportsAPI, laboursAPI, documentsAPI
 } from '../api';
 import {
   Clock, Wallet, Calendar, MapPin, Shield, Database, FileText,
-  Plus, Check, X, AlertCircle, Download, RefreshCw, ChevronDown, ChevronUp
+  Plus, Check, X, AlertCircle, Download, RefreshCw, ChevronDown, ChevronUp,
+  FileArchive, Trash2, Eye, Upload
 } from 'lucide-react';
 
 const TabButton = ({ active, onClick, icon: Icon, label }) => (
@@ -49,6 +50,7 @@ const More = () => {
     { id: 'advances', label: 'Advances', icon: Wallet },
     { id: 'leaves', label: 'Leaves', icon: Calendar },
     { id: 'sites', label: 'Sites', icon: MapPin },
+    { id: 'documents', label: 'Documents', icon: FileArchive },
     { id: 'reports', label: 'Reports', icon: FileText },
     ...(isAdmin ? [
       { id: 'audit', label: 'Audit Logs', icon: Shield },
@@ -98,8 +100,11 @@ const More = () => {
           {activeTab === 'sites' && (
             <SitesTab labours={labours} setError={setError} setSuccess={setSuccess} isAdmin={isAdmin} />
           )}
+          {activeTab === 'documents' && (
+            <DocumentsTab labours={labours} isAdmin={isAdmin} setError={setError} setSuccess={setSuccess} />
+          )}
           {activeTab === 'reports' && (
-            <ReportsTab labours={labours} />
+            <ReportsTab labours={labours} isAdmin={isAdmin} />
           )}
           {activeTab === 'audit' && isAdmin && (
             <AuditTab />
@@ -671,8 +676,150 @@ const SitesTab = ({ labours, setError, setSuccess, isAdmin }) => {
   );
 };
 
+// Documents Tab
+const DOC_TYPES = ['aadhar', 'pan', 'photo', 'certificate', 'contract', 'other'];
+
+const DocumentsTab = ({ labours, isAdmin, setError, setSuccess }) => {
+  const [selectedLabour, setSelectedLabour] = useState('');
+  const [docs, setDocs] = useState([]);
+  const [loadingDocs, setLoadingDocs] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [docType, setDocType] = useState('aadhar');
+
+  const loadDocs = async (labourId) => {
+    if (!labourId) return;
+    setLoadingDocs(true);
+    try {
+      const res = await documentsAPI.list(labourId);
+      setDocs(res.data.documents || []);
+    } catch (err) {
+      setError('Failed to load documents');
+    } finally {
+      setLoadingDocs(false);
+    }
+  };
+
+  const handleLabourChange = (e) => {
+    setSelectedLabour(e.target.value);
+    setDocs([]);
+    if (e.target.value) loadDocs(e.target.value);
+  };
+
+  const handleUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file || !selectedLabour) return;
+    setUploading(true);
+    try {
+      await documentsAPI.upload(selectedLabour, file, docType);
+      setSuccess('Document uploaded');
+      loadDocs(selectedLabour);
+    } catch (err) {
+      setError(err.response?.data?.detail || 'Upload failed');
+    } finally {
+      setUploading(false);
+      e.target.value = '';
+    }
+  };
+
+  const handleDelete = async (docId) => {
+    if (!confirm('Delete this document?')) return;
+    try {
+      await documentsAPI.delete(selectedLabour, docId);
+      setSuccess('Document deleted');
+      setDocs((prev) => prev.filter((d) => d.id !== docId));
+    } catch (err) {
+      setError('Failed to delete document');
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <h3 className="text-lg font-semibold text-gray-800">Labour Documents</h3>
+
+      <div className="flex flex-wrap gap-3 items-end">
+        <div className="flex-1 min-w-[180px]">
+          <label className="label">Select Labour</label>
+          <select value={selectedLabour} onChange={handleLabourChange} className="input">
+            <option value="">Select Labour</option>
+            {labours.map((l) => (
+              <option key={l.id} value={l.id}>{l.name}</option>
+            ))}
+          </select>
+        </div>
+
+        {isAdmin && selectedLabour && (
+          <>
+            <div>
+              <label className="label">Document Type</label>
+              <select value={docType} onChange={(e) => setDocType(e.target.value)} className="input w-36">
+                {DOC_TYPES.map((t) => (
+                  <option key={t} value={t}>{t.charAt(0).toUpperCase() + t.slice(1)}</option>
+                ))}
+              </select>
+            </div>
+            <label className={`btn-primary flex items-center gap-2 cursor-pointer ${uploading ? 'opacity-60 pointer-events-none' : ''}`}>
+              {uploading ? (
+                <RefreshCw size={16} className="animate-spin" />
+              ) : (
+                <Upload size={16} />
+              )}
+              Upload
+              <input type="file" className="hidden" onChange={handleUpload}
+                accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" />
+            </label>
+          </>
+        )}
+      </div>
+
+      {loadingDocs ? (
+        <div className="flex justify-center py-8">
+          <div className="w-6 h-6 border-4 border-primary-600 border-t-transparent rounded-full animate-spin" />
+        </div>
+      ) : selectedLabour && docs.length === 0 ? (
+        <p className="text-center py-8 text-gray-400">No documents uploaded yet</p>
+      ) : (
+        <div className="space-y-2">
+          {docs.map((doc) => (
+            <div key={doc.id} className="flex items-center justify-between bg-gray-50 border rounded-lg px-4 py-3">
+              <div className="flex items-center gap-3">
+                <FileText size={20} className="text-primary-600" />
+                <div>
+                  <p className="font-medium text-gray-800 text-sm">{doc.original_name}</p>
+                  <p className="text-xs text-gray-500 capitalize">
+                    {doc.doc_type} · Uploaded {new Date(doc.uploaded_at).toLocaleDateString('en-IN')}
+                  </p>
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <a
+                  href={documentsAPI.getDownloadUrl(selectedLabour, doc.id)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="p-2 rounded-lg hover:bg-gray-200 text-blue-600"
+                  title="View / Download"
+                >
+                  <Eye size={16} />
+                </a>
+                {isAdmin && (
+                  <button
+                    onClick={() => handleDelete(doc.id)}
+                    className="p-2 rounded-lg hover:bg-red-50 text-red-500"
+                    title="Delete"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
 // Reports Tab
-const ReportsTab = ({ labours }) => {
+const ReportsTab = ({ labours, isAdmin }) => {
   const [reportType, setReportType] = useState('monthly');
   const [year, setYear] = useState(new Date().getFullYear());
   const [month, setMonth] = useState(new Date().getMonth() + 1);
@@ -685,6 +832,8 @@ const ReportsTab = ({ labours }) => {
       let response;
       if (reportType === 'monthly') {
         response = await reportsAPI.getMonthly(year, month);
+      } else if (reportType === 'payroll') {
+        response = await reportsAPI.getPayroll(year, month);
       } else if (reportType === 'labour' && labourId) {
         response = await reportsAPI.getLabourReport(labourId);
       } else {
@@ -704,11 +853,17 @@ const ReportsTab = ({ labours }) => {
     <div>
       <h3 className="text-lg font-semibold mb-4">Generate Reports</h3>
       
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <div className={`border-2 rounded-lg p-4 cursor-pointer transition-colors ${reportType === 'monthly' ? 'border-primary-500 bg-primary-50' : 'border-gray-200 hover:border-gray-300'}`} onClick={() => setReportType('monthly')}>
           <h4 className="font-semibold">Monthly Report</h4>
           <p className="text-sm text-gray-500">Detailed monthly summary</p>
         </div>
+        {isAdmin && (
+          <div className={`border-2 rounded-lg p-4 cursor-pointer transition-colors ${reportType === 'payroll' ? 'border-primary-500 bg-primary-50' : 'border-gray-200 hover:border-gray-300'}`} onClick={() => setReportType('payroll')}>
+            <h4 className="font-semibold">Payroll Register</h4>
+            <p className="text-sm text-gray-500">Monthly payroll printout</p>
+          </div>
+        )}
         <div className={`border-2 rounded-lg p-4 cursor-pointer transition-colors ${reportType === 'labour' ? 'border-primary-500 bg-primary-50' : 'border-gray-200 hover:border-gray-300'}`} onClick={() => setReportType('labour')}>
           <h4 className="font-semibold">Labour Report</h4>
           <p className="text-sm text-gray-500">Individual labour details</p>
@@ -720,7 +875,7 @@ const ReportsTab = ({ labours }) => {
       </div>
 
       <div className="bg-gray-50 p-4 rounded-lg">
-        {reportType === 'monthly' && (
+        {(reportType === 'monthly' || reportType === 'payroll') && (
           <div className="flex gap-4 items-end">
             <div>
               <label className="label">Year</label>

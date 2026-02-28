@@ -4,8 +4,9 @@ from datetime import date, datetime, timedelta
 from typing import Optional
 import io
 
+import calendar as cal_module
 from ..models import User
-from ..auth import get_current_manager_or_admin
+from ..auth import get_current_manager_or_admin, get_current_admin
 from ..db_wrapper import (
     get_all_labours, get_attendance_by_labour, get_salary_records,
     get_overtime_records, get_advances, get_leaves
@@ -434,5 +435,113 @@ async def get_summary_report(
         media_type="text/html",
         headers={
             "Content-Disposition": "inline; filename=summary_report.html"
+        }
+    )
+
+
+@router.get("/payroll")
+async def get_payroll_register(
+    year: int,
+    month: int,
+    current_user: User = Depends(get_current_admin)
+):
+    """Generate printable payroll register for a given month (Admin only)"""
+    if not (1 <= month <= 12):
+        raise HTTPException(status_code=400, detail="month must be 1–12")
+
+    start_date = date(year, month, 1)
+    end_date = date(year, month, cal_module.monthrange(year, month)[1])
+    month_name = start_date.strftime('%B %Y')
+
+    labours = get_all_labours(include_inactive=True)
+    all_advances = get_advances()
+
+    rows = ""
+    grand_gross = grand_advance = grand_net = grand_paid = 0
+
+    for labour in sorted(labours, key=lambda x: x.name):
+        records = get_salary_records(labour_id=labour.id)
+        month_records = [r for r in records if start_date <= r.week_end <= end_date]
+        if not month_records:
+            continue
+
+        gross = sum(r.total_amount for r in month_records)
+        paid = sum(r.paid_amount for r in month_records)
+        days = sum(r.days_present for r in month_records)
+
+        adv_given = sum(
+            a.amount for a in all_advances
+            if a.labour_id == labour.id and start_date <= a.date <= end_date
+        )
+        net = max(0.0, gross - adv_given)
+        balance = gross - paid
+
+        grand_gross += gross
+        grand_advance += adv_given
+        grand_net += net
+        grand_paid += paid
+
+        status_color = "#059669" if balance <= 0 else "#dc2626"
+        rows += f"""
+        <tr>
+            <td>{labour.name}</td>
+            <td style="text-align:right">&#8377;{labour.daily_wage:,.0f}</td>
+            <td style="text-align:center">{days:.1f}</td>
+            <td style="text-align:right">&#8377;{gross:,.2f}</td>
+            <td style="text-align:right">&#8377;{adv_given:,.2f}</td>
+            <td style="text-align:right">&#8377;{net:,.2f}</td>
+            <td style="text-align:right">&#8377;{paid:,.2f}</td>
+            <td style="text-align:right;color:{status_color}">&#8377;{balance:,.2f}</td>
+        </tr>"""
+
+    content = f"""
+    <div class="summary">
+        <div class="summary-item">
+            <div class="summary-value">&#8377;{grand_gross:,.2f}</div>
+            <div class="summary-label">Total Gross</div>
+        </div>
+        <div class="summary-item">
+            <div class="summary-value">&#8377;{grand_paid:,.2f}</div>
+            <div class="summary-label">Total Paid</div>
+        </div>
+        <div class="summary-item">
+            <div class="summary-value">&#8377;{grand_gross - grand_paid:,.2f}</div>
+            <div class="summary-label">Total Balance</div>
+        </div>
+        <div class="summary-item">
+            <div class="summary-value">&#8377;{grand_advance:,.2f}</div>
+            <div class="summary-label">Total Advances</div>
+        </div>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Name</th><th>Daily Rate</th><th>Days</th>
+                <th>Gross</th><th>Advance</th><th>Net</th>
+                <th>Paid</th><th>Balance</th>
+            </tr>
+        </thead>
+        <tbody>
+            {rows if rows else '<tr><td colspan="8" style="text-align:center">No records for this period</td></tr>'}
+        </tbody>
+        <tfoot>
+            <tr style="font-weight:bold;background:#f3f4f6">
+                <td>Total</td><td></td><td></td>
+                <td style="text-align:right">&#8377;{grand_gross:,.2f}</td>
+                <td style="text-align:right">&#8377;{grand_advance:,.2f}</td>
+                <td style="text-align:right">&#8377;{grand_net:,.2f}</td>
+                <td style="text-align:right">&#8377;{grand_paid:,.2f}</td>
+                <td style="text-align:right">&#8377;{grand_gross - grand_paid:,.2f}</td>
+            </tr>
+        </tfoot>
+    </table>"""
+
+    html = generate_html_report(f"Payroll Register — {month_name}", content)
+    return Response(
+        content=html,
+        media_type="text/html",
+        headers={
+            "Content-Disposition": f"inline; filename=payroll_register_{year}_{month:02d}.html"
         }
     )

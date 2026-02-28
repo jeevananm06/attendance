@@ -287,3 +287,35 @@ class BackupRecord(BaseModel):
     filename: str
     size_bytes: int
     created_by: str
+
+
+# ============== NOTIFICATIONS ==============
+
+class NotificationType(str, Enum):
+    SALARY_PAID = "salary_paid"
+    LEAVE_APPROVED = "leave_approved"
+    LEAVE_REJECTED = "leave_rejected"
+    ADVANCE_GIVEN = "advance_given"
+
+
+class Notification(BaseModel):
+    id: str
+    user: str               # username the notification is FOR
+    labour_id: Optional[str] = None
+    type: NotificationType
+    title: str
+    message: str
+    is_read: bool = False
+    created_at: datetime
+
+
+class NotificationMarkRead(BaseModel):
+    notification_ids: List[str]
+
+
+# ============== PUSH SUBSCRIPTIONS ==============
+
+class PushSubscription(BaseModel):
+    endpoint: str
+    keys: dict   # {"p256dh": "...", "auth": "..."}
+    user: str

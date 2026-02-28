@@ -10,12 +10,14 @@ import uuid
 from .config import (
     USERS_FILE, LABOURS_FILE, ATTENDANCE_FILE, SALARY_FILE,
     OVERTIME_FILE, ADVANCES_FILE, LEAVES_FILE, LEAVE_BALANCE_FILE,
-    SITES_FILE, SITE_ASSIGNMENTS_FILE, AUDIT_LOG_FILE, BACKUPS_FILE, BACKUP_DIR
+    SITES_FILE, SITE_ASSIGNMENTS_FILE, AUDIT_LOG_FILE, BACKUPS_FILE, BACKUP_DIR,
+    NOTIFICATIONS_FILE, PUSH_SUBSCRIPTIONS_FILE
 )
 from .models import (
     User, Labour, Attendance, SalaryRecord, UserRole, AttendanceStatus,
     Overtime, Advance, Leave, LeaveType, LeaveStatus, LeaveBalance,
-    Site, LabourSiteAssignment, AuditLog, AuditAction, BackupRecord
+    Site, LabourSiteAssignment, AuditLog, AuditAction, BackupRecord,
+    Notification, NotificationType
 )
 
 
@@ -83,6 +85,16 @@ def init_csv_files():
     if not BACKUPS_FILE.exists():
         df = pd.DataFrame(columns=["id", "timestamp", "filename", "size_bytes", "created_by"])
         df.to_csv(BACKUPS_FILE, index=False)
+
+    if not NOTIFICATIONS_FILE.exists():
+        df = pd.DataFrame(columns=[
+            "id", "user", "labour_id", "type", "title", "message", "is_read", "created_at"
+        ])
+        df.to_csv(NOTIFICATIONS_FILE, index=False)
+
+    if not PUSH_SUBSCRIPTIONS_FILE.exists():
+        df = pd.DataFrame(columns=["id", "user", "endpoint", "p256dh", "auth", "created_at"])
+        df.to_csv(PUSH_SUBSCRIPTIONS_FILE, index=False)
 
 
 # User operations
@@ -1029,13 +1041,131 @@ def restore_backup(backup_id: str) -> bool:
 def get_backup_file_path(backup_id: str) -> Optional[Path]:
     if not BACKUPS_FILE.exists():
         return None
-    
+
     df = pd.read_csv(BACKUPS_FILE)
     row = df[df["id"] == backup_id]
     if row.empty:
         return None
-    
+
     filename = row.iloc[0]["filename"]
     backup_path = BACKUP_DIR / filename
-    
+
     return backup_path if backup_path.exists() else None
+
+
+# ============== NOTIFICATION OPERATIONS ==============
+
+def create_notification(user: str, notif_type: str, title: str, message: str,
+                        labour_id: str = None) -> Notification:
+    notif_id = str(uuid.uuid4())[:8]
+    now = datetime.now()
+
+    df = pd.read_csv(NOTIFICATIONS_FILE) if NOTIFICATIONS_FILE.exists() else pd.DataFrame()
+    new_row = pd.DataFrame([{
+        "id": notif_id,
+        "user": user,
+        "labour_id": labour_id,
+        "type": notif_type,
+        "title": title,
+        "message": message,
+        "is_read": False,
+        "created_at": now.isoformat()
+    }])
+    df = pd.concat([df, new_row], ignore_index=True)
+    df.to_csv(NOTIFICATIONS_FILE, index=False)
+
+    return Notification(
+        id=notif_id, user=user, labour_id=labour_id,
+        type=NotificationType(notif_type), title=title, message=message,
+        is_read=False, created_at=now
+    )
+
+
+def get_notifications(user: str, unread_only: bool = False, limit: int = 50) -> List[Notification]:
+    if not NOTIFICATIONS_FILE.exists():
+        return []
+    df = pd.read_csv(NOTIFICATIONS_FILE)
+    df = df[df["user"] == user]
+    if unread_only:
+        df = df[df["is_read"] == False]
+    df = df.sort_values("created_at", ascending=False).head(limit)
+
+    results = []
+    for _, row in df.iterrows():
+        results.append(Notification(
+            id=row["id"],
+            user=row["user"],
+            labour_id=row["labour_id"] if pd.notna(row["labour_id"]) else None,
+            type=NotificationType(row["type"]),
+            title=row["title"],
+            message=row["message"],
+            is_read=bool(row["is_read"]),
+            created_at=datetime.fromisoformat(row["created_at"])
+        ))
+    return results
+
+
+def get_unread_count(user: str) -> int:
+    if not NOTIFICATIONS_FILE.exists():
+        return 0
+    df = pd.read_csv(NOTIFICATIONS_FILE)
+    return int(len(df[(df["user"] == user) & (df["is_read"] == False)]))
+
+
+def mark_notifications_read(user: str, notification_ids: List[str] = None) -> int:
+    if not NOTIFICATIONS_FILE.exists():
+        return 0
+    df = pd.read_csv(NOTIFICATIONS_FILE)
+    if notification_ids:
+        mask = (df["user"] == user) & (df["id"].isin(notification_ids))
+    else:
+        mask = (df["user"] == user) & (df["is_read"] == False)
+    count = int(mask.sum())
+    df.loc[mask, "is_read"] = True
+    df.to_csv(NOTIFICATIONS_FILE, index=False)
+    return count
+
+
+# ============== PUSH SUBSCRIPTION OPERATIONS ==============
+
+def save_push_subscription(user: str, endpoint: str, p256dh: str, auth: str) -> bool:
+    """Upsert a push subscription (unique by endpoint)."""
+    df = pd.read_csv(PUSH_SUBSCRIPTIONS_FILE) if PUSH_SUBSCRIPTIONS_FILE.exists() else pd.DataFrame()
+    if not df.empty and "endpoint" in df.columns:
+        df = df[df["endpoint"] != endpoint]  # Remove existing with same endpoint
+    new_row = pd.DataFrame([{
+        "id": str(uuid.uuid4())[:8],
+        "user": user,
+        "endpoint": endpoint,
+        "p256dh": p256dh,
+        "auth": auth,
+        "created_at": datetime.now().isoformat()
+    }])
+    df = pd.concat([df, new_row], ignore_index=True)
+    df.to_csv(PUSH_SUBSCRIPTIONS_FILE, index=False)
+    return True
+
+
+def delete_push_subscription(endpoint: str) -> bool:
+    if not PUSH_SUBSCRIPTIONS_FILE.exists():
+        return False
+    df = pd.read_csv(PUSH_SUBSCRIPTIONS_FILE)
+    before = len(df)
+    df = df[df["endpoint"] != endpoint]
+    df.to_csv(PUSH_SUBSCRIPTIONS_FILE, index=False)
+    return len(df) < before
+
+
+def get_push_subscriptions(user: str) -> List[dict]:
+    """Return list of subscription_info dicts for pywebpush."""
+    if not PUSH_SUBSCRIPTIONS_FILE.exists():
+        return []
+    df = pd.read_csv(PUSH_SUBSCRIPTIONS_FILE)
+    df = df[df["user"] == user]
+    results = []
+    for _, row in df.iterrows():
+        results.append({
+            "endpoint": row["endpoint"],
+            "keys": {"p256dh": row["p256dh"], "auth": row["auth"]}
+        })
+    return results
