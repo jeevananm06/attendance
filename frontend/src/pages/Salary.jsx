@@ -28,9 +28,6 @@ const Salary = () => {
   const [calculatingLabour, setCalculatingLabour] = useState(null);
   const [payPanel, setPayPanel] = useState(null); // { labourId, weekEnd, total }
   const [payAmount, setPayAmount] = useState('');
-  const [refreshing, setRefreshing] = useState(false);
-  const touchStartY = useRef(0);
-  const containerRef = useRef(null);
 
   useEffect(() => {
     fetchData();
@@ -62,33 +59,7 @@ const Salary = () => {
       console.error(err);
     } finally {
       if (!silent) setLoading(false);
-      setRefreshing(false);
     }
-  };
-
-  const handlePullToRefresh = () => {
-    if (refreshing) return;
-    setRefreshing(true);
-    fetchData(true);
-  };
-
-  const pullTriggered = useRef(false);
-  const handleTouchStart = (e) => {
-    touchStartY.current = e.touches[0].clientY;
-    pullTriggered.current = false;
-  };
-  const handleTouchMove = (e) => {
-    if (pullTriggered.current || refreshing) return;
-    const container = containerRef.current;
-    if (!container || container.scrollTop > 5) return;
-    const diff = e.touches[0].clientY - touchStartY.current;
-    if (diff > 120) {
-      pullTriggered.current = true;
-      handlePullToRefresh();
-    }
-  };
-  const handleTouchEnd = () => {
-    pullTriggered.current = false;
   };
 
   const handleCalculateAll = async () => {
@@ -162,18 +133,7 @@ const Salary = () => {
   }
 
   return (
-    <div
-      className="space-y-6"
-      ref={containerRef}
-      onTouchStart={handleTouchStart}
-      onTouchMove={handleTouchMove}
-      onTouchEnd={handleTouchEnd}
-    >
-      {refreshing && (
-        <div className="flex justify-center py-2">
-          <div className="w-5 h-5 border-2 border-primary-600 border-t-transparent rounded-full animate-spin" />
-        </div>
-      )}
+    <div className="space-y-6">
       {error && (
         <div className="p-4 bg-red-50 border border-red-200 rounded-lg flex items-center gap-3 text-red-700">
           <AlertCircle size={20} />
