@@ -99,7 +99,8 @@ async def get_overview_stats(
     if current_user.role == UserRole.ADMIN:
         all_salary_records = get_salary_records()
         total_earned = sum(r.total_amount for r in all_salary_records)
-        total_paid = sum(r.total_amount for r in all_salary_records if r.is_paid)
+        # Use paid_amount to account for partial payments
+        total_paid = sum(r.paid_amount for r in all_salary_records)
         total_pending = total_earned - total_paid
         result["salary"] = {
             "total_earned": total_earned,
