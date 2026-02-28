@@ -171,6 +171,7 @@ class Advance(BaseModel):
     id: str
     labour_id: str
     amount: float
+    repaid_amount: float = 0.0
     date: date
     reason: Optional[str] = None
     is_deducted: bool = False
@@ -183,6 +184,10 @@ class AdvanceCreate(BaseModel):
     labour_id: str
     amount: float
     reason: Optional[str] = None
+
+
+class AdvanceRepay(BaseModel):
+    repay_amount: float
 
 
 # Leave Management

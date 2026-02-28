@@ -712,13 +712,14 @@ def get_pending_advances(labour_id: str) -> float:
 
 
 def mark_advance_deducted(advance_id: str) -> Advance:
-    """Mark an advance as deducted"""
+    """Mark an advance as fully deducted"""
     db = get_db_session()
     try:
         advance = db.query(AdvanceDB).filter(AdvanceDB.id == advance_id).first()
         if not advance:
             return None
         
+        advance.repaid_amount = advance.amount
         advance.is_deducted = True
         db.commit()
         db.refresh(advance)
@@ -727,6 +728,42 @@ def mark_advance_deducted(advance_id: str) -> Advance:
             id=advance.id,
             labour_id=advance.labour_id,
             amount=advance.amount,
+            repaid_amount=advance.repaid_amount or 0.0,
+            date=advance.date,
+            reason=advance.reason,
+            is_deducted=advance.is_deducted,
+            deducted_from_week=None,
+            given_by=advance.created_by,
+            created_at=advance.created_at
+        )
+    finally:
+        db.close()
+
+
+def repay_advance_partial(advance_id: str, repay_amount: float) -> Advance:
+    """Record a partial repayment for an advance"""
+    db = get_db_session()
+    try:
+        advance = db.query(AdvanceDB).filter(AdvanceDB.id == advance_id).first()
+        if not advance:
+            return None
+        
+        current_repaid = advance.repaid_amount or 0.0
+        new_repaid = min(current_repaid + repay_amount, advance.amount)
+        advance.repaid_amount = new_repaid
+        
+        # Auto-mark fully deducted if fully repaid
+        if new_repaid >= advance.amount:
+            advance.is_deducted = True
+        
+        db.commit()
+        db.refresh(advance)
+        
+        return Advance(
+            id=advance.id,
+            labour_id=advance.labour_id,
+            amount=advance.amount,
+            repaid_amount=advance.repaid_amount or 0.0,
             date=advance.date,
             reason=advance.reason,
             is_deducted=advance.is_deducted,

@@ -2,10 +2,10 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from typing import List
 from datetime import date
 
-from ..models import Advance, AdvanceCreate, User, AuditAction
+from ..models import Advance, AdvanceCreate, AdvanceRepay, User, AuditAction
 from ..auth import get_current_manager_or_admin
 from ..db_wrapper import (
-    create_advance, get_advances, get_pending_advances, mark_advance_deducted,
+    create_advance, get_advances, get_pending_advances, mark_advance_deducted, repay_advance_partial,
     get_labour, create_audit_log, get_all_labours
 )
 
@@ -108,7 +108,7 @@ async def mark_advance_as_deducted(
     advance_id: str,
     current_user: User = Depends(get_current_manager_or_admin)
 ):
-    """Mark an advance as deducted/paid"""
+    """Mark an advance as fully deducted/paid"""
     advance = mark_advance_deducted(advance_id)
     if not advance:
         raise HTTPException(
@@ -122,7 +122,39 @@ async def mark_advance_as_deducted(
         action=AuditAction.UPDATE,
         entity_type="advance",
         entity_id=advance_id,
-        new_value=f"Marked ₹{advance.amount} as deducted for {labour.name if labour else advance.labour_id}"
+        new_value=f"Marked ₹{advance.amount} as fully deducted for {labour.name if labour else advance.labour_id}"
+    )
+    
+    return advance
+
+
+@router.post("/{advance_id}/repay", response_model=Advance)
+async def repay_advance(
+    advance_id: str,
+    data: AdvanceRepay,
+    current_user: User = Depends(get_current_manager_or_admin)
+):
+    """Record a partial repayment for an advance"""
+    if data.repay_amount <= 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Repay amount must be greater than zero"
+        )
+    
+    advance = repay_advance_partial(advance_id, data.repay_amount)
+    if not advance:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Advance with id {advance_id} not found"
+        )
+    
+    labour = get_labour(advance.labour_id)
+    create_audit_log(
+        user=current_user.username,
+        action=AuditAction.UPDATE,
+        entity_type="advance",
+        entity_id=advance_id,
+        new_value=f"Partial repay ₹{data.repay_amount} for {labour.name if labour else advance.labour_id} (total repaid: ₹{advance.repaid_amount}/{advance.amount})"
     )
     
     return advance

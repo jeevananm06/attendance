@@ -90,6 +90,19 @@ async def startup_event():
     except Exception as e:
         print(f"DB INIT ERROR: {e}", flush=True)
         raise
+
+    if USE_POSTGRES:
+        try:
+            from .db_connection import engine
+            from sqlalchemy import text
+            with engine.connect() as conn:
+                conn.execute(text(
+                    "ALTER TABLE advances ADD COLUMN IF NOT EXISTS repaid_amount FLOAT DEFAULT 0.0"
+                ))
+                conn.commit()
+            print("DB MIGRATION: repaid_amount column ensured in advances", flush=True)
+        except Exception as e:
+            print(f"DB MIGRATION WARNING: {e}", flush=True)
     
     try:
         existing = get_user("admin")

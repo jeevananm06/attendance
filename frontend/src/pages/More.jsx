@@ -219,6 +219,9 @@ const AdvancesTab = ({ labours, setError, setSuccess }) => {
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [deducting, setDeducting] = useState(null);
+  const [repayPanel, setRepayPanel] = useState(null); // advance id currently open for repay
+  const [repayAmount, setRepayAmount] = useState('');
+  const [repaying, setRepaying] = useState(null);
   const [formData, setFormData] = useState({ labour_id: '', amount: '', reason: '' });
 
   useEffect(() => { fetchRecords(); }, []);
@@ -253,7 +256,7 @@ const AdvancesTab = ({ labours, setError, setSuccess }) => {
     try {
       setDeducting(advanceId);
       await advancesAPI.markDeducted(advanceId);
-      setSuccess('Advance marked as deducted');
+      setSuccess('Advance marked as fully deducted');
       fetchRecords();
       setTimeout(() => setSuccess(''), 3000);
     } catch (err) {
@@ -263,9 +266,30 @@ const AdvancesTab = ({ labours, setError, setSuccess }) => {
     }
   };
 
+  const handlePartialRepay = async (advanceId) => {
+    const amount = parseFloat(repayAmount);
+    if (!amount || amount <= 0) {
+      setError('Enter a valid repay amount');
+      return;
+    }
+    try {
+      setRepaying(advanceId);
+      await advancesAPI.repayPartial(advanceId, amount);
+      setSuccess(`₹${amount.toLocaleString()} repayment recorded`);
+      setRepayPanel(null);
+      setRepayAmount('');
+      fetchRecords();
+      setTimeout(() => setSuccess(''), 3000);
+    } catch (err) {
+      setError(err.response?.data?.detail || 'Failed to record repayment');
+    } finally {
+      setRepaying(null);
+    }
+  };
+
   if (loading) return <div className="text-center py-8"><RefreshCw className="animate-spin mx-auto" /></div>;
 
-  const pendingTotal = records.filter(r => !r.is_deducted).reduce((sum, r) => sum + r.amount, 0);
+  const pendingTotal = records.filter(r => !r.is_deducted).reduce((sum, r) => sum + r.amount - (r.repaid_amount || 0), 0);
 
   return (
     <div>
@@ -297,6 +321,7 @@ const AdvancesTab = ({ labours, setError, setSuccess }) => {
             <th className="text-left py-3 px-4">Labour</th>
             <th className="text-left py-3 px-4">Date</th>
             <th className="text-right py-3 px-4">Amount</th>
+            <th className="text-right py-3 px-4">Remaining</th>
             <th className="text-left py-3 px-4">Reason</th>
             <th className="text-center py-3 px-4">Status</th>
             <th className="text-center py-3 px-4">Action</th>
@@ -304,34 +329,87 @@ const AdvancesTab = ({ labours, setError, setSuccess }) => {
           <tbody>
             {records.map((r) => {
               const labour = labours.find(l => l.id === r.labour_id);
+              const repaid = r.repaid_amount || 0;
+              const remaining = r.amount - repaid;
+              const pct = Math.round((repaid / r.amount) * 100);
               return (
-                <tr key={r.id} className="border-b">
-                  <td className="py-3 px-4">{labour?.name || r.labour_id}</td>
-                  <td className="py-3 px-4">{r.date}</td>
-                  <td className="py-3 px-4 text-right font-medium">₹{r.amount.toLocaleString()}</td>
-                  <td className="py-3 px-4 text-gray-500">{r.reason || '-'}</td>
-                  <td className="py-3 px-4 text-center">
-                    <span className={`px-2 py-1 rounded-full text-xs ${r.is_deducted ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'}`}>
-                      {r.is_deducted ? 'Deducted' : 'Pending'}
-                    </span>
-                  </td>
-                  <td className="py-3 px-4 text-center">
-                    {!r.is_deducted && (
-                      <button
-                        onClick={() => handleMarkDeducted(r.id)}
-                        disabled={deducting === r.id}
-                        className="px-3 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50 flex items-center gap-1 mx-auto"
-                      >
-                        {deducting === r.id ? (
-                          <RefreshCw className="animate-spin" size={12} />
-                        ) : (
-                          <Check size={12} />
-                        )}
-                        Mark Deducted
-                      </button>
-                    )}
-                  </td>
-                </tr>
+                <>
+                  <tr key={r.id} className="border-b">
+                    <td className="py-3 px-4">{labour?.name || r.labour_id}</td>
+                    <td className="py-3 px-4">{r.date}</td>
+                    <td className="py-3 px-4 text-right font-medium">₹{r.amount.toLocaleString()}</td>
+                    <td className="py-3 px-4 text-right">
+                      {repaid > 0 ? (
+                        <div>
+                          <span className={remaining > 0 ? 'text-orange-600 font-medium' : 'text-green-600 font-medium'}>
+                            ₹{remaining.toLocaleString()}
+                          </span>
+                          <div className="w-full bg-gray-200 rounded-full h-1.5 mt-1">
+                            <div className="bg-green-500 h-1.5 rounded-full" style={{ width: `${pct}%` }} />
+                          </div>
+                          <span className="text-xs text-gray-400">{pct}% repaid</span>
+                        </div>
+                      ) : (
+                        <span className="text-gray-400 text-sm">—</span>
+                      )}
+                    </td>
+                    <td className="py-3 px-4 text-gray-500">{r.reason || '-'}</td>
+                    <td className="py-3 px-4 text-center">
+                      <span className={`px-2 py-1 rounded-full text-xs ${r.is_deducted ? 'bg-green-100 text-green-700' : repaid > 0 ? 'bg-yellow-100 text-yellow-700' : 'bg-orange-100 text-orange-700'}`}>
+                        {r.is_deducted ? 'Fully Repaid' : repaid > 0 ? 'Partial' : 'Pending'}
+                      </span>
+                    </td>
+                    <td className="py-3 px-4 text-center">
+                      {!r.is_deducted && (
+                        <div className="flex flex-col gap-1 items-center">
+                          <button
+                            onClick={() => { setRepayPanel(repayPanel === r.id ? null : r.id); setRepayAmount(''); }}
+                            className="px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 w-full"
+                          >
+                            Partial Repay
+                          </button>
+                          <button
+                            onClick={() => handleMarkDeducted(r.id)}
+                            disabled={deducting === r.id}
+                            className="px-3 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50 flex items-center gap-1 mx-auto w-full justify-center"
+                          >
+                            {deducting === r.id ? <RefreshCw className="animate-spin" size={12} /> : <Check size={12} />}
+                            Full Repay
+                          </button>
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                  {repayPanel === r.id && (
+                    <tr key={`${r.id}-repay`} className="bg-blue-50 border-b">
+                      <td colSpan={7} className="px-4 py-3">
+                        <div className="flex items-center gap-3">
+                          <span className="text-sm font-medium text-gray-700">Repay amount (max ₹{remaining.toLocaleString()}):</span>
+                          <input
+                            type="number"
+                            value={repayAmount}
+                            onChange={(e) => setRepayAmount(e.target.value)}
+                            placeholder="Enter amount"
+                            className="input w-40"
+                            min="1"
+                            max={remaining}
+                          />
+                          <button
+                            onClick={() => handlePartialRepay(r.id)}
+                            disabled={repaying === r.id}
+                            className="btn-primary flex items-center gap-2 py-1.5 px-4 text-sm"
+                          >
+                            {repaying === r.id ? <RefreshCw className="animate-spin" size={14} /> : <Check size={14} />}
+                            Confirm
+                          </button>
+                          <button onClick={() => setRepayPanel(null)} className="text-gray-500 hover:text-gray-700">
+                            <X size={18} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </>
               );
             })}
           </tbody>

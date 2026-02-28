@@ -124,6 +124,7 @@ class AdvanceDB(Base):
     date = Column(Date, nullable=False)
     reason = Column(Text, nullable=True)
     is_deducted = Column(Boolean, default=False)
+    repaid_amount = Column(Float, default=0.0)
     created_by = Column(String(100), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     
