@@ -97,6 +97,10 @@ def count_days_from_attendance(labour_attendance: dict, start: date, end: date) 
             days += 1.0
         elif status == AttendanceStatus.HALF_DAY:
             days += 0.5
+        elif status == AttendanceStatus.PRESENT_HALF:
+            days += 1.5
+        elif status == AttendanceStatus.DOUBLE_DUTY:
+            days += 2.0
         d += timedelta(days=1)
     return days
 
@@ -110,6 +114,10 @@ def calculate_days_worked(labour_id: str, start: date, end: date) -> float:
             total_days += 1.0
         elif record.status == AttendanceStatus.HALF_DAY:
             total_days += 0.5
+        elif record.status == AttendanceStatus.PRESENT_HALF:
+            total_days += 1.5
+        elif record.status == AttendanceStatus.DOUBLE_DUTY:
+            total_days += 2.0
     return total_days
 
 

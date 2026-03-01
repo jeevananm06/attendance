@@ -118,7 +118,7 @@ const Dashboard = () => {
         <StatCard
           icon={CalendarCheck}
           label="Present Today"
-          value={stats?.today_attendance?.present || 0}
+          value={(stats?.today_attendance?.present || 0) + (stats?.today_attendance?.present_half || 0) + (stats?.today_attendance?.double_duty || 0)}
           subValue={`${stats?.today_attendance?.not_marked || 0} not marked`}
           color="bg-green-500"
           link="/attendance"
@@ -166,6 +166,28 @@ const Dashboard = () => {
                 {stats?.today_attendance?.half_day || 0}
               </span>
             </div>
+            {(stats?.today_attendance?.present_half > 0 || stats?.today_attendance?.double_duty > 0) && (
+              <>
+                <div className="flex items-center justify-between p-3 bg-teal-50 dark:bg-teal-900/30 rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <CalendarCheck className="text-teal-600" size={20} />
+                    <span className="text-gray-700 dark:text-gray-300">P+½ (1.5d)</span>
+                  </div>
+                  <span className="font-semibold text-teal-600">
+                    {stats?.today_attendance?.present_half || 0}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between p-3 bg-blue-50 dark:bg-blue-900/30 rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <CalendarCheck className="text-blue-600" size={20} />
+                    <span className="text-gray-700 dark:text-gray-300">P+P (2d)</span>
+                  </div>
+                  <span className="font-semibold text-blue-600">
+                    {stats?.today_attendance?.double_duty || 0}
+                  </span>
+                </div>
+              </>
+            )}
             <div className="flex items-center justify-between p-3 bg-red-50 dark:bg-red-900/30 rounded-lg">
               <div className="flex items-center gap-3">
                 <UserX className="text-red-600" size={20} />

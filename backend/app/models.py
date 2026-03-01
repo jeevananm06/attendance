@@ -80,6 +80,8 @@ class AttendanceStatus(str, Enum):
     PRESENT = "present"
     ABSENT = "absent"
     HALF_DAY = "half_day"
+    PRESENT_HALF = "present_half"
+    DOUBLE_DUTY = "double_duty"
 
 
 class Attendance(BaseModel):

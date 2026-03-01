@@ -12,13 +12,16 @@ import {
   Save,
   ChevronDown,
   ChevronUp,
-  CalendarCheck
+  CalendarCheck,
+  MoreHorizontal
 } from 'lucide-react';
 
 const STATUS_META = {
-  present:  { label: 'P', color: 'bg-green-500 text-white',  light: 'bg-green-100 text-green-800 border-green-300' },
-  half_day: { label: 'H', color: 'bg-yellow-400 text-white', light: 'bg-yellow-100 text-yellow-800 border-yellow-300' },
-  absent:   { label: 'A', color: 'bg-red-500 text-white',    light: 'bg-red-100 text-red-800 border-red-300' },
+  present:      { label: 'P',  color: 'bg-green-500 text-white',  light: 'bg-green-100 text-green-800 border-green-300',  days: 1.0, desc: 'Present' },
+  half_day:     { label: 'H',  color: 'bg-yellow-400 text-white', light: 'bg-yellow-100 text-yellow-800 border-yellow-300', days: 0.5, desc: 'Half Day' },
+  absent:       { label: 'A',  color: 'bg-red-500 text-white',    light: 'bg-red-100 text-red-800 border-red-300',        days: 0,   desc: 'Absent' },
+  present_half: { label: 'P½', color: 'bg-teal-500 text-white',   light: 'bg-teal-100 text-teal-800 border-teal-300',     days: 1.5, desc: 'P + Half' },
+  double_duty:  { label: 'PP', color: 'bg-blue-600 text-white',   light: 'bg-blue-100 text-blue-800 border-blue-300',     days: 2.0, desc: 'Double Duty' },
 };
 
 function getDaysInMonth(year, month) {
@@ -80,11 +83,14 @@ const MonthlyLabourCard = ({ labour, year, month }) => {
     if (expanded) fetchMonthData();
   }, [expanded, fetchMonthData]);
 
-  const present    = Object.values(monthAttendance).filter((s) => s === 'present').length;
-  const halfDay    = Object.values(monthAttendance).filter((s) => s === 'half_day').length;
-  const absent     = Object.values(monthAttendance).filter((s) => s === 'absent').length;
-  const daysWorked = present + halfDay * 0.5;
-  const earned     = daysWorked * labour.daily_wage;
+  const vals = Object.values(monthAttendance);
+  const present     = vals.filter((s) => s === 'present').length;
+  const halfDay     = vals.filter((s) => s === 'half_day').length;
+  const absent      = vals.filter((s) => s === 'absent').length;
+  const presentHalf = vals.filter((s) => s === 'present_half').length;
+  const doubleDuty  = vals.filter((s) => s === 'double_duty').length;
+  const daysWorked  = present + halfDay * 0.5 + presentHalf * 1.5 + doubleDuty * 2.0;
+  const earned      = daysWorked * labour.daily_wage;
 
   return (
     <div className="border dark:border-gray-700 rounded-lg overflow-hidden bg-white dark:bg-gray-800">
@@ -102,10 +108,12 @@ const MonthlyLabourCard = ({ labour, year, month }) => {
           </div>
         </div>
         <div className="flex items-center gap-3">
-          <div className="hidden sm:flex gap-2 text-xs font-semibold">
+          <div className="hidden sm:flex gap-2 text-xs font-semibold flex-wrap">
             <span className="px-2 py-0.5 rounded bg-green-100 text-green-700">P {present}</span>
             <span className="px-2 py-0.5 rounded bg-yellow-100 text-yellow-700">H {halfDay}</span>
             <span className="px-2 py-0.5 rounded bg-red-100 text-red-700">A {absent}</span>
+            {presentHalf > 0 && <span className="px-2 py-0.5 rounded bg-teal-100 text-teal-700">P½ {presentHalf}</span>}
+            {doubleDuty > 0 && <span className="px-2 py-0.5 rounded bg-blue-100 text-blue-700">PP {doubleDuty}</span>}
           </div>
           <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
             <select
@@ -116,6 +124,8 @@ const MonthlyLabourCard = ({ labour, year, month }) => {
               <option value="present">Present</option>
               <option value="half_day">Half Day</option>
               <option value="absent">Absent</option>
+              <option value="present_half">P+½</option>
+              <option value="double_duty">P+P</option>
             </select>
             <button
               onClick={handleFillMonth}
@@ -189,6 +199,8 @@ const MonthlyLabourCard = ({ labour, year, month }) => {
                 <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-green-500 inline-block" /> Present</span>
                 <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-yellow-400 inline-block" /> Half Day</span>
                 <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-red-500 inline-block" /> Absent</span>
+                <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-teal-500 inline-block" /> P+½</span>
+                <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-blue-600 inline-block" /> P+P</span>
                 <span className="flex items-center gap-1"><span className="w-3 h-3 rounded border border-gray-300 bg-white inline-block" /> Unmarked</span>
               </div>
             </>
@@ -217,6 +229,8 @@ const Attendance = () => {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [popupLabourId, setPopupLabourId] = useState(null);
+  const [popupSelection, setPopupSelection] = useState(null);
 
   const now = new Date();
   const [selectedYear, setSelectedYear] = useState(now.getFullYear());
@@ -320,12 +334,33 @@ const Attendance = () => {
 
   const getStatusColor = (status) => STATUS_META[status]?.color || 'bg-gray-200 text-gray-600';
 
+  const openPopup = (labourId) => {
+    setPopupSelection(attendance[labourId] || null);
+    setPopupLabourId(labourId);
+  };
+
+  const confirmPopup = () => {
+    if (popupLabourId) {
+      setAttendance((prev) => ({ ...prev, [popupLabourId]: popupSelection || undefined }));
+    }
+    setPopupLabourId(null);
+    setPopupSelection(null);
+  };
+
+  const closePopup = () => {
+    setPopupLabourId(null);
+    setPopupSelection(null);
+  };
+
+  const attVals = Object.values(attendance);
   const dailyStats = {
-    total:     labours.length,
-    present:   Object.values(attendance).filter((s) => s === 'present').length,
-    absent:    Object.values(attendance).filter((s) => s === 'absent').length,
-    halfDay:   Object.values(attendance).filter((s) => s === 'half_day').length,
-    notMarked: labours.length - Object.values(attendance).filter(Boolean).length,
+    total:       labours.length,
+    present:     attVals.filter((s) => s === 'present').length,
+    absent:      attVals.filter((s) => s === 'absent').length,
+    halfDay:     attVals.filter((s) => s === 'half_day').length,
+    presentHalf: attVals.filter((s) => s === 'present_half').length,
+    doubleDuty:  attVals.filter((s) => s === 'double_duty').length,
+    notMarked:   labours.length - attVals.filter(Boolean).length,
   };
 
   if (loading) {
@@ -429,20 +464,27 @@ const Attendance = () => {
         </div>
       </div>
 
+      {/* Popup backdrop */}
+      {popupLabourId && (
+        <div className="fixed inset-0 z-40" onClick={closePopup} />
+      )}
+
       {/* DAILY VIEW */}
       {view === 'daily' && (
         <>
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+          <div className="grid grid-cols-3 md:grid-cols-7 gap-3">
             {[
-              { label: 'Total',      value: dailyStats.total,      bg: 'bg-white dark:bg-gray-800 border dark:border-gray-700', tc: 'text-gray-800 dark:text-gray-100', sc: 'text-gray-500 dark:text-gray-400' },
-              { label: 'Present',    value: dailyStats.present,    bg: 'bg-green-50 border border-green-200',   tc: 'text-green-600',  sc: 'text-green-600' },
-              { label: 'Absent',     value: dailyStats.absent,     bg: 'bg-red-50 border border-red-200',       tc: 'text-red-600',    sc: 'text-red-600' },
-              { label: 'Half Day',   value: dailyStats.halfDay,    bg: 'bg-yellow-50 border border-yellow-200', tc: 'text-yellow-600', sc: 'text-yellow-600' },
-              { label: 'Not Marked', value: dailyStats.notMarked,  bg: 'bg-gray-50 dark:bg-gray-700 border dark:border-gray-700', tc: 'text-gray-600 dark:text-gray-400', sc: 'text-gray-500 dark:text-gray-400' },
+              { label: 'Total',      value: dailyStats.total,       bg: 'bg-white dark:bg-gray-800 border dark:border-gray-700', tc: 'text-gray-800 dark:text-gray-100', sc: 'text-gray-500 dark:text-gray-400' },
+              { label: 'Present',    value: dailyStats.present,     bg: 'bg-green-50 border border-green-200',   tc: 'text-green-600',  sc: 'text-green-600' },
+              { label: 'Half Day',   value: dailyStats.halfDay,     bg: 'bg-yellow-50 border border-yellow-200', tc: 'text-yellow-600', sc: 'text-yellow-600' },
+              { label: 'P+½',        value: dailyStats.presentHalf, bg: 'bg-teal-50 border border-teal-200',     tc: 'text-teal-600',   sc: 'text-teal-600' },
+              { label: 'P+P',        value: dailyStats.doubleDuty,  bg: 'bg-blue-50 border border-blue-200',     tc: 'text-blue-600',   sc: 'text-blue-600' },
+              { label: 'Absent',     value: dailyStats.absent,      bg: 'bg-red-50 border border-red-200',       tc: 'text-red-600',    sc: 'text-red-600' },
+              { label: 'Not Marked', value: dailyStats.notMarked,   bg: 'bg-gray-50 dark:bg-gray-700 border dark:border-gray-700', tc: 'text-gray-600 dark:text-gray-400', sc: 'text-gray-500 dark:text-gray-400' },
             ].map(({ label, value, bg, tc, sc }) => (
-              <div key={label} className={`p-4 rounded-lg text-center ${bg}`}>
-                <p className={`text-2xl font-bold ${tc}`}>{value}</p>
-                <p className={`text-sm ${sc}`}>{label}</p>
+              <div key={label} className={`p-3 rounded-lg text-center ${bg}`}>
+                <p className={`text-xl font-bold ${tc}`}>{value}</p>
+                <p className={`text-xs ${sc}`}>{label}</p>
               </div>
             ))}
           </div>
@@ -465,7 +507,7 @@ const Attendance = () => {
                         {labour.phone && <p className="text-sm text-gray-500 dark:text-gray-400">{labour.phone}</p>}
                       </td>
                       <td className="py-4 px-4">
-                        <div className="flex justify-center gap-2">
+                        <div className="flex justify-center gap-2 items-center">
                           {[
                             { status: 'present',  icon: <Check size={20} />,  hover: 'hover:bg-green-100' },
                             { status: 'half_day', icon: <Clock size={20} />,  hover: 'hover:bg-yellow-100' },
@@ -479,11 +521,70 @@ const Attendance = () => {
                                   ? getStatusColor(status)
                                   : `bg-gray-100 ${hover} text-gray-600`
                               }`}
-                              title={status}
+                              title={STATUS_META[status]?.desc}
                             >
                               {icon}
                             </button>
                           ))}
+                          {/* Show selected extra status badge if any */}
+                          {(attendance[labour.id] === 'present_half' || attendance[labour.id] === 'double_duty') && (
+                            <span className={`px-2 py-1 rounded-lg text-xs font-bold ${getStatusColor(attendance[labour.id])}`}>
+                              {STATUS_META[attendance[labour.id]]?.label}
+                            </span>
+                          )}
+                          {/* 3-dot menu for extra options */}
+                          <div className="relative">
+                            <button
+                              onClick={() => openPopup(labour.id)}
+                              className="p-2 rounded-lg transition-colors bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-500"
+                              title="More options"
+                            >
+                              <MoreHorizontal size={20} />
+                            </button>
+                            {popupLabourId === labour.id && (
+                              <div className="absolute right-0 top-full mt-1 w-56 bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 z-50 overflow-hidden">
+                                <div className="px-4 py-2 border-b border-gray-100 dark:border-gray-700">
+                                  <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Select Status</p>
+                                </div>
+                                <div className="py-1">
+                                  {Object.entries(STATUS_META).map(([key, meta]) => (
+                                    <button
+                                      key={key}
+                                      onClick={() => setPopupSelection(popupSelection === key ? null : key)}
+                                      className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm transition-colors ${
+                                        popupSelection === key
+                                          ? 'bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300'
+                                          : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
+                                      }`}
+                                    >
+                                      <span className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold ${meta.color}`}>
+                                        {meta.label}
+                                      </span>
+                                      <span className="flex-1 text-left font-medium">{meta.desc}</span>
+                                      <span className="text-xs text-gray-400">{meta.days}d</span>
+                                      {popupSelection === key && (
+                                        <Check size={16} className="text-primary-600" />
+                                      )}
+                                    </button>
+                                  ))}
+                                </div>
+                                <div className="flex gap-2 px-4 py-2 border-t border-gray-100 dark:border-gray-700">
+                                  <button
+                                    onClick={closePopup}
+                                    className="flex-1 px-3 py-1.5 text-sm rounded-lg border border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700"
+                                  >
+                                    Cancel
+                                  </button>
+                                  <button
+                                    onClick={confirmPopup}
+                                    className="flex-1 px-3 py-1.5 text-sm rounded-lg bg-primary-600 text-white hover:bg-primary-700 font-medium"
+                                  >
+                                    OK
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+                          </div>
                         </div>
                       </td>
                       <td className="py-4 px-4">

@@ -80,8 +80,10 @@ async def get_overview_stats(
     present_today = sum(1 for a in today_attendance if a.status == AttendanceStatus.PRESENT)
     half_day_today = sum(1 for a in today_attendance if a.status == AttendanceStatus.HALF_DAY)
     absent_today = sum(1 for a in today_attendance if a.status == AttendanceStatus.ABSENT)
+    present_half_today = sum(1 for a in today_attendance if a.status == AttendanceStatus.PRESENT_HALF)
+    double_duty_today = sum(1 for a in today_attendance if a.status == AttendanceStatus.DOUBLE_DUTY)
     not_marked = total_labours - len(today_attendance)
-    
+
     result = {
         "labours": {
             "total": total_labours,
@@ -93,6 +95,8 @@ async def get_overview_stats(
             "present": present_today,
             "half_day": half_day_today,
             "absent": absent_today,
+            "present_half": present_half_today,
+            "double_duty": double_duty_today,
             "not_marked": not_marked
         }
     }
