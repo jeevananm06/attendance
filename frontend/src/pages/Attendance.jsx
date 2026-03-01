@@ -348,16 +348,21 @@ const Attendance = () => {
 
   const getStatusColor = (status) => STATUS_META[status]?.color || 'bg-gray-200 text-gray-600';
 
+  const [popupPos, setPopupPos] = useState({ top: 0, left: 0, flip: false });
+
   const openPopup = (labourId) => {
     if (popupLabourId === labourId) { setPopupLabourId(null); return; }
-    setPopupLabourId(labourId);
-  };
-
-  const shouldFlipPopup = (labourId) => {
     const btn = popupBtnRefs.current[labourId];
-    if (!btn) return false;
-    const rect = btn.getBoundingClientRect();
-    return (window.innerHeight - rect.bottom) < 300;
+    if (btn) {
+      const rect = btn.getBoundingClientRect();
+      const flip = (window.innerHeight - rect.bottom) < 300;
+      setPopupPos({
+        top: flip ? rect.top : rect.bottom + 4,
+        left: rect.right - 224, // 224 = w-56 = 14rem
+        flip,
+      });
+    }
+    setPopupLabourId(labourId);
   };
 
   const selectPopupStatus = (statusKey) => {
@@ -485,9 +490,45 @@ const Attendance = () => {
         </div>
       </div>
 
-      {/* Popup backdrop */}
+      {/* Status popup (fixed position, outside table to avoid overflow/stacking issues) */}
       {popupLabourId && (
-        <div className="fixed inset-0 z-40" onClick={closePopup} />
+        <>
+          <div className="fixed inset-0 z-[60]" onClick={closePopup} />
+          <div
+            className="fixed w-56 bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 z-[70] overflow-hidden"
+            style={{
+              top: popupPos.flip ? 'auto' : `${popupPos.top}px`,
+              bottom: popupPos.flip ? `${window.innerHeight - popupPos.top}px` : 'auto',
+              left: `${Math.max(8, popupPos.left)}px`,
+            }}
+          >
+            <div className="py-1">
+              {Object.entries(STATUS_META).map(([key, meta]) => {
+                const isSelected = attendance[popupLabourId] === key;
+                return (
+                  <button
+                    key={key}
+                    onClick={() => selectPopupStatus(key)}
+                    className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm transition-colors ${
+                      isSelected
+                        ? 'bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300'
+                        : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
+                    }`}
+                  >
+                    <span className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold ${meta.color}`}>
+                      {meta.label}
+                    </span>
+                    <span className="flex-1 text-left font-medium">{meta.desc}</span>
+                    <span className="text-xs text-gray-400">{meta.days}d</span>
+                    {isSelected && (
+                      <Check size={16} className="text-primary-600" />
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </>
       )}
 
       {/* DAILY VIEW */}
@@ -510,7 +551,7 @@ const Attendance = () => {
             ))}
           </div>
 
-          <div className={`card ${popupLabourId ? 'pb-16' : ''}`}>
+          <div className="card">
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
@@ -554,45 +595,14 @@ const Attendance = () => {
                             </span>
                           )}
                           {/* 3-dot menu for extra options */}
-                          <div className="relative">
-                            <button
-                              ref={(el) => (popupBtnRefs.current[labour.id] = el)}
-                              onClick={() => openPopup(labour.id)}
-                              className="p-2 rounded-lg transition-colors bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-500"
-                              title="More options"
-                            >
-                              <MoreHorizontal size={20} />
-                            </button>
-                            {popupLabourId === labour.id && (
-                              <div className={`absolute right-0 w-56 bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 z-50 overflow-hidden ${shouldFlipPopup(labour.id) ? 'bottom-full mb-1' : 'top-full mt-1'}`}>
-                                <div className="py-1">
-                                  {Object.entries(STATUS_META).map(([key, meta]) => {
-                                    const isSelected = attendance[labour.id] === key;
-                                    return (
-                                      <button
-                                        key={key}
-                                        onClick={() => selectPopupStatus(key)}
-                                        className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm transition-colors ${
-                                          isSelected
-                                            ? 'bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300'
-                                            : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
-                                        }`}
-                                      >
-                                        <span className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold ${meta.color}`}>
-                                          {meta.label}
-                                        </span>
-                                        <span className="flex-1 text-left font-medium">{meta.desc}</span>
-                                        <span className="text-xs text-gray-400">{meta.days}d</span>
-                                        {isSelected && (
-                                          <Check size={16} className="text-primary-600" />
-                                        )}
-                                      </button>
-                                    );
-                                  })}
-                                </div>
-                              </div>
-                            )}
-                          </div>
+                          <button
+                            ref={(el) => (popupBtnRefs.current[labour.id] = el)}
+                            onClick={() => openPopup(labour.id)}
+                            className="p-2 rounded-lg transition-colors bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-500"
+                            title="More options"
+                          >
+                            <MoreHorizontal size={20} />
+                          </button>
                         </div>
                       </td>
                       <td className="py-4 px-4">
