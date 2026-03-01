@@ -231,6 +231,8 @@ const Attendance = () => {
   const [success, setSuccess] = useState('');
   const [popupLabourId, setPopupLabourId] = useState(null);
   const [popupSelection, setPopupSelection] = useState(null);
+  const originalAttendance = useRef({});
+  const originalComments = useRef({});
 
   const now = new Date();
   const [selectedYear, setSelectedYear] = useState(now.getFullYear());
@@ -269,6 +271,8 @@ const Attendance = () => {
       });
       setAttendance(statusMap);
       setComments(commentMap);
+      originalAttendance.current = { ...statusMap };
+      originalComments.current = { ...commentMap };
     } catch (err) {
       setError('Failed to load data');
     } finally {
@@ -292,12 +296,22 @@ const Attendance = () => {
     try {
       setSaving(true);
       setError('');
+      // Only send records that actually changed (status or comment differs from original)
       const records = Object.entries(attendance)
-        .filter(([_, s]) => s)
+        .filter(([labour_id, s]) => {
+          if (!s) return false;
+          const origStatus = originalAttendance.current[labour_id];
+          const origComment = originalComments.current[labour_id] || null;
+          const newComment = comments[labour_id] || null;
+          return s !== origStatus || newComment !== origComment;
+        })
         .map(([labour_id, status]) => ({ labour_id, status, comment: comments[labour_id] || null }));
-      if (records.length === 0) { setError('No attendance marked'); return; }
+      if (records.length === 0) { setError('No changes to save'); return; }
       await attendanceAPI.markBulk({ date: selectedDate, records });
-      setSuccess('Attendance saved successfully!');
+      // Update originals to reflect saved state
+      originalAttendance.current = { ...attendance };
+      originalComments.current = { ...comments };
+      setSuccess(`Saved ${records.length} record${records.length > 1 ? 's' : ''} successfully!`);
       setTimeout(() => setSuccess(''), 3000);
     } catch (err) {
       setError(err.response?.data?.detail || 'Failed to save attendance');
