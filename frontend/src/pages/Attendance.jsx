@@ -230,7 +230,6 @@ const Attendance = () => {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [popupLabourId, setPopupLabourId] = useState(null);
-  const [popupSelection, setPopupSelection] = useState(null);
   const [popupFlip, setPopupFlip] = useState(false);
   const originalAttendance = useRef({});
   const originalComments = useRef({});
@@ -351,30 +350,30 @@ const Attendance = () => {
   const getStatusColor = (status) => STATUS_META[status]?.color || 'bg-gray-200 text-gray-600';
 
   const openPopup = (labourId) => {
-    setPopupSelection(attendance[labourId] || null);
+    if (popupLabourId === labourId) { setPopupLabourId(null); return; }
     // Check if popup should flip upward (not enough space below)
     const btn = popupBtnRefs.current[labourId];
     if (btn) {
       const rect = btn.getBoundingClientRect();
       const spaceBelow = window.innerHeight - rect.bottom;
-      setPopupFlip(spaceBelow < 340);
+      setPopupFlip(spaceBelow < 300);
     } else {
       setPopupFlip(false);
     }
     setPopupLabourId(labourId);
   };
 
-  const confirmPopup = () => {
-    if (popupLabourId) {
-      setAttendance((prev) => ({ ...prev, [popupLabourId]: popupSelection || undefined }));
-    }
+  const selectPopupStatus = (statusKey) => {
+    if (!popupLabourId) return;
+    const current = attendance[popupLabourId];
+    // Toggle: if same status clicked, unmark it
+    const newStatus = current === statusKey ? undefined : statusKey;
+    setAttendance((prev) => ({ ...prev, [popupLabourId]: newStatus }));
     setPopupLabourId(null);
-    setPopupSelection(null);
   };
 
   const closePopup = () => {
     setPopupLabourId(null);
-    setPopupSelection(null);
   };
 
   const attVals = Object.values(attendance);
@@ -569,44 +568,30 @@ const Attendance = () => {
                             </button>
                             {popupLabourId === labour.id && (
                               <div className={`absolute right-0 w-56 bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 z-50 overflow-hidden ${popupFlip ? 'bottom-full mb-1' : 'top-full mt-1'}`}>
-                                <div className="px-4 py-2 border-b border-gray-100 dark:border-gray-700">
-                                  <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Select Status</p>
-                                </div>
                                 <div className="py-1">
-                                  {Object.entries(STATUS_META).map(([key, meta]) => (
-                                    <button
-                                      key={key}
-                                      onClick={() => setPopupSelection(popupSelection === key ? null : key)}
-                                      className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm transition-colors ${
-                                        popupSelection === key
-                                          ? 'bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300'
-                                          : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
-                                      }`}
-                                    >
-                                      <span className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold ${meta.color}`}>
-                                        {meta.label}
-                                      </span>
-                                      <span className="flex-1 text-left font-medium">{meta.desc}</span>
-                                      <span className="text-xs text-gray-400">{meta.days}d</span>
-                                      {popupSelection === key && (
-                                        <Check size={16} className="text-primary-600" />
-                                      )}
-                                    </button>
-                                  ))}
-                                </div>
-                                <div className="flex gap-2 px-4 py-2 border-t border-gray-100 dark:border-gray-700">
-                                  <button
-                                    onClick={closePopup}
-                                    className="flex-1 px-3 py-1.5 text-sm rounded-lg border border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700"
-                                  >
-                                    Cancel
-                                  </button>
-                                  <button
-                                    onClick={confirmPopup}
-                                    className="flex-1 px-3 py-1.5 text-sm rounded-lg bg-primary-600 text-white hover:bg-primary-700 font-medium"
-                                  >
-                                    OK
-                                  </button>
+                                  {Object.entries(STATUS_META).map(([key, meta]) => {
+                                    const isSelected = attendance[labour.id] === key;
+                                    return (
+                                      <button
+                                        key={key}
+                                        onClick={() => selectPopupStatus(key)}
+                                        className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm transition-colors ${
+                                          isSelected
+                                            ? 'bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300'
+                                            : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
+                                        }`}
+                                      >
+                                        <span className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold ${meta.color}`}>
+                                          {meta.label}
+                                        </span>
+                                        <span className="flex-1 text-left font-medium">{meta.desc}</span>
+                                        <span className="text-xs text-gray-400">{meta.days}d</span>
+                                        {isSelected && (
+                                          <Check size={16} className="text-primary-600" />
+                                        )}
+                                      </button>
+                                    );
+                                  })}
                                 </div>
                               </div>
                             )}
