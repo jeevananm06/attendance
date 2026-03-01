@@ -575,14 +575,42 @@ const SitesTab = ({ labours, setError, setSuccess, isAdmin }) => {
   const fetchData = async () => {
     try {
       setLoading(true);
-      const [sitesRes, summaryRes, unassignedRes] = await Promise.all([
+      const [sitesRes, summaryRes] = await Promise.all([
         sitesAPI.getAll(), 
-        sitesAPI.getSummary(),
-        sitesAPI.getUnassignedLabours()
+        sitesAPI.getSummary()
       ]);
       setSites(sitesRes.data);
       setSummary(summaryRes.data);
-      setUnassignedLabours(unassignedRes.data.labours || []);
+      
+      // Try to fetch unassigned labours from backend first
+      try {
+        const unassignedRes = await sitesAPI.getUnassignedLabours();
+        setUnassignedLabours(unassignedRes.data.labours || []);
+      } catch (unassignedErr) {
+        console.warn('Failed to load unassigned labours from backend, calculating on frontend:', unassignedErr);
+        
+        // Fallback: Calculate unassigned labours on frontend
+        try {
+          const allAssignedLabourIds = new Set();
+          
+          // Fetch labours for each site
+          const siteLaboursPromises = summaryRes.data.sites.map(site => 
+            sitesAPI.getLabours(site.site_id).catch(() => ({ data: { labours: [] } }))
+          );
+          const siteLaboursResponses = await Promise.all(siteLaboursPromises);
+          
+          summaryRes.data.sites.forEach((site, index) => {
+            const siteLabours = siteLaboursResponses[index].data.labours || [];
+            siteLabours.forEach(labour => allAssignedLabourIds.add(labour.id));
+          });
+          
+          const unassigned = labours.filter(l => !allAssignedLabourIds.has(l.id));
+          setUnassignedLabours(unassigned);
+        } catch (fallbackErr) {
+          console.error('Failed to calculate unassigned labours on frontend:', fallbackErr);
+          setUnassignedLabours([]);
+        }
+      }
     } catch (err) {
       setError('Failed to load sites');
     } finally {

@@ -177,22 +177,35 @@ async def get_unassigned_labours(
     current_user: User = Depends(get_current_manager_or_admin)
 ):
     """Get all labours that are not assigned to any site"""
-    all_labours = get_all_labours()
-    sites = get_sites()
-    
-    # Get all assigned labour IDs
-    assigned_labour_ids = set()
-    for site in sites:
-        labour_ids = get_labours_by_site(site.id)
-        assigned_labour_ids.update(labour_ids)
-    
-    # Filter unassigned labours
-    unassigned_labours = [
-        labour for labour in all_labours 
-        if labour.id not in assigned_labour_ids
-    ]
-    
-    return {
-        "unassigned_count": len(unassigned_labours),
-        "labours": unassigned_labours
-    }
+    try:
+        all_labours = get_all_labours()
+        sites = get_sites()
+        
+        # Get all assigned labour IDs
+        assigned_labour_ids = set()
+        for site in sites:
+            try:
+                labour_ids = get_labours_by_site(site.id)
+                assigned_labour_ids.update(labour_ids)
+            except Exception as e:
+                # Log error but continue with other sites
+                print(f"Error getting labours for site {site.id}: {e}")
+                continue
+        
+        # Filter unassigned labours
+        unassigned_labours = [
+            labour for labour in all_labours 
+            if labour.id not in assigned_labour_ids
+        ]
+        
+        return {
+            "unassigned_count": len(unassigned_labours),
+            "labours": unassigned_labours
+        }
+    except Exception as e:
+        # Return empty result if there's an error
+        print(f"Error in get_unassigned_labours: {e}")
+        return {
+            "unassigned_count": 0,
+            "labours": []
+        }
