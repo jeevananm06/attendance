@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+ import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import {
   overtimeAPI, advancesAPI, leavesAPI, sitesAPI,
@@ -16,7 +16,7 @@ const TabButton = ({ active, onClick, icon: Icon, label }) => (
     className={`flex items-center gap-2 px-4 py-3 font-medium transition-colors ${
       active
         ? 'text-primary-600 border-b-2 border-primary-600'
-        : 'text-gray-500 hover:text-gray-700'
+        : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
     }`}
   >
     <Icon size={18} />
@@ -75,7 +75,7 @@ const More = () => {
       )}
 
       <div className="card">
-        <div className="flex overflow-x-auto border-b -mx-6 px-6">
+        <div className="flex overflow-x-auto border-b dark:border-gray-700 -mx-6 px-6">
           {tabs.map((tab) => (
             <TabButton
               key={tab.id}
@@ -171,7 +171,7 @@ const OvertimeTab = ({ labours, setError, setSuccess }) => {
       </div>
 
       {showForm && (
-        <form onSubmit={handleSubmit} className="bg-gray-50 p-4 rounded-lg mb-4 grid grid-cols-1 md:grid-cols-5 gap-4">
+        <form onSubmit={handleSubmit} className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg mb-4 grid grid-cols-1 md:grid-cols-5 gap-4">
           <select value={formData.labour_id} onChange={(e) => setFormData({...formData, labour_id: e.target.value})} className="input" required>
             <option value="">Select Labour</option>
             {labours.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
@@ -190,7 +190,7 @@ const OvertimeTab = ({ labours, setError, setSuccess }) => {
 
       <div className="overflow-x-auto">
         <table className="w-full">
-          <thead><tr className="border-b bg-gray-50">
+          <thead><tr className="border-b dark:border-gray-700 bg-gray-50 dark:bg-gray-700">
             <th className="text-left py-3 px-4">Labour</th>
             <th className="text-left py-3 px-4">Date</th>
             <th className="text-center py-3 px-4">Hours</th>
@@ -201,7 +201,7 @@ const OvertimeTab = ({ labours, setError, setSuccess }) => {
             {records.map((r) => {
               const labour = labours.find(l => l.id === r.labour_id);
               return (
-                <tr key={r.id} className="border-b">
+                <tr key={r.id} className="border-b dark:border-gray-700">
                   <td className="py-3 px-4">{labour?.name || r.labour_id}</td>
                   <td className="py-3 px-4">{r.date}</td>
                   <td className="py-3 px-4 text-center">{r.hours}</td>
@@ -212,7 +212,7 @@ const OvertimeTab = ({ labours, setError, setSuccess }) => {
             })}
           </tbody>
         </table>
-        {records.length === 0 && <p className="text-center py-8 text-gray-500">No overtime records</p>}
+        {records.length === 0 && <p className="text-center py-8 text-gray-500 dark:text-gray-400">No overtime records</p>}
       </div>
     </div>
   );
@@ -309,7 +309,7 @@ const AdvancesTab = ({ labours, setError, setSuccess }) => {
       </div>
 
       {showForm && (
-        <form onSubmit={handleSubmit} className="bg-gray-50 p-4 rounded-lg mb-4 grid grid-cols-1 md:grid-cols-4 gap-4">
+        <form onSubmit={handleSubmit} className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg mb-4 grid grid-cols-1 md:grid-cols-4 gap-4">
           <select value={formData.labour_id} onChange={(e) => setFormData({...formData, labour_id: e.target.value})} className="input" required>
             <option value="">Select Labour</option>
             {labours.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
@@ -322,7 +322,7 @@ const AdvancesTab = ({ labours, setError, setSuccess }) => {
 
       <div className="overflow-x-auto">
         <table className="w-full">
-          <thead><tr className="border-b bg-gray-50">
+          <thead><tr className="border-b dark:border-gray-700 bg-gray-50 dark:bg-gray-700">
             <th className="text-left py-3 px-4">Labour</th>
             <th className="text-left py-3 px-4">Date</th>
             <th className="text-right py-3 px-4">Amount</th>
@@ -339,7 +339,7 @@ const AdvancesTab = ({ labours, setError, setSuccess }) => {
               const pct = Math.round((repaid / r.amount) * 100);
               return (
                 <>
-                  <tr key={r.id} className="border-b">
+                  <tr key={r.id} className="border-b dark:border-gray-700">
                     <td className="py-3 px-4">{labour?.name || r.labour_id}</td>
                     <td className="py-3 px-4">{r.date}</td>
                     <td className="py-3 px-4 text-right font-medium">₹{r.amount.toLocaleString()}</td>
@@ -349,10 +349,10 @@ const AdvancesTab = ({ labours, setError, setSuccess }) => {
                           <span className={remaining > 0 ? 'text-orange-600 font-medium' : 'text-green-600 font-medium'}>
                             ₹{remaining.toLocaleString()}
                           </span>
-                          <div className="w-full bg-gray-200 rounded-full h-1.5 mt-1">
+                          <div className="w-full bg-gray-200 dark:bg-gray-600 rounded-full h-1.5 mt-1">
                             <div className="bg-green-500 h-1.5 rounded-full" style={{ width: `${pct}%` }} />
                           </div>
-                          <span className="text-xs text-gray-400">{pct}% repaid</span>
+                          <span className="text-xs text-gray-400 dark:text-gray-500">{pct}% repaid</span>
                         </div>
                       ) : (
                         <span className="text-gray-400 text-sm">—</span>
@@ -386,10 +386,10 @@ const AdvancesTab = ({ labours, setError, setSuccess }) => {
                     </td>
                   </tr>
                   {repayPanel === r.id && (
-                    <tr key={`${r.id}-repay`} className="bg-blue-50 border-b">
+                    <tr key={`${r.id}-repay`} className="bg-blue-50 dark:bg-blue-900/30 border-b dark:border-gray-700">
                       <td colSpan={7} className="px-4 py-3">
                         <div className="flex items-center gap-3">
-                          <span className="text-sm font-medium text-gray-700">Repay amount (max ₹{remaining.toLocaleString()}):</span>
+                          <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Repay amount (max ₹{remaining.toLocaleString()}):</span>
                           <input
                             type="number"
                             value={repayAmount}
@@ -419,7 +419,7 @@ const AdvancesTab = ({ labours, setError, setSuccess }) => {
             })}
           </tbody>
         </table>
-        {records.length === 0 && <p className="text-center py-8 text-gray-500">No advance records</p>}
+        {records.length === 0 && <p className="text-center py-8 text-gray-500 dark:text-gray-400">No advance records</p>}
       </div>
     </div>
   );
@@ -494,7 +494,7 @@ const LeavesTab = ({ labours, setError, setSuccess }) => {
       </div>
 
       {showForm && (
-        <form onSubmit={handleSubmit} className="bg-gray-50 p-4 rounded-lg mb-4 grid grid-cols-1 md:grid-cols-6 gap-4">
+        <form onSubmit={handleSubmit} className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg mb-4 grid grid-cols-1 md:grid-cols-6 gap-4">
           <select value={formData.labour_id} onChange={(e) => setFormData({...formData, labour_id: e.target.value})} className="input" required>
             <option value="">Select Labour</option>
             {labours.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
@@ -514,7 +514,7 @@ const LeavesTab = ({ labours, setError, setSuccess }) => {
 
       <div className="overflow-x-auto">
         <table className="w-full">
-          <thead><tr className="border-b bg-gray-50">
+          <thead><tr className="border-b dark:border-gray-700 bg-gray-50 dark:bg-gray-700">
             <th className="text-left py-3 px-4">Labour</th>
             <th className="text-left py-3 px-4">Type</th>
             <th className="text-left py-3 px-4">Period</th>
@@ -526,7 +526,7 @@ const LeavesTab = ({ labours, setError, setSuccess }) => {
             {records.map((r) => {
               const labour = labours.find(l => l.id === r.labour_id);
               return (
-                <tr key={r.id} className="border-b">
+                <tr key={r.id} className="border-b dark:border-gray-700">
                   <td className="py-3 px-4">{labour?.name || r.labour_id}</td>
                   <td className="py-3 px-4 capitalize">{r.leave_type}</td>
                   <td className="py-3 px-4">{r.start_date} to {r.end_date}</td>
@@ -551,7 +551,7 @@ const LeavesTab = ({ labours, setError, setSuccess }) => {
             })}
           </tbody>
         </table>
-        {records.length === 0 && <p className="text-center py-8 text-gray-500">No leave records</p>}
+        {records.length === 0 && <p className="text-center py-8 text-gray-500 dark:text-gray-400">No leave records</p>}
       </div>
     </div>
   );
@@ -613,21 +613,21 @@ const SitesTab = ({ labours, setError, setSuccess, isAdmin }) => {
   return (
     <div>
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-        <div className="bg-blue-50 p-4 rounded-lg text-center">
+        <div className="bg-blue-50 dark:bg-blue-900/30 p-4 rounded-lg text-center">
           <p className="text-2xl font-bold text-blue-600">{summary?.total_sites || 0}</p>
-          <p className="text-sm text-gray-600">Total Sites</p>
+          <p className="text-sm text-gray-600 dark:text-gray-400">Total Sites</p>
         </div>
-        <div className="bg-green-50 p-4 rounded-lg text-center">
+        <div className="bg-green-50 dark:bg-green-900/30 p-4 rounded-lg text-center">
           <p className="text-2xl font-bold text-green-600">{summary?.assigned_labours || 0}</p>
-          <p className="text-sm text-gray-600">Assigned</p>
+          <p className="text-sm text-gray-600 dark:text-gray-400">Assigned</p>
         </div>
-        <div className="bg-orange-50 p-4 rounded-lg text-center">
+        <div className="bg-orange-50 dark:bg-orange-900/30 p-4 rounded-lg text-center">
           <p className="text-2xl font-bold text-orange-600">{summary?.unassigned_labours || 0}</p>
-          <p className="text-sm text-gray-600">Unassigned</p>
+          <p className="text-sm text-gray-600 dark:text-gray-400">Unassigned</p>
         </div>
-        <div className="bg-gray-50 p-4 rounded-lg text-center">
-          <p className="text-2xl font-bold text-gray-600">{summary?.total_labours || 0}</p>
-          <p className="text-sm text-gray-600">Total Labours</p>
+        <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg text-center">
+          <p className="text-2xl font-bold text-gray-600 dark:text-gray-300">{summary?.total_labours || 0}</p>
+          <p className="text-sm text-gray-600 dark:text-gray-400">Total Labours</p>
         </div>
       </div>
 
@@ -640,14 +640,14 @@ const SitesTab = ({ labours, setError, setSuccess, isAdmin }) => {
       </div>
 
       {showForm && isAdmin && (
-        <form onSubmit={handleCreateSite} className="bg-gray-50 p-4 rounded-lg mb-4 grid grid-cols-1 md:grid-cols-3 gap-4">
+        <form onSubmit={handleCreateSite} className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg mb-4 grid grid-cols-1 md:grid-cols-3 gap-4">
           <input type="text" placeholder="Site Name" value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} className="input" required />
           <input type="text" placeholder="Address (optional)" value={formData.address} onChange={(e) => setFormData({...formData, address: e.target.value})} className="input" />
           <button type="submit" className="btn-success">Create Site</button>
         </form>
       )}
 
-      <form onSubmit={handleAssign} className="bg-blue-50 p-4 rounded-lg mb-4 grid grid-cols-1 md:grid-cols-3 gap-4">
+      <form onSubmit={handleAssign} className="bg-blue-50 dark:bg-blue-900/30 p-4 rounded-lg mb-4 grid grid-cols-1 md:grid-cols-3 gap-4">
         <select value={assignData.labour_id} onChange={(e) => setAssignData({...assignData, labour_id: e.target.value})} className="input" required>
           <option value="">Select Labour</option>
           {labours.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
@@ -661,17 +661,17 @@ const SitesTab = ({ labours, setError, setSuccess, isAdmin }) => {
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {summary?.sites?.map((site) => (
-          <div key={site.site_id} className="border rounded-lg p-4">
+          <div key={site.site_id} className="border dark:border-gray-700 rounded-lg p-4">
             <div className="flex items-center gap-2 mb-2">
               <MapPin className="text-primary-600" size={20} />
-              <h4 className="font-semibold">{site.name}</h4>
+              <h4 className="font-semibold dark:text-gray-100">{site.name}</h4>
             </div>
-            {site.address && <p className="text-sm text-gray-500 mb-2">{site.address}</p>}
+            {site.address && <p className="text-sm text-gray-500 dark:text-gray-400 mb-2">{site.address}</p>}
             <p className="text-sm"><span className="font-medium">{site.labour_count}</span> labours assigned</p>
           </div>
         ))}
       </div>
-      {sites.length === 0 && <p className="text-center py-8 text-gray-500">No sites created</p>}
+      {sites.length === 0 && <p className="text-center py-8 text-gray-500 dark:text-gray-400">No sites created</p>}
     </div>
   );
 };
@@ -734,7 +734,7 @@ const DocumentsTab = ({ labours, isAdmin, setError, setSuccess }) => {
 
   return (
     <div className="space-y-4">
-      <h3 className="text-lg font-semibold text-gray-800">Labour Documents</h3>
+      <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100">Labour Documents</h3>
 
       <div className="flex flex-wrap gap-3 items-end">
         <div className="flex-1 min-w-[180px]">
@@ -780,12 +780,12 @@ const DocumentsTab = ({ labours, isAdmin, setError, setSuccess }) => {
       ) : (
         <div className="space-y-2">
           {docs.map((doc) => (
-            <div key={doc.id} className="flex items-center justify-between bg-gray-50 border rounded-lg px-4 py-3">
+            <div key={doc.id} className="flex items-center justify-between bg-gray-50 dark:bg-gray-700 border dark:border-gray-700 rounded-lg px-4 py-3">
               <div className="flex items-center gap-3">
                 <FileText size={20} className="text-primary-600" />
                 <div>
-                  <p className="font-medium text-gray-800 text-sm">{doc.original_name}</p>
-                  <p className="text-xs text-gray-500 capitalize">
+                  <p className="font-medium text-gray-800 dark:text-gray-100 text-sm">{doc.original_name}</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 capitalize">
                     {doc.doc_type} · Uploaded {new Date(doc.uploaded_at).toLocaleDateString('en-IN')}
                   </p>
                 </div>
@@ -795,7 +795,7 @@ const DocumentsTab = ({ labours, isAdmin, setError, setSuccess }) => {
                   href={documentsAPI.getDownloadUrl(selectedLabour, doc.id)}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="p-2 rounded-lg hover:bg-gray-200 text-blue-600"
+                  className="p-2 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 text-blue-600"
                   title="View / Download"
                 >
                   <Eye size={16} />
@@ -854,27 +854,27 @@ const ReportsTab = ({ labours, isAdmin }) => {
       <h3 className="text-lg font-semibold mb-4">Generate Reports</h3>
       
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <div className={`border-2 rounded-lg p-4 cursor-pointer transition-colors ${reportType === 'monthly' ? 'border-primary-500 bg-primary-50' : 'border-gray-200 hover:border-gray-300'}`} onClick={() => setReportType('monthly')}>
-          <h4 className="font-semibold">Monthly Report</h4>
-          <p className="text-sm text-gray-500">Detailed monthly summary</p>
+        <div className={`border-2 rounded-lg p-4 cursor-pointer transition-colors ${reportType === 'monthly' ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/30' : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'}`} onClick={() => setReportType('monthly')}>
+          <h4 className="font-semibold dark:text-gray-100">Monthly Report</h4>
+          <p className="text-sm text-gray-500 dark:text-gray-400">Detailed monthly summary</p>
         </div>
         {isAdmin && (
-          <div className={`border-2 rounded-lg p-4 cursor-pointer transition-colors ${reportType === 'payroll' ? 'border-primary-500 bg-primary-50' : 'border-gray-200 hover:border-gray-300'}`} onClick={() => setReportType('payroll')}>
-            <h4 className="font-semibold">Payroll Register</h4>
-            <p className="text-sm text-gray-500">Monthly payroll printout</p>
+          <div className={`border-2 rounded-lg p-4 cursor-pointer transition-colors ${reportType === 'payroll' ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/30' : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'}`} onClick={() => setReportType('payroll')}>
+            <h4 className="font-semibold dark:text-gray-100">Payroll Register</h4>
+            <p className="text-sm text-gray-500 dark:text-gray-400">Monthly payroll printout</p>
           </div>
         )}
-        <div className={`border-2 rounded-lg p-4 cursor-pointer transition-colors ${reportType === 'labour' ? 'border-primary-500 bg-primary-50' : 'border-gray-200 hover:border-gray-300'}`} onClick={() => setReportType('labour')}>
-          <h4 className="font-semibold">Labour Report</h4>
-          <p className="text-sm text-gray-500">Individual labour details</p>
+        <div className={`border-2 rounded-lg p-4 cursor-pointer transition-colors ${reportType === 'labour' ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/30' : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'}`} onClick={() => setReportType('labour')}>
+          <h4 className="font-semibold dark:text-gray-100">Labour Report</h4>
+          <p className="text-sm text-gray-500 dark:text-gray-400">Individual labour details</p>
         </div>
-        <div className={`border-2 rounded-lg p-4 cursor-pointer transition-colors ${reportType === 'summary' ? 'border-primary-500 bg-primary-50' : 'border-gray-200 hover:border-gray-300'}`} onClick={() => setReportType('summary')}>
-          <h4 className="font-semibold">Summary Report</h4>
-          <p className="text-sm text-gray-500">Organization overview</p>
+        <div className={`border-2 rounded-lg p-4 cursor-pointer transition-colors ${reportType === 'summary' ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/30' : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'}`} onClick={() => setReportType('summary')}>
+          <h4 className="font-semibold dark:text-gray-100">Summary Report</h4>
+          <p className="text-sm text-gray-500 dark:text-gray-400">Organization overview</p>
         </div>
       </div>
 
-      <div className="bg-gray-50 p-4 rounded-lg">
+      <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg">
         {(reportType === 'monthly' || reportType === 'payroll') && (
           <div className="flex gap-4 items-end">
             <div>
@@ -947,7 +947,7 @@ const AuditTab = () => {
       <h3 className="text-lg font-semibold mb-4">Audit Logs</h3>
       <div className="overflow-x-auto max-h-96 overflow-y-auto">
         <table className="w-full">
-          <thead className="sticky top-0 bg-white"><tr className="border-b bg-gray-50">
+          <thead className="sticky top-0 bg-white dark:bg-gray-800"><tr className="border-b dark:border-gray-700 bg-gray-50 dark:bg-gray-700">
             <th className="text-left py-3 px-4">Timestamp</th>
             <th className="text-left py-3 px-4">User</th>
             <th className="text-left py-3 px-4">Action</th>
@@ -956,17 +956,17 @@ const AuditTab = () => {
           </tr></thead>
           <tbody>
             {logs.map((log) => (
-              <tr key={log.id} className="border-b text-sm">
-                <td className="py-2 px-4 text-gray-500">{new Date(log.timestamp).toLocaleString()}</td>
+              <tr key={log.id} className="border-b dark:border-gray-700 text-sm">
+                <td className="py-2 px-4 text-gray-500 dark:text-gray-400">{new Date(log.timestamp).toLocaleString()}</td>
                 <td className="py-2 px-4">{log.user}</td>
                 <td className="py-2 px-4"><span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-xs">{log.action}</span></td>
                 <td className="py-2 px-4">{log.entity_type}</td>
-                <td className="py-2 px-4 text-gray-500">{log.new_value || log.entity_id || '-'}</td>
+                <td className="py-2 px-4 text-gray-500 dark:text-gray-400">{log.new_value || log.entity_id || '-'}</td>
               </tr>
             ))}
           </tbody>
         </table>
-        {logs.length === 0 && <p className="text-center py-8 text-gray-500">No audit logs</p>}
+        {logs.length === 0 && <p className="text-center py-8 text-gray-500 dark:text-gray-400">No audit logs</p>}
       </div>
     </div>
   );
@@ -1045,10 +1045,10 @@ const BackupTab = ({ setError, setSuccess }) => {
 
       <div className="space-y-3">
         {backups.map((backup) => (
-          <div key={backup.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+          <div key={backup.id} className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
             <div>
-              <p className="font-medium">{backup.filename}</p>
-              <p className="text-sm text-gray-500">
+              <p className="font-medium dark:text-gray-100">{backup.filename}</p>
+              <p className="text-sm text-gray-500 dark:text-gray-400">
                 {new Date(backup.timestamp).toLocaleString()} • {(backup.size_bytes / 1024).toFixed(1)} KB • by {backup.created_by}
               </p>
             </div>
@@ -1062,7 +1062,7 @@ const BackupTab = ({ setError, setSuccess }) => {
             </div>
           </div>
         ))}
-        {backups.length === 0 && <p className="text-center py-8 text-gray-500">No backups yet</p>}
+        {backups.length === 0 && <p className="text-center py-8 text-gray-500 dark:text-gray-400">No backups yet</p>}
       </div>
     </div>
   );

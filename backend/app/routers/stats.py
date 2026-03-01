@@ -197,7 +197,7 @@ async def get_site_cost_stats(
     result = []
     for site in sites:
         labours = get_labours_by_site(site.id)
-        labour_ids = {l.id for l in labours}
+        labour_ids = set(labours)
 
         site_records = [r for r in all_salary if r.labour_id in labour_ids]
         total_earned = sum(r.total_amount for r in site_records)

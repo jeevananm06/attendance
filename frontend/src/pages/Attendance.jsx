@@ -87,9 +87,9 @@ const MonthlyLabourCard = ({ labour, year, month }) => {
   const earned     = daysWorked * labour.daily_wage;
 
   return (
-    <div className="border rounded-lg overflow-hidden bg-white">
+    <div className="border dark:border-gray-700 rounded-lg overflow-hidden bg-white dark:bg-gray-800">
       <div
-        className="flex items-center justify-between p-4 cursor-pointer hover:bg-gray-50"
+        className="flex items-center justify-between p-4 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700"
         onClick={() => setExpanded((v) => !v)}
       >
         <div className="flex items-center gap-3">
@@ -97,8 +97,8 @@ const MonthlyLabourCard = ({ labour, year, month }) => {
             {labour.name.charAt(0).toUpperCase()}
           </div>
           <div>
-            <p className="font-semibold text-gray-800">{labour.name}</p>
-            <p className="text-xs text-gray-500">₹{labour.daily_wage}/day</p>
+            <p className="font-semibold text-gray-800 dark:text-gray-100">{labour.name}</p>
+            <p className="text-xs text-gray-500 dark:text-gray-400">₹{labour.daily_wage}/day</p>
           </div>
         </div>
         <div className="flex items-center gap-3">
@@ -111,7 +111,7 @@ const MonthlyLabourCard = ({ labour, year, month }) => {
             <select
               value={fillStatus}
               onChange={(e) => setFillStatus(e.target.value)}
-              className="text-xs border border-gray-300 rounded px-1 py-0.5 bg-white"
+              className="text-xs border border-gray-300 dark:border-gray-600 rounded px-1 py-0.5 bg-white dark:bg-gray-700 dark:text-gray-100"
             >
               <option value="present">Present</option>
               <option value="half_day">Half Day</option>
@@ -128,8 +128,8 @@ const MonthlyLabourCard = ({ labour, year, month }) => {
             </button>
           </div>
           <div className="text-right">
-            <p className="font-bold text-gray-800">₹{earned.toLocaleString()}</p>
-            <p className="text-xs text-gray-400">{daysWorked} days</p>
+            <p className="font-bold text-gray-800 dark:text-gray-100">₹{earned.toLocaleString()}</p>
+            <p className="text-xs text-gray-400 dark:text-gray-500">{daysWorked} days</p>
           </div>
           {expanded
             ? <ChevronUp size={18} className="text-gray-400 flex-shrink-0" />
@@ -144,7 +144,7 @@ const MonthlyLabourCard = ({ labour, year, month }) => {
       )}
 
       {expanded && (
-        <div className="border-t bg-gray-50 p-4">
+        <div className="border-t dark:border-gray-700 bg-gray-50 dark:bg-gray-700 p-4">
           {loadingMonth ? (
             <div className="flex justify-center py-4">
               <div className="w-6 h-6 border-2 border-primary-600 border-t-transparent rounded-full animate-spin" />
@@ -355,11 +355,11 @@ const Attendance = () => {
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
           {/* Only show view toggle if user can view monthly */}
           {canViewMonthly ? (
-            <div className="flex bg-gray-100 rounded-lg p-1 gap-1">
+            <div className="flex bg-gray-100 dark:bg-gray-700 rounded-lg p-1 gap-1">
               <button
                 onClick={() => setView('daily')}
                 className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                  view === 'daily' ? 'bg-white shadow text-primary-600' : 'text-gray-500 hover:text-gray-700'
+                  view === 'daily' ? 'bg-white dark:bg-gray-600 shadow text-primary-600 dark:text-primary-400' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700'
                 }`}
               >
                 Daily
@@ -367,20 +367,20 @@ const Attendance = () => {
               <button
                 onClick={() => setView('monthly')}
                 className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                  view === 'monthly' ? 'bg-white shadow text-primary-600' : 'text-gray-500 hover:text-gray-700'
+                  view === 'monthly' ? 'bg-white dark:bg-gray-600 shadow text-primary-600 dark:text-primary-400' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700'
                 }`}
               >
                 Monthly
               </button>
             </div>
           ) : (
-            <h3 className="text-lg font-semibold text-gray-800">Daily Attendance</h3>
+            <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100">Daily Attendance</h3>
           )}
 
           {view === 'daily' && (
             <div className="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto">
               <div className="flex items-center gap-2">
-                <button onClick={() => changeDate(-1)} className="p-2 hover:bg-gray-100 rounded-lg">
+                <button onClick={() => changeDate(-1)} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg">
                   <ChevronLeft size={22} />
                 </button>
                 <div className="flex flex-col items-center">
@@ -393,9 +393,9 @@ const Attendance = () => {
                       className="input w-auto"
                     />
                   </div>
-                  <span className="text-xs text-gray-500 font-medium">{getSelectedDayName()}</span>
+                  <span className="text-xs text-gray-500 dark:text-gray-400 font-medium">{getSelectedDayName()}</span>
                 </div>
-                <button onClick={() => changeDate(1)} className="p-2 hover:bg-gray-100 rounded-lg">
+                <button onClick={() => changeDate(1)} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg">
                   <ChevronRight size={22} />
                 </button>
               </div>
@@ -415,13 +415,13 @@ const Attendance = () => {
 
           {view === 'monthly' && (
             <div className="flex items-center gap-3">
-              <button onClick={() => changeMonth(-1)} className="p-2 hover:bg-gray-100 rounded-lg">
+              <button onClick={() => changeMonth(-1)} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg">
                 <ChevronLeft size={22} />
               </button>
-              <span className="font-semibold text-gray-800 min-w-[150px] text-center text-lg">
+              <span className="font-semibold text-gray-800 dark:text-gray-100 min-w-[150px] text-center text-lg">
                 {MONTH_NAMES[selectedMonth]} {selectedYear}
               </span>
-              <button onClick={() => changeMonth(1)} className="p-2 hover:bg-gray-100 rounded-lg">
+              <button onClick={() => changeMonth(1)} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg">
                 <ChevronRight size={22} />
               </button>
             </div>
@@ -434,11 +434,11 @@ const Attendance = () => {
         <>
           <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
             {[
-              { label: 'Total',      value: dailyStats.total,      bg: 'bg-white border',                       tc: 'text-gray-800',   sc: 'text-gray-500' },
+              { label: 'Total',      value: dailyStats.total,      bg: 'bg-white dark:bg-gray-800 border dark:border-gray-700', tc: 'text-gray-800 dark:text-gray-100', sc: 'text-gray-500 dark:text-gray-400' },
               { label: 'Present',    value: dailyStats.present,    bg: 'bg-green-50 border border-green-200',   tc: 'text-green-600',  sc: 'text-green-600' },
               { label: 'Absent',     value: dailyStats.absent,     bg: 'bg-red-50 border border-red-200',       tc: 'text-red-600',    sc: 'text-red-600' },
               { label: 'Half Day',   value: dailyStats.halfDay,    bg: 'bg-yellow-50 border border-yellow-200', tc: 'text-yellow-600', sc: 'text-yellow-600' },
-              { label: 'Not Marked', value: dailyStats.notMarked,  bg: 'bg-gray-50 border',                     tc: 'text-gray-600',   sc: 'text-gray-500' },
+              { label: 'Not Marked', value: dailyStats.notMarked,  bg: 'bg-gray-50 dark:bg-gray-700 border dark:border-gray-700', tc: 'text-gray-600 dark:text-gray-400', sc: 'text-gray-500 dark:text-gray-400' },
             ].map(({ label, value, bg, tc, sc }) => (
               <div key={label} className={`p-4 rounded-lg text-center ${bg}`}>
                 <p className={`text-2xl font-bold ${tc}`}>{value}</p>
@@ -451,18 +451,18 @@ const Attendance = () => {
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
-                  <tr className="border-b">
-                    <th className="text-left py-3 px-4 font-semibold text-gray-700">Name</th>
-                    <th className="text-center py-3 px-4 font-semibold text-gray-700">Status</th>
-                    <th className="text-left py-3 px-4 font-semibold text-gray-700">Comment</th>
+                  <tr className="border-b dark:border-gray-700">
+                    <th className="text-left py-3 px-4 font-semibold text-gray-700 dark:text-gray-300">Name</th>
+                    <th className="text-center py-3 px-4 font-semibold text-gray-700 dark:text-gray-300">Status</th>
+                    <th className="text-left py-3 px-4 font-semibold text-gray-700 dark:text-gray-300">Comment</th>
                   </tr>
                 </thead>
                 <tbody>
                   {labours.map((labour) => (
-                    <tr key={labour.id} className="border-b hover:bg-gray-50">
+                    <tr key={labour.id} className="border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700">
                       <td className="py-4 px-4">
-                        <p className="font-medium text-gray-800">{labour.name}</p>
-                        {labour.phone && <p className="text-sm text-gray-500">{labour.phone}</p>}
+                        <p className="font-medium text-gray-800 dark:text-gray-100">{labour.name}</p>
+                        {labour.phone && <p className="text-sm text-gray-500 dark:text-gray-400">{labour.phone}</p>}
                       </td>
                       <td className="py-4 px-4">
                         <div className="flex justify-center gap-2">
@@ -492,7 +492,7 @@ const Attendance = () => {
                           placeholder="Add comment..."
                           value={comments[labour.id] || ''}
                           onChange={(e) => handleCommentChange(labour.id, e.target.value)}
-                          className="w-full border border-gray-200 rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-primary-500"
+                          className="w-full border border-gray-200 dark:border-gray-600 rounded px-2 py-1 text-sm bg-white dark:bg-gray-700 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-primary-500"
                         />
                       </td>
                     </tr>
@@ -501,7 +501,7 @@ const Attendance = () => {
               </table>
             </div>
             {labours.length === 0 && (
-              <div className="text-center py-12 text-gray-500">
+              <div className="text-center py-12 text-gray-500 dark:text-gray-400">
                 <Calendar size={48} className="mx-auto mb-4 opacity-50" />
                 <p>No labours found. Add labours first.</p>
               </div>
@@ -514,7 +514,7 @@ const Attendance = () => {
       {view === 'monthly' && (
         <div className="space-y-3">
           {labours.length === 0 ? (
-            <div className="card text-center py-12 text-gray-500">
+            <div className="card text-center py-12 text-gray-500 dark:text-gray-400">
               <Calendar size={48} className="mx-auto mb-4 opacity-50" />
               <p>No labours found.</p>
             </div>

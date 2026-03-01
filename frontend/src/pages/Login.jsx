@@ -30,13 +30,13 @@ const Login = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary-500 to-primary-700 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
-        <div className="bg-white rounded-2xl shadow-xl p-8">
+        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-8">
           <div className="text-center mb-8">
             <div className="inline-flex items-center justify-center w-16 h-16 bg-primary-100 rounded-full mb-4">
               <LogIn className="w-8 h-8 text-primary-600" />
             </div>
-            <h1 className="text-2xl font-bold text-gray-800">Welcome Back</h1>
-            <p className="text-gray-500 mt-2">Labour Attendance Management System</p>
+            <h1 className="text-2xl font-bold text-gray-800 dark:text-gray-100">Welcome Back</h1>
+            <p className="text-gray-500 dark:text-gray-400 mt-2">Labour Attendance Management System</p>
           </div>
 
           {error && (
@@ -96,8 +96,8 @@ const Login = () => {
             </button>
           </form>
 
-          <div className="mt-6 p-4 bg-gray-50 rounded-lg">
-            <p className="text-sm text-gray-600 text-center">
+          <div className="mt-6 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+            <p className="text-sm text-gray-600 dark:text-gray-400 text-center">
               <strong>Default Admin:</strong> admin / admin123
             </p>
           </div>

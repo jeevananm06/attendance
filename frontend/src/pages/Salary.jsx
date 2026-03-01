@@ -175,11 +175,11 @@ const Salary = () => {
       {slip && <SalarySlip slip={slip} onClose={() => setSlip(null)} />}
 
       {/* Tabs */}
-      <div className="flex gap-1 bg-gray-100 p-1 rounded-lg w-fit">
+      <div className="flex gap-1 bg-gray-100 dark:bg-gray-700 p-1 rounded-lg w-fit">
         <button
           onClick={() => setTab('pending')}
           className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-            tab === 'pending' ? 'bg-white text-primary-600 shadow-sm' : 'text-gray-600 hover:text-gray-800'
+            tab === 'pending' ? 'bg-white dark:bg-gray-600 text-primary-600 dark:text-primary-400 shadow-sm' : 'text-gray-600 dark:text-gray-400 hover:text-gray-800'
           }`}
         >
           Pending Payments
@@ -187,7 +187,7 @@ const Salary = () => {
         <button
           onClick={() => setTab('register')}
           className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-            tab === 'register' ? 'bg-white text-primary-600 shadow-sm' : 'text-gray-600 hover:text-gray-800'
+            tab === 'register' ? 'bg-white dark:bg-gray-600 text-primary-600 dark:text-primary-400 shadow-sm' : 'text-gray-600 dark:text-gray-400 hover:text-gray-800'
           }`}
         >
           Pay Register
@@ -243,19 +243,19 @@ const Salary = () => {
 
       {/* Pending Salaries List */}
       <div className="card">
-        <h3 className="text-lg font-semibold text-gray-800 mb-4">Pending Payments</h3>
+        <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4">Pending Payments</h3>
 
         <div className="space-y-4">
           {pendingSalaries?.labours?.map((labour) => (
             <div
               key={labour.labour_id}
               className={`border rounded-lg overflow-hidden ${
-                labour.total_pending > 0 ? 'border-orange-200' : 'border-gray-200'
+                labour.total_pending > 0 ? 'border-orange-200 dark:border-orange-800' : 'border-gray-200 dark:border-gray-700'
               }`}
             >
               <div
                 className={`p-4 flex items-center justify-between cursor-pointer ${
-                  labour.total_pending > 0 ? 'bg-orange-50' : 'bg-gray-50'
+                  labour.total_pending > 0 ? 'bg-orange-50 dark:bg-orange-900/20' : 'bg-gray-50 dark:bg-gray-700'
                 }`}
                 onClick={() =>
                   setExpandedLabour(expandedLabour === labour.labour_id ? null : labour.labour_id)
@@ -267,7 +267,7 @@ const Salary = () => {
                   </div>
                   <div>
                     <div className="flex items-center gap-2">
-                      <p className="font-semibold text-gray-800">{labour.name}</p>
+                      <p className="font-semibold text-gray-800 dark:text-gray-100">{labour.name}</p>
                       <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
                         labour.pay_cycle === 'monthly'
                           ? 'bg-purple-100 text-purple-700'
@@ -282,7 +282,7 @@ const Salary = () => {
                         </span>
                       )}
                     </div>
-                    <p className="text-sm text-gray-500">
+                    <p className="text-sm text-gray-500 dark:text-gray-400">
                       {labour.weeks_pending || 0} {labour.pay_cycle === 'monthly' ? 'month(s)' : 'week(s)'} pending
                     </p>
                   </div>
@@ -310,12 +310,12 @@ const Salary = () => {
               </div>
 
               {expandedLabour === labour.labour_id && (
-                <div className="p-4 border-t bg-white">
+                <div className="p-4 border-t dark:border-gray-700 bg-white dark:bg-gray-800">
                   {labour.records && labour.records.length > 0 ? (
                     <>
                       <table className="w-full text-sm mb-4">
                         <thead>
-                          <tr className="text-gray-500">
+                          <tr className="text-gray-500 dark:text-gray-400">
                             <th className="text-left py-2">{labour.pay_cycle === 'monthly' ? 'Month' : 'Week'}</th>
                             <th className="text-center py-2">Days</th>
                             <th className="text-right py-2">Amount</th>
@@ -362,14 +362,14 @@ const Salary = () => {
                             <div className="flex items-center gap-2 flex-wrap">
                               <div className="flex flex-col">
                                 <div className="flex items-center gap-2">
-                                  <span className="text-sm text-gray-600">₹</span>
+                                  <span className="text-sm text-gray-600 dark:text-gray-400">₹</span>
                                   <input
                                     type="number"
                                     min="1"
                                     max={labour.total_pending}
                                     value={payAmount}
                                     onChange={(e) => setPayAmount(e.target.value)}
-                                    className="w-32 border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                    className="w-32 border border-gray-300 dark:border-gray-600 rounded px-2 py-1.5 text-sm bg-white dark:bg-gray-700 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500"
                                     autoFocus
                                   />
                                   <button
@@ -415,7 +415,7 @@ const Salary = () => {
                       </div>
                     </>
                   ) : (
-                    <div className="text-center py-4 text-gray-500">
+                    <div className="text-center py-4 text-gray-500 dark:text-gray-400">
                       <p>No pending salary records</p>
                       <button
                         onClick={() => handleCalculateOne(labour.labour_id)}
@@ -438,7 +438,7 @@ const Salary = () => {
         </div>
 
         {(!pendingSalaries?.labours || pendingSalaries.labours.length === 0) && (
-          <div className="text-center py-12 text-gray-500">
+          <div className="text-center py-12 text-gray-500 dark:text-gray-400">
             <Wallet size={48} className="mx-auto mb-4 opacity-50" />
             <p>No labours found</p>
           </div>
@@ -448,23 +448,23 @@ const Salary = () => {
 
       {tab === 'register' && (
         <div className="card space-y-4">
-          <h3 className="text-lg font-semibold text-gray-800">Monthly Pay Register</h3>
+          <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100">Monthly Pay Register</h3>
           <div className="flex flex-wrap gap-3 items-end">
             <div>
-              <label className="block text-xs text-gray-500 mb-1">Year</label>
+              <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">Year</label>
               <input
                 type="number"
                 value={regYear}
                 onChange={(e) => setRegYear(Number(e.target.value))}
-                className="border border-gray-300 rounded-lg px-3 py-2 text-sm w-24 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                className="border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm w-24 bg-white dark:bg-gray-700 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500"
               />
             </div>
             <div>
-              <label className="block text-xs text-gray-500 mb-1">Month</label>
+              <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">Month</label>
               <select
                 value={regMonth}
                 onChange={(e) => setRegMonth(Number(e.target.value))}
-                className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                className="border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500"
               >
                 {MONTHS.map((m, i) => (
                   <option key={i + 1} value={i + 1}>{m}</option>
@@ -487,30 +487,30 @@ const Salary = () => {
 
           {register && (
             <>
-              <p className="text-sm text-gray-500">
+              <p className="text-sm text-gray-500 dark:text-gray-400">
                 {MONTHS[register.month - 1]} {register.year} —{' '}
-                <span className="font-medium text-gray-700">{register.labours.length} labours</span>
+                <span className="font-medium text-gray-700 dark:text-gray-300">{register.labours.length} labours</span>
               </p>
               {register.labours.length === 0 ? (
-                <p className="text-center py-8 text-gray-400">No salary records for this period</p>
+                <p className="text-center py-8 text-gray-400 dark:text-gray-500">No salary records for this period</p>
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
-                    <thead className="bg-gray-50">
+                    <thead className="bg-gray-50 dark:bg-gray-700">
                       <tr>
-                        <th className="text-left px-3 py-2 text-gray-600">Labour</th>
-                        <th className="text-center px-3 py-2 text-gray-600">Weeks</th>
-                        <th className="text-right px-3 py-2 text-gray-600">Earned</th>
-                        <th className="text-right px-3 py-2 text-gray-600">Paid</th>
-                        <th className="text-right px-3 py-2 text-gray-600">Balance</th>
+                        <th className="text-left px-3 py-2 text-gray-600 dark:text-gray-300">Labour</th>
+                        <th className="text-center px-3 py-2 text-gray-600 dark:text-gray-300">Weeks</th>
+                        <th className="text-right px-3 py-2 text-gray-600 dark:text-gray-300">Earned</th>
+                        <th className="text-right px-3 py-2 text-gray-600 dark:text-gray-300">Paid</th>
+                        <th className="text-right px-3 py-2 text-gray-600 dark:text-gray-300">Balance</th>
                       </tr>
                     </thead>
                     <tbody>
                       {register.labours.map((l) => (
                         <tr key={l.labour_id} className="border-t">
-                          <td className="px-3 py-2 font-medium text-gray-900">{l.labour_name}</td>
-                          <td className="px-3 py-2 text-center text-gray-600">{l.weeks.length}</td>
-                          <td className="px-3 py-2 text-right text-gray-800">₹{l.total_earned.toLocaleString()}</td>
+                          <td className="px-3 py-2 font-medium text-gray-900 dark:text-gray-100">{l.labour_name}</td>
+                          <td className="px-3 py-2 text-center text-gray-600 dark:text-gray-400">{l.weeks.length}</td>
+                          <td className="px-3 py-2 text-right text-gray-800 dark:text-gray-200">₹{l.total_earned.toLocaleString()}</td>
                           <td className="px-3 py-2 text-right text-green-700">₹{l.total_paid.toLocaleString()}</td>
                           <td className={`px-3 py-2 text-right font-semibold ${l.balance > 0 ? 'text-orange-600' : 'text-green-600'}`}>
                             ₹{l.balance.toLocaleString()}
@@ -518,11 +518,11 @@ const Salary = () => {
                         </tr>
                       ))}
                     </tbody>
-                    <tfoot className="border-t-2 border-gray-300 bg-gray-50">
+                    <tfoot className="border-t-2 border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700">
                       <tr>
-                        <td className="px-3 py-2 font-bold text-gray-800">Total</td>
+                        <td className="px-3 py-2 font-bold text-gray-800 dark:text-gray-100">Total</td>
                         <td />
-                        <td className="px-3 py-2 text-right font-bold text-gray-800">₹{register.grand_total_earned.toLocaleString()}</td>
+                        <td className="px-3 py-2 text-right font-bold text-gray-800 dark:text-gray-100">₹{register.grand_total_earned.toLocaleString()}</td>
                         <td className="px-3 py-2 text-right font-bold text-green-700">₹{register.grand_total_paid.toLocaleString()}</td>
                         <td className="px-3 py-2 text-right font-bold text-orange-600">
                           ₹{(register.grand_total_earned - register.grand_total_paid).toLocaleString()}

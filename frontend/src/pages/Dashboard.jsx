@@ -17,9 +17,9 @@ const StatCard = ({ icon: Icon, label, value, subValue, color, link }) => (
   <Link to={link} className="card hover:shadow-md transition-shadow">
     <div className="flex items-start justify-between">
       <div>
-        <p className="text-sm text-gray-500 mb-1">{label}</p>
-        <p className="text-2xl font-bold text-gray-800">{value}</p>
-        {subValue && <p className="text-sm text-gray-500 mt-1">{subValue}</p>}
+        <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">{label}</p>
+        <p className="text-2xl font-bold text-gray-800 dark:text-gray-100">{value}</p>
+        {subValue && <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{subValue}</p>}
       </div>
       <div className={`p-3 rounded-lg ${color}`}>
         <Icon size={24} className="text-white" />
@@ -146,41 +146,41 @@ const Dashboard = () => {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Today's Attendance Summary */}
         <div className="card">
-          <h3 className="text-lg font-semibold text-gray-800 mb-4">Today's Attendance</h3>
+          <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4">Today's Attendance</h3>
           <div className="space-y-4">
-            <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg">
+            <div className="flex items-center justify-between p-3 bg-green-50 dark:bg-green-900/30 rounded-lg">
               <div className="flex items-center gap-3">
                 <UserCheck className="text-green-600" size={20} />
-                <span className="text-gray-700">Present</span>
+                <span className="text-gray-700 dark:text-gray-300">Present</span>
               </div>
               <span className="font-semibold text-green-600">
                 {stats?.today_attendance?.present || 0}
               </span>
             </div>
-            <div className="flex items-center justify-between p-3 bg-yellow-50 rounded-lg">
+            <div className="flex items-center justify-between p-3 bg-yellow-50 dark:bg-yellow-900/30 rounded-lg">
               <div className="flex items-center gap-3">
                 <Clock className="text-yellow-600" size={20} />
-                <span className="text-gray-700">Half Day</span>
+                <span className="text-gray-700 dark:text-gray-300">Half Day</span>
               </div>
               <span className="font-semibold text-yellow-600">
                 {stats?.today_attendance?.half_day || 0}
               </span>
             </div>
-            <div className="flex items-center justify-between p-3 bg-red-50 rounded-lg">
+            <div className="flex items-center justify-between p-3 bg-red-50 dark:bg-red-900/30 rounded-lg">
               <div className="flex items-center gap-3">
                 <UserX className="text-red-600" size={20} />
-                <span className="text-gray-700">Absent</span>
+                <span className="text-gray-700 dark:text-gray-300">Absent</span>
               </div>
               <span className="font-semibold text-red-600">
                 {stats?.today_attendance?.absent || 0}
               </span>
             </div>
-            <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+            <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
               <div className="flex items-center gap-3">
-                <AlertCircle className="text-gray-600" size={20} />
-                <span className="text-gray-700">Not Marked</span>
+                <AlertCircle className="text-gray-600 dark:text-gray-400" size={20} />
+                <span className="text-gray-700 dark:text-gray-300">Not Marked</span>
               </div>
-              <span className="font-semibold text-gray-600">
+              <span className="font-semibold text-gray-600 dark:text-gray-400">
                 {stats?.today_attendance?.not_marked || 0}
               </span>
             </div>
@@ -196,16 +196,16 @@ const Dashboard = () => {
         {/* Salary Summary - Admin only */}
         {isAdmin && (
           <div className="card">
-            <h3 className="text-lg font-semibold text-gray-800 mb-4">Salary Overview</h3>
+            <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4">Salary Overview</h3>
             <div className="space-y-4">
-              <div className="p-4 bg-gray-50 rounded-lg">
+              <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
                 <div className="flex justify-between items-center mb-2">
-                  <span className="text-gray-600">Total Earned</span>
-                  <span className="font-semibold text-gray-800">
+                  <span className="text-gray-600 dark:text-gray-400">Total Earned</span>
+                  <span className="font-semibold text-gray-800 dark:text-gray-100">
                     ₹{(stats?.salary?.total_earned || 0).toLocaleString()}
                   </span>
                 </div>
-                <div className="w-full bg-gray-200 rounded-full h-2">
+                <div className="w-full bg-gray-200 dark:bg-gray-600 rounded-full h-2">
                   <div
                     className="bg-green-500 h-2 rounded-full"
                     style={{
@@ -219,14 +219,14 @@ const Dashboard = () => {
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
-                <div className="p-4 bg-green-50 rounded-lg text-center">
-                  <p className="text-sm text-gray-600 mb-1">Paid</p>
+                <div className="p-4 bg-green-50 dark:bg-green-900/30 rounded-lg text-center">
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Paid</p>
                   <p className="text-xl font-bold text-green-600">
                     ₹{(stats?.salary?.total_paid || 0).toLocaleString()}
                   </p>
                 </div>
-                <div className="p-4 bg-orange-50 rounded-lg text-center">
-                  <p className="text-sm text-gray-600 mb-1">Pending</p>
+                <div className="p-4 bg-orange-50 dark:bg-orange-900/30 rounded-lg text-center">
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Pending</p>
                   <p className="text-xl font-bold text-orange-600">
                     ₹{(stats?.salary?.total_pending || 0).toLocaleString()}
                   </p>
@@ -245,7 +245,7 @@ const Dashboard = () => {
 
       {/* Quick Actions */}
       <div className="card">
-        <h3 className="text-lg font-semibold text-gray-800 mb-4">Quick Actions</h3>
+        <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4">Quick Actions</h3>
         <div className={`grid grid-cols-2 ${isAdmin ? 'md:grid-cols-4' : 'md:grid-cols-2'} gap-4`}>
           {isAdmin && (
             <Link
@@ -253,7 +253,7 @@ const Dashboard = () => {
               className="p-4 bg-blue-50 rounded-lg text-center hover:bg-blue-100 transition-colors"
             >
               <Users className="mx-auto mb-2 text-blue-600" size={24} />
-              <span className="text-sm font-medium text-gray-700">Add Labour</span>
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Add Labour</span>
             </Link>
           )}
           <Link
@@ -270,14 +270,14 @@ const Dashboard = () => {
                 className="p-4 bg-purple-50 rounded-lg text-center hover:bg-purple-100 transition-colors"
               >
                 <Wallet className="mx-auto mb-2 text-purple-600" size={24} />
-                <span className="text-sm font-medium text-gray-700">Pay Salary</span>
+                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Pay Salary</span>
               </Link>
               <Link
                 to="/export"
                 className="p-4 bg-orange-50 rounded-lg text-center hover:bg-orange-100 transition-colors"
               >
                 <TrendingUp className="mx-auto mb-2 text-orange-600" size={24} />
-                <span className="text-sm font-medium text-gray-700">Export Data</span>
+                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Export Data</span>
               </Link>
             </>
           )}

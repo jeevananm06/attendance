@@ -76,10 +76,10 @@ const NotificationBell = () => {
     <div className="relative" ref={dropdownRef}>
       <button
         onClick={handleOpen}
-        className="relative p-2 rounded-lg hover:bg-gray-100 transition-colors"
+        className="relative p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
         aria-label="Notifications"
       >
-        <Bell size={20} className="text-gray-600" />
+        <Bell size={20} className="text-gray-600 dark:text-gray-400" />
         {unreadCount > 0 && (
           <span className="absolute top-1 right-1 min-w-[16px] h-4 px-0.5 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center leading-none">
             {unreadCount > 99 ? '99+' : unreadCount}
@@ -88,10 +88,10 @@ const NotificationBell = () => {
       </button>
 
       {open && (
-        <div className="absolute right-0 mt-2 w-80 bg-white rounded-xl shadow-lg border border-gray-200 z-50 overflow-hidden">
+        <div className="absolute right-0 mt-2 w-80 bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 z-50 overflow-hidden">
           {/* Header */}
-          <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
-            <span className="font-semibold text-gray-800">Notifications</span>
+          <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-gray-700">
+            <span className="font-semibold text-gray-800 dark:text-gray-100">Notifications</span>
             {notifications.length > 0 && (
               <button
                 onClick={async () => {
@@ -107,7 +107,7 @@ const NotificationBell = () => {
           </div>
 
           {/* List */}
-          <div className="max-h-80 overflow-y-auto divide-y divide-gray-50">
+          <div className="max-h-80 overflow-y-auto divide-y divide-gray-50 dark:divide-gray-700">
             {loading && (
               <div className="py-8 text-center text-gray-400 text-sm">Loading…</div>
             )}
@@ -120,14 +120,14 @@ const NotificationBell = () => {
               return (
                 <div
                   key={notif.id}
-                  className={`flex gap-3 px-4 py-3 ${notif.is_read ? '' : 'bg-blue-50/40'}`}
+                  className={`flex gap-3 px-4 py-3 ${notif.is_read ? '' : 'bg-blue-50/40 dark:bg-blue-900/20'}`}
                 >
                   <div className={`flex-shrink-0 w-8 h-8 rounded-full ${cfg.bg} flex items-center justify-center`}>
                     <Icon size={14} className={cfg.color} />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gray-800 truncate">{notif.title}</p>
-                    <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">{notif.message}</p>
+                    <p className="text-sm font-medium text-gray-800 dark:text-gray-100 truncate">{notif.title}</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 leading-relaxed">{notif.message}</p>
                     <p className="text-[10px] text-gray-400 mt-1">{timeAgo(notif.created_at)}</p>
                   </div>
                   {!notif.is_read && (

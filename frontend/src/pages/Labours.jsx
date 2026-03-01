@@ -130,7 +130,7 @@ const Labours = () => {
   return (
     <div className="space-y-6">
       {error && (
-        <div className="p-4 bg-red-50 border border-red-200 rounded-lg flex items-center gap-3 text-red-700">
+        <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg flex items-center gap-3 text-red-700 dark:text-red-400">
           <AlertCircle size={20} />
           <span>{error}</span>
           <button onClick={() => setError('')} className="ml-auto">
@@ -142,7 +142,7 @@ const Labours = () => {
       {/* Header */}
       <div className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center">
         <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500" size={20} />
           <input
             type="text"
             placeholder="Search by name or phone..."
@@ -152,7 +152,7 @@ const Labours = () => {
           />
         </div>
         <div className="flex gap-3">
-          <label className="flex items-center gap-2 text-sm text-gray-600">
+          <label className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
             <input
               type="checkbox"
               checked={showInactive}
@@ -187,11 +187,11 @@ const Labours = () => {
                   <User className="text-primary-600" size={24} />
                 </div>
                 <div>
-                  <h3 className="font-semibold text-gray-800">{labour.name}</h3>
+                  <h3 className="font-semibold text-gray-800 dark:text-gray-100">{labour.name}</h3>
                   <span className={`text-xs px-2 py-0.5 rounded-full ${
                     labour.is_active
-                      ? 'bg-green-100 text-green-700'
-                      : 'bg-gray-100 text-gray-600'
+                      ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                      : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400'
                   }`}>
                     {labour.is_active ? 'Active' : 'Inactive'}
                   </span>
@@ -200,14 +200,14 @@ const Labours = () => {
               <div className="flex gap-2">
                 <button
                   onClick={() => openEditModal(labour)}
-                  className="p-2 text-gray-500 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors"
+                  className="p-2 text-gray-500 dark:text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors"
                 >
                   <Edit2 size={18} />
                 </button>
                 {labour.is_active && (
                   <button
                     onClick={() => handleDelete(labour)}
-                    className="p-2 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                    className="p-2 text-gray-500 dark:text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                   >
                     <Trash2 size={18} />
                   </button>
@@ -217,23 +217,23 @@ const Labours = () => {
 
             <div className="space-y-2 text-sm">
               {labour.phone && (
-                <div className="flex items-center gap-2 text-gray-600">
+                <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
                   <Phone size={16} />
                   <span>{labour.phone}</span>
                 </div>
               )}
-              <div className="flex items-center gap-2 text-gray-600">
+              <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
                 <IndianRupee size={16} />
                 <span>₹{labour.daily_wage}/day</span>
                 <span className={`ml-auto text-xs px-2 py-0.5 rounded-full font-medium ${
                   (labour.pay_cycle || 'weekly') === 'monthly'
-                    ? 'bg-purple-100 text-purple-700'
-                    : 'bg-blue-100 text-blue-700'
+                    ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400'
+                    : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
                 }`}>
                   {(labour.pay_cycle || 'weekly') === 'monthly' ? 'Monthly' : 'Weekly'}
                 </span>
               </div>
-              <div className="flex items-center gap-2 text-gray-600">
+              <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
                 <Calendar size={16} />
                 <span>Joined: {new Date(labour.joined_date).toLocaleDateString()}</span>
               </div>
@@ -243,7 +243,7 @@ const Labours = () => {
       </div>
 
       {filteredLabours.length === 0 && (
-        <div className="text-center py-12 text-gray-500">
+        <div className="text-center py-12 text-gray-500 dark:text-gray-400">
           <User size={48} className="mx-auto mb-4 opacity-50" />
           <p>No labours found</p>
         </div>
@@ -252,14 +252,14 @@ const Labours = () => {
       {/* Modal */}
       {showModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-md">
-            <div className="flex items-center justify-between p-6 border-b">
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl w-full max-w-md">
+            <div className="flex items-center justify-between p-6 border-b dark:border-gray-700">
               <h2 className="text-xl font-semibold">
                 {editingLabour ? 'Edit Labour' : 'Add New Labour'}
               </h2>
               <button
                 onClick={() => setShowModal(false)}
-                className="p-2 hover:bg-gray-100 rounded-lg"
+                className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
               >
                 <X size={20} />
               </button>
@@ -321,8 +321,8 @@ const Labours = () => {
                 <div className="flex gap-3">
                   <label className={`flex-1 flex items-center justify-center gap-2 p-3 rounded-lg border-2 cursor-pointer transition-colors ${
                     formData.pay_cycle === 'weekly'
-                      ? 'border-blue-500 bg-blue-50 text-blue-700'
-                      : 'border-gray-200 text-gray-600 hover:border-gray-300'
+                      ? 'border-blue-500 bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:border-blue-400 dark:text-blue-400'
+                      : 'border-gray-200 text-gray-600 hover:border-gray-300 dark:border-gray-700 dark:text-gray-400 dark:hover:border-gray-600'
                   }`}>
                     <input
                       type="radio"
@@ -336,8 +336,8 @@ const Labours = () => {
                   </label>
                   <label className={`flex-1 flex items-center justify-center gap-2 p-3 rounded-lg border-2 cursor-pointer transition-colors ${
                     formData.pay_cycle === 'monthly'
-                      ? 'border-purple-500 bg-purple-50 text-purple-700'
-                      : 'border-gray-200 text-gray-600 hover:border-gray-300'
+                      ? 'border-purple-500 bg-purple-50 text-purple-700 dark:bg-purple-900/30 dark:border-purple-400 dark:text-purple-400'
+                      : 'border-gray-200 text-gray-600 hover:border-gray-300 dark:border-gray-700 dark:text-gray-400 dark:hover:border-gray-600'
                   }`}>
                     <input
                       type="radio"

@@ -69,7 +69,7 @@ const Layout = ({ children }) => {
         <div className="flex items-center justify-between h-16 px-6 border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
           <h1 className="text-xl font-bold text-primary-600">AttendanceMS</h1>
           <button
-            className="lg:hidden p-2 rounded-lg hover:bg-gray-100"
+            className="lg:hidden p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700"
             onClick={() => setSidebarOpen(false)}
           >
             <X size={20} />
@@ -104,7 +104,7 @@ const Layout = ({ children }) => {
           <div className="flex items-center gap-3 px-4 py-2 mb-2">
             <UserCircle size={24} className="text-gray-400" />
             <div>
-              <p className="font-medium text-gray-800">{user?.username}</p>
+              <p className="font-medium text-gray-800 dark:text-gray-100">{user?.username}</p>
               <p className="text-xs text-gray-500 capitalize">{user?.role}</p>
             </div>
           </div>
@@ -123,7 +123,7 @@ const Layout = ({ children }) => {
         {/* Top bar */}
         <header className="sticky top-0 z-30 h-16 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 flex items-center px-4 lg:px-8">
           <button
-            className="lg:hidden p-2 rounded-lg hover:bg-gray-100 mr-4"
+            className="lg:hidden p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 mr-4"
             onClick={() => setSidebarOpen(true)}
           >
             <Menu size={24} />

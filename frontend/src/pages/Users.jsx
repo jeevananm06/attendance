@@ -100,7 +100,7 @@ const Users = () => {
 
   if (!isAdmin) {
     return (
-      <div className="flex flex-col items-center justify-center h-64 text-gray-500">
+      <div className="flex flex-col items-center justify-center h-64 text-gray-500 dark:text-gray-400">
         <Shield size={48} className="mb-4 opacity-50" />
         <p className="text-lg font-medium">Admin Access Required</p>
         <p className="text-sm">Only administrators can manage users</p>
@@ -138,8 +138,8 @@ const Users = () => {
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-xl font-semibold text-gray-800">User Management</h2>
-          <p className="text-sm text-gray-500">Manage admin and manager accounts</p>
+          <h2 className="text-xl font-semibold text-gray-800 dark:text-gray-100">User Management</h2>
+          <p className="text-sm text-gray-500 dark:text-gray-400">Manage admin and manager accounts</p>
         </div>
         <button
           onClick={() => {
@@ -172,7 +172,7 @@ const Users = () => {
                   )}
                 </div>
                 <div>
-                  <h3 className="font-semibold text-gray-800">{user.username}</h3>
+                  <h3 className="font-semibold text-gray-800 dark:text-gray-100">{user.username}</h3>
                   <div className="flex items-center gap-2">
                     <span className={`text-xs px-2 py-0.5 rounded-full capitalize ${
                       user.role === 'admin' ? 'bg-purple-100 text-purple-700' :
@@ -182,7 +182,7 @@ const Users = () => {
                       {user.role}
                     </span>
                     {user.is_active === false && (
-                      <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400">
                         Inactive
                       </span>
                     )}
@@ -191,7 +191,7 @@ const Users = () => {
               </div>
               <button
                 onClick={() => openEditModal(user)}
-                className="p-2 text-gray-500 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors"
+                className="p-2 text-gray-500 dark:text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors"
               >
                 <Edit2 size={18} />
               </button>
@@ -201,7 +201,7 @@ const Users = () => {
       </div>
 
       {users.length === 0 && (
-        <div className="text-center py-12 text-gray-500">
+        <div className="text-center py-12 text-gray-500 dark:text-gray-400">
           <User size={48} className="mx-auto mb-4 opacity-50" />
           <p>No users found</p>
         </div>
@@ -210,14 +210,14 @@ const Users = () => {
       {/* Add/Edit User Modal */}
       {showModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-md">
-            <div className="flex items-center justify-between p-6 border-b">
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl w-full max-w-md">
+            <div className="flex items-center justify-between p-6 border-b dark:border-gray-700">
               <h2 className="text-xl font-semibold">
                 {editingUser ? `Edit User: ${editingUser.username}` : 'Add New User'}
               </h2>
               <button
                 onClick={() => setShowModal(false)}
-                className="p-2 hover:bg-gray-100 rounded-lg"
+                className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
               >
                 <X size={20} />
               </button>
@@ -274,8 +274,8 @@ const Users = () => {
                   <option value="manager">Manager</option>
                   <option value="admin">Admin</option>
                 </select>
-                <p className="text-xs text-gray-500 mt-1">
-                  {formData.role === 'admin' 
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  {formData.role === 'admin'
                     ? 'Full access including user management'
                     : formData.role === 'manager'
                     ? 'Can manage labours, attendance, salary, and stats'
@@ -292,9 +292,9 @@ const Users = () => {
                       onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
                       className="rounded border-gray-300"
                     />
-                    <span className="text-sm text-gray-700">Active</span>
+                    <span className="text-sm text-gray-700 dark:text-gray-300">Active</span>
                   </label>
-                  <p className="text-xs text-gray-500 mt-1">
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                     Inactive users cannot log in
                   </p>
                 </div>

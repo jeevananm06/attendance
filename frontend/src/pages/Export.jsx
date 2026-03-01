@@ -124,8 +124,8 @@ const Export = () => {
         <div className="flex items-center gap-3 mb-6">
           <FileSpreadsheet className="text-primary-600" size={28} />
           <div>
-            <h2 className="text-xl font-semibold text-gray-800">Export Data</h2>
-            <p className="text-sm text-gray-500">Download your data as CSV files</p>
+            <h2 className="text-xl font-semibold text-gray-800 dark:text-gray-100">Export Data</h2>
+            <p className="text-sm text-gray-500 dark:text-gray-400">Download your data as CSV files</p>
           </div>
         </div>
 
@@ -140,13 +140,13 @@ const Export = () => {
                 )}`}
               >
                 <div className="flex items-center gap-3 mb-4">
-                  <div className={`p-3 rounded-lg bg-white shadow-sm`}>
+                  <div className={`p-3 rounded-lg bg-white dark:bg-gray-700 shadow-sm`}>
                     <Icon size={24} className={getIconColorClass(option.color)} />
                   </div>
-                  <h3 className="font-semibold text-gray-800">{option.title}</h3>
+                  <h3 className="font-semibold text-gray-800 dark:text-gray-100">{option.title}</h3>
                 </div>
 
-                <p className="text-sm text-gray-600 mb-4">{option.description}</p>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">{option.description}</p>
 
                 <button
                   onClick={() => handleExport(option.id)}
@@ -169,14 +169,14 @@ const Export = () => {
       </div>
 
       <div className="card">
-        <h3 className="text-lg font-semibold text-gray-800 mb-4">Export Information</h3>
-        <div className="space-y-4 text-sm text-gray-600">
+        <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4">Export Information</h3>
+        <div className="space-y-4 text-sm text-gray-600 dark:text-gray-400">
           <div className="flex items-start gap-3">
             <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0 mt-0.5">
               <span className="text-blue-600 font-medium">1</span>
             </div>
             <div>
-              <p className="font-medium text-gray-800">CSV Format</p>
+              <p className="font-medium text-gray-800 dark:text-gray-100">CSV Format</p>
               <p>All exports are in CSV (Comma Separated Values) format, compatible with Excel, Google Sheets, and other spreadsheet applications.</p>
             </div>
           </div>
@@ -186,7 +186,7 @@ const Export = () => {
               <span className="text-blue-600 font-medium">2</span>
             </div>
             <div>
-              <p className="font-medium text-gray-800">Complete Data</p>
+              <p className="font-medium text-gray-800 dark:text-gray-100">Complete Data</p>
               <p>Each export includes all records in the system. Use spreadsheet filters to narrow down the data as needed.</p>
             </div>
           </div>
@@ -196,7 +196,7 @@ const Export = () => {
               <span className="text-blue-600 font-medium">3</span>
             </div>
             <div>
-              <p className="font-medium text-gray-800">Date in Filename</p>
+              <p className="font-medium text-gray-800 dark:text-gray-100">Date in Filename</p>
               <p>Each exported file includes today's date in the filename for easy organization and tracking.</p>
             </div>
           </div>

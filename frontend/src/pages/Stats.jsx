@@ -47,17 +47,17 @@ const Stats = () => {
   const fetchData = async (silent = false) => {
     try {
       if (!silent) setLoading(true);
-      const requests = [
+      const [overviewRes, weeklyRes, labourRes] = await Promise.all([
         statsAPI.getOverview(),
         statsAPI.getWeekly(8),
         statsAPI.getAllLabourStats()
-      ];
-      if (isAdmin) requests.push(statsAPI.getSiteCosts());
-      const [overviewRes, weeklyRes, labourRes, siteRes] = await Promise.all(requests);
+      ]);
       setOverview(overviewRes.data);
       setWeeklyStats(weeklyRes.data);
       setLabourStats(labourRes.data);
-      if (siteRes) setSiteCosts(siteRes.data);
+      if (isAdmin) {
+        statsAPI.getSiteCosts().then(r => setSiteCosts(r.data)).catch(() => {});
+      }
     } catch (err) {
       setError('Failed to load statistics');
       console.error(err);
@@ -126,10 +126,10 @@ const Stats = () => {
         <div className="card">
           <div className="flex items-center gap-3 mb-2">
             <Users className="text-blue-500" size={24} />
-            <h3 className="font-semibold text-gray-700">Total Labours</h3>
+            <h3 className="font-semibold text-gray-700 dark:text-gray-300">Total Labours</h3>
           </div>
-          <p className="text-3xl font-bold text-gray-800">{overview?.labours?.total || 0}</p>
-          <p className="text-sm text-gray-500 mt-1">
+          <p className="text-3xl font-bold text-gray-800 dark:text-gray-100">{overview?.labours?.total || 0}</p>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
             {overview?.labours?.active || 0} active, {overview?.labours?.inactive || 0} inactive
           </p>
         </div>
@@ -137,7 +137,7 @@ const Stats = () => {
         <div className="card">
           <div className="flex items-center gap-3 mb-2">
             <TrendingUp className="text-green-500" size={24} />
-            <h3 className="font-semibold text-gray-700">Total Paid</h3>
+            <h3 className="font-semibold text-gray-700 dark:text-gray-300">Total Paid</h3>
           </div>
           <p className="text-3xl font-bold text-green-600">
             ₹{(overview?.salary?.total_paid || 0).toLocaleString()}
@@ -147,7 +147,7 @@ const Stats = () => {
         <div className="card">
           <div className="flex items-center gap-3 mb-2">
             <Calendar className="text-orange-500" size={24} />
-            <h3 className="font-semibold text-gray-700">Pending Payment</h3>
+            <h3 className="font-semibold text-gray-700 dark:text-gray-300">Pending Payment</h3>
           </div>
           <p className="text-3xl font-bold text-orange-600">
             ₹{(overview?.salary?.total_pending || 0).toLocaleString()}
@@ -159,7 +159,7 @@ const Stats = () => {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Today's Attendance Pie Chart */}
         <div className="card">
-          <h3 className="text-lg font-semibold text-gray-800 mb-4">Today's Attendance</h3>
+          <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4">Today's Attendance</h3>
           {attendancePieData.length > 0 ? (
             <ResponsiveContainer width="100%" height={300}>
               <PieChart>
@@ -182,7 +182,7 @@ const Stats = () => {
               </PieChart>
             </ResponsiveContainer>
           ) : (
-            <div className="h-64 flex items-center justify-center text-gray-500">
+            <div className="h-64 flex items-center justify-center text-gray-500 dark:text-gray-400">
               No attendance data for today
             </div>
           )}
@@ -190,7 +190,7 @@ const Stats = () => {
 
         {/* Weekly Wages Chart */}
         <div className="card">
-          <h3 className="text-lg font-semibold text-gray-800 mb-4">Weekly Wages (Last 8 Weeks)</h3>
+          <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4">Weekly Wages (Last 8 Weeks)</h3>
           {weeklyChartData && weeklyChartData.length > 0 ? (
             <ResponsiveContainer width="100%" height={300}>
               <LineChart data={weeklyChartData}>
@@ -206,7 +206,7 @@ const Stats = () => {
               </LineChart>
             </ResponsiveContainer>
           ) : (
-            <div className="h-64 flex items-center justify-center text-gray-500">
+            <div className="h-64 flex items-center justify-center text-gray-500 dark:text-gray-400">
               No weekly data available
             </div>
           )}
@@ -218,7 +218,7 @@ const Stats = () => {
         <div className="card">
           <div className="flex items-center gap-2 mb-4">
             <MapPin className="text-primary-600" size={20} />
-            <h3 className="text-lg font-semibold text-gray-800">Site-wise Cost</h3>
+            <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100">Site-wise Cost</h3>
           </div>
           <ResponsiveContainer width="100%" height={280}>
             <BarChart data={siteCosts.sites} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
@@ -237,31 +237,31 @@ const Stats = () => {
 
       {/* Labour Stats Table */}
       <div className="card">
-        <h3 className="text-lg font-semibold text-gray-800 mb-4">Labour Statistics</h3>
+        <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4">Labour Statistics</h3>
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
-              <tr className="border-b bg-gray-50">
-                <th className="text-left py-3 px-4 font-semibold text-gray-700">Name</th>
-                <th className="text-center py-3 px-4 font-semibold text-gray-700">Status</th>
-                <th className="text-center py-3 px-4 font-semibold text-gray-700">Days Present</th>
-                <th className="text-center py-3 px-4 font-semibold text-gray-700">Half Days</th>
-                <th className="text-center py-3 px-4 font-semibold text-gray-700">Absent</th>
-                <th className="text-right py-3 px-4 font-semibold text-gray-700">Total Earned</th>
-                <th className="text-right py-3 px-4 font-semibold text-gray-700">Paid</th>
-                <th className="text-right py-3 px-4 font-semibold text-gray-700">Pending</th>
+              <tr className="border-b bg-gray-50 dark:bg-gray-700">
+                <th className="text-left py-3 px-4 font-semibold text-gray-700 dark:text-gray-300">Name</th>
+                <th className="text-center py-3 px-4 font-semibold text-gray-700 dark:text-gray-300">Status</th>
+                <th className="text-center py-3 px-4 font-semibold text-gray-700 dark:text-gray-300">Days Present</th>
+                <th className="text-center py-3 px-4 font-semibold text-gray-700 dark:text-gray-300">Half Days</th>
+                <th className="text-center py-3 px-4 font-semibold text-gray-700 dark:text-gray-300">Absent</th>
+                <th className="text-right py-3 px-4 font-semibold text-gray-700 dark:text-gray-300">Total Earned</th>
+                <th className="text-right py-3 px-4 font-semibold text-gray-700 dark:text-gray-300">Paid</th>
+                <th className="text-right py-3 px-4 font-semibold text-gray-700 dark:text-gray-300">Pending</th>
               </tr>
             </thead>
             <tbody>
               {labourStats?.labours?.map((labour) => (
                 <tr
                   key={labour.labour_id}
-                  className="border-b hover:bg-gray-50 cursor-pointer"
+                  className="border-b hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer"
                   onClick={() => fetchLabourDetail(labour.labour_id)}
                 >
                   <td className="py-3 px-4">
-                    <p className="font-medium text-gray-800">{labour.name}</p>
-                    <p className="text-sm text-gray-500">₹{labour.daily_wage}/day</p>
+                    <p className="font-medium text-gray-800 dark:text-gray-100">{labour.name}</p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">₹{labour.daily_wage}/day</p>
                   </td>
                   <td className="py-3 px-4 text-center">
                     <span
@@ -299,7 +299,7 @@ const Stats = () => {
         </div>
 
         {(!labourStats?.labours || labourStats.labours.length === 0) && (
-          <div className="text-center py-12 text-gray-500">
+          <div className="text-center py-12 text-gray-500 dark:text-gray-400">
             <BarChart3 size={48} className="mx-auto mb-4 opacity-50" />
             <p>No labour statistics available</p>
           </div>
@@ -309,16 +309,16 @@ const Stats = () => {
       {/* Labour Detail Modal */}
       {selectedLabour && labourDetail && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-lg">
-            <div className="flex items-center justify-between p-6 border-b">
-              <h2 className="text-xl font-semibold">{labourDetail.name}</h2>
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl w-full max-w-lg">
+            <div className="flex items-center justify-between p-6 border-b dark:border-gray-700">
+              <h2 className="text-xl font-semibold dark:text-gray-100">{labourDetail.name}</h2>
               <button
                 onClick={() => {
                   setSelectedLabour(null);
                   setLabourDetail(null);
                   setLabourTrend(null);
                 }}
-                className="p-2 hover:bg-gray-100 rounded-lg"
+                className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
               >
                 <X size={20} />
               </button>
@@ -326,58 +326,58 @@ const Stats = () => {
 
             <div className="p-6 space-y-6 overflow-y-auto max-h-[70vh]">
               <div>
-                <p className="text-sm text-gray-500 mb-1">Daily Wage</p>
-                <p className="text-2xl font-bold text-gray-800">₹{labourDetail.daily_wage}</p>
+                <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">Daily Wage</p>
+                <p className="text-2xl font-bold text-gray-800 dark:text-gray-100">₹{labourDetail.daily_wage}</p>
               </div>
 
               <div>
-                <p className="text-sm text-gray-500 mb-1">Joined Date</p>
-                <p className="font-medium text-gray-800">
+                <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">Joined Date</p>
+                <p className="font-medium text-gray-800 dark:text-gray-100">
                   {new Date(labourDetail.joined_date).toLocaleDateString()}
                 </p>
               </div>
 
               <div>
-                <h4 className="font-semibold text-gray-700 mb-3">Attendance Summary</h4>
+                <h4 className="font-semibold text-gray-700 dark:text-gray-300 mb-3">Attendance Summary</h4>
                 <div className="grid grid-cols-3 gap-4">
-                  <div className="bg-green-50 p-3 rounded-lg text-center">
+                  <div className="bg-green-50 dark:bg-green-900/30 p-3 rounded-lg text-center">
                     <p className="text-2xl font-bold text-green-600">
                       {labourDetail.attendance?.present_days || 0}
                     </p>
-                    <p className="text-xs text-gray-600">Present</p>
+                    <p className="text-xs text-gray-600 dark:text-gray-400">Present</p>
                   </div>
-                  <div className="bg-yellow-50 p-3 rounded-lg text-center">
+                  <div className="bg-yellow-50 dark:bg-yellow-900/30 p-3 rounded-lg text-center">
                     <p className="text-2xl font-bold text-yellow-600">
                       {labourDetail.attendance?.half_days || 0}
                     </p>
-                    <p className="text-xs text-gray-600">Half Days</p>
+                    <p className="text-xs text-gray-600 dark:text-gray-400">Half Days</p>
                   </div>
-                  <div className="bg-red-50 p-3 rounded-lg text-center">
+                  <div className="bg-red-50 dark:bg-red-900/30 p-3 rounded-lg text-center">
                     <p className="text-2xl font-bold text-red-600">
                       {labourDetail.attendance?.absent_days || 0}
                     </p>
-                    <p className="text-xs text-gray-600">Absent</p>
+                    <p className="text-xs text-gray-600 dark:text-gray-400">Absent</p>
                   </div>
                 </div>
               </div>
 
               <div>
-                <h4 className="font-semibold text-gray-700 mb-3">Salary Summary</h4>
+                <h4 className="font-semibold text-gray-700 dark:text-gray-300 mb-3">Salary Summary</h4>
                 <div className="space-y-2">
                   <div className="flex justify-between">
-                    <span className="text-gray-600">Total Earned</span>
+                    <span className="text-gray-600 dark:text-gray-400">Total Earned</span>
                     <span className="font-medium">
                       ₹{(labourDetail.salary?.total_earned || 0).toLocaleString()}
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-600">Total Paid</span>
+                    <span className="text-gray-600 dark:text-gray-400">Total Paid</span>
                     <span className="font-medium text-green-600">
                       ₹{(labourDetail.salary?.total_paid || 0).toLocaleString()}
                     </span>
                   </div>
-                  <div className="flex justify-between border-t pt-2">
-                    <span className="font-medium text-gray-700">Pending</span>
+                  <div className="flex justify-between border-t dark:border-gray-600 pt-2">
+                    <span className="font-medium text-gray-700 dark:text-gray-300">Pending</span>
                     <span className="font-bold text-orange-600">
                       ₹{(labourDetail.salary?.pending_amount || 0).toLocaleString()}
                     </span>
@@ -387,7 +387,7 @@ const Stats = () => {
 
               {isAdmin && labourTrend && labourTrend.trend.length > 0 && (
                 <div>
-                  <h4 className="font-semibold text-gray-700 mb-3">Attendance Trend (Last 12 Weeks)</h4>
+                  <h4 className="font-semibold text-gray-700 dark:text-gray-300 mb-3">Attendance Trend (Last 12 Weeks)</h4>
                   <ResponsiveContainer width="100%" height={200}>
                     <LineChart data={labourTrend.trend} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
                       <CartesianGrid strokeDasharray="3 3" />
