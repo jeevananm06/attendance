@@ -231,8 +231,10 @@ const Attendance = () => {
   const [success, setSuccess] = useState('');
   const [popupLabourId, setPopupLabourId] = useState(null);
   const [popupSelection, setPopupSelection] = useState(null);
+  const [popupFlip, setPopupFlip] = useState(false);
   const originalAttendance = useRef({});
   const originalComments = useRef({});
+  const popupBtnRefs = useRef({});
 
   const now = new Date();
   const [selectedYear, setSelectedYear] = useState(now.getFullYear());
@@ -350,6 +352,15 @@ const Attendance = () => {
 
   const openPopup = (labourId) => {
     setPopupSelection(attendance[labourId] || null);
+    // Check if popup should flip upward (not enough space below)
+    const btn = popupBtnRefs.current[labourId];
+    if (btn) {
+      const rect = btn.getBoundingClientRect();
+      const spaceBelow = window.innerHeight - rect.bottom;
+      setPopupFlip(spaceBelow < 340);
+    } else {
+      setPopupFlip(false);
+    }
     setPopupLabourId(labourId);
   };
 
@@ -503,7 +514,7 @@ const Attendance = () => {
             ))}
           </div>
 
-          <div className="card">
+          <div className={`card ${popupLabourId ? 'pb-16' : ''}`}>
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
@@ -549,6 +560,7 @@ const Attendance = () => {
                           {/* 3-dot menu for extra options */}
                           <div className="relative">
                             <button
+                              ref={(el) => (popupBtnRefs.current[labour.id] = el)}
                               onClick={() => openPopup(labour.id)}
                               className="p-2 rounded-lg transition-colors bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-500"
                               title="More options"
@@ -556,7 +568,7 @@ const Attendance = () => {
                               <MoreHorizontal size={20} />
                             </button>
                             {popupLabourId === labour.id && (
-                              <div className="absolute right-0 top-full mt-1 w-56 bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 z-50 overflow-hidden">
+                              <div className={`absolute right-0 w-56 bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 z-50 overflow-hidden ${popupFlip ? 'bottom-full mb-1' : 'top-full mt-1'}`}>
                                 <div className="px-4 py-2 border-b border-gray-100 dark:border-gray-700">
                                   <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Select Status</p>
                                 </div>
