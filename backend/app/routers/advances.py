@@ -5,7 +5,7 @@ from datetime import date
 from ..models import Advance, AdvanceCreate, AdvanceRepay, User, AuditAction
 from ..auth import get_current_manager_or_admin
 from ..db_wrapper import (
-    create_advance, get_advances, get_pending_advances, mark_advance_deducted, repay_advance_partial,
+    create_advance, get_advances, get_pending_advances, get_all_pending_advances_bulk, mark_advance_deducted, repay_advance_partial,
     get_labour, create_audit_log, get_all_labours, create_notification
 )
 from ..whatsapp_service import send_whatsapp_message
@@ -108,11 +108,14 @@ async def get_all_pending_advances(
 ):
     """Get pending advances for all labours"""
     labours = get_all_labours()
+    # Single bulk query instead of N queries
+    pending_map = get_all_pending_advances_bulk()
+    
     results = []
     total_pending = 0
     
     for labour in labours:
-        pending = get_pending_advances(labour.id)
+        pending = pending_map.get(labour.id, 0.0)
         if pending > 0:
             results.append({
                 "labour_id": labour.id,

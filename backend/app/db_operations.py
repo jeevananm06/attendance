@@ -714,6 +714,23 @@ def get_pending_advances(labour_id: str) -> float:
     return sum(a.amount - (a.repaid_amount or 0.0) for a in advances)
 
 
+def get_all_pending_advances_bulk() -> dict:
+    """Get pending advances for all labours in a single query. Returns dict keyed by labour_id."""
+    db = get_db_session()
+    try:
+        records = db.query(AdvanceDB).filter(AdvanceDB.is_deducted == False).all()
+        result = {}
+        for r in records:
+            pending = r.amount - (r.repaid_amount or 0.0)
+            if pending > 0:
+                if r.labour_id not in result:
+                    result[r.labour_id] = 0.0
+                result[r.labour_id] += pending
+        return result
+    finally:
+        db.close()
+
+
 def mark_advance_deducted(advance_id: str) -> Advance:
     """Mark an advance as fully deducted"""
     db = get_db_session()

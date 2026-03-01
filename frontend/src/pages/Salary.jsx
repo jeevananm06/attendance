@@ -51,9 +51,9 @@ const Salary = () => {
   const fetchData = async (silent = false) => {
     try {
       if (!silent) setLoading(true);
-      const [pendingRes, laboursRes, advancesRes] = await Promise.all([
+      // Fetch pending salaries and advances in parallel (labours data included in pending response)
+      const [pendingRes, advancesRes] = await Promise.all([
         salaryAPI.getAllPending(),
-        laboursAPI.getAll(),
         advancesAPI.getAllPending()
       ]);
       const data = pendingRes.data;
@@ -61,7 +61,15 @@ const Salary = () => {
         data.labours = [...data.labours].sort((a, b) => a.name.localeCompare(b.name));
       }
       setPendingSalaries(data);
-      setLabours([...laboursRes.data].sort((a, b) => a.name.localeCompare(b.name)));
+      // Extract labours from pending response (already includes name, daily_wage, phone, pay_cycle)
+      const laboursList = (data?.labours || []).map(l => ({
+        id: l.labour_id,
+        name: l.name,
+        daily_wage: l.daily_wage,
+        phone: l.phone,
+        pay_cycle: l.pay_cycle
+      }));
+      setLabours(laboursList);
       
       // Build advances map by labour_id
       const advMap = {};

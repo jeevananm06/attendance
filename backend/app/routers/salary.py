@@ -100,11 +100,15 @@ async def get_all_pending_salaries(
             }
         pending["name"] = labour.name
         pending["pay_cycle"] = getattr(labour, "pay_cycle", "weekly") or "weekly"
+        pending["daily_wage"] = labour.daily_wage
+        pending["phone"] = labour.phone
         results.append(pending)
 
     total_pending = sum(r["total_pending"] for r in results)
+    labours_with_pending = len([r for r in results if r["total_pending"] > 0])
     return {
         "total_pending": total_pending,
+        "labours_with_pending": labours_with_pending,
         "labours": results
     }
 
@@ -344,8 +348,10 @@ async def get_salary_summary(
     all_records = get_salary_records()
     labours = get_all_labours()
     
-    total_paid = sum(r.total_amount for r in all_records if r.is_paid)
-    total_pending = sum(r.total_amount for r in all_records if not r.is_paid)
+    # Use paid_amount to correctly account for partial payments
+    total_earned = sum(r.total_amount for r in all_records)
+    total_paid = sum(r.paid_amount for r in all_records)
+    total_pending = total_earned - total_paid
     
     return {
         "total_labours": len(labours),
