@@ -14,9 +14,9 @@ if USE_POSTGRES:
         # Labour operations
         get_all_labours, get_labour, create_labour, update_labour, delete_labour,
         # Attendance operations
-        get_attendance_by_date, get_attendance_by_labour, mark_attendance, delete_attendance, purge_absent_attendance_records,
+        get_attendance_by_date, get_attendance_by_labour, get_attendance_bulk, mark_attendance, delete_attendance, purge_absent_attendance_records,
         # Salary operations
-        get_salary_records, create_salary_record, mark_salary_paid,
+        get_salary_records, get_salary_records_bulk, create_salary_record, mark_salary_paid,
         # Overtime operations
         create_overtime, get_overtime_records,
         # Advance operations

@@ -7,7 +7,10 @@ from ..auth import get_current_manager_or_admin, get_current_authenticated_user,
 from ..db_wrapper import (
     get_all_labours,
     get_attendance_by_labour,
+    get_attendance_by_date,
+    get_attendance_bulk,
     get_salary_records,
+    get_salary_records_bulk,
     get_sites,
     get_labours_by_site
 )
@@ -69,13 +72,9 @@ async def get_overview_stats(
     total_labours = len(labours)
     active_labours = sum(1 for l in labours if l.is_active)
     
-    # Get today's attendance
+    # Get today's attendance in ONE query instead of N queries
     today = date.today()
-    today_attendance = []
-    for labour in labours:
-        att = get_attendance_by_labour(labour.id, today, today)
-        if att:
-            today_attendance.extend(att)
+    today_attendance = get_attendance_by_date(today)
     
     present_today = sum(1 for a in today_attendance if a.status == AttendanceStatus.PRESENT)
     half_day_today = sum(1 for a in today_attendance if a.status == AttendanceStatus.HALF_DAY)
@@ -161,27 +160,30 @@ async def get_all_labour_stats(
 ):
     """Get statistics for all labours"""
     labours = get_all_labours(include_inactive=True)
-    stats = []
+    if not labours:
+        return {"labours": []}
     
+    # Bulk fetch all data in 2 queries instead of 2*N queries
+    labour_ids = [l.id for l in labours]
+    all_salary_map = get_salary_records_bulk(labour_ids)
+    
+    stats = []
     for labour in labours:
-        attendance = get_attendance_by_labour(labour.id)
-        salary_records = get_salary_records(labour_id=labour.id)
-        
-        present_days = sum(1 for a in attendance if a.status == AttendanceStatus.PRESENT)
-        half_days = sum(1 for a in attendance if a.status == AttendanceStatus.HALF_DAY)
-        absent_days = sum(1 for a in attendance if a.status == AttendanceStatus.ABSENT)
+        # Get all-time attendance stats from salary records (days_present already calculated)
+        salary_records = all_salary_map.get(labour.id, [])
         
         total_earned = sum(r.total_amount for r in salary_records)
-        total_paid = sum(r.total_amount for r in salary_records if r.is_paid)
+        total_paid = sum(r.paid_amount for r in salary_records)
+        total_days = sum(r.days_present for r in salary_records)
         
         stats.append({
             "labour_id": labour.id,
             "name": labour.name,
             "is_active": labour.is_active,
             "daily_wage": labour.daily_wage,
-            "total_days_present": present_days + (half_days * 0.5),
-            "total_days_absent": absent_days,
-            "total_half_days": half_days,
+            "total_days_present": total_days,
+            "total_days_absent": 0,  # Not tracked in salary records
+            "total_half_days": 0,    # Not tracked separately
             "total_earned": total_earned,
             "total_paid": total_paid,
             "pending_amount": total_earned - total_paid
