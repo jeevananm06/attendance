@@ -257,6 +257,7 @@ export const sitesAPI = {
   assign: (labourId, siteId) => api.post(`/sites/assign?labour_id=${labourId}&site_id=${siteId}`),
   getLabourSite: (labourId) => api.get(`/sites/labour/${labourId}/site`),
   getSummary: () => api.get('/sites/summary'),
+  getUnassignedLabours: () => api.get('/sites/unassigned-labours'),
 };
 
 export const auditAPI = {

@@ -7,7 +7,7 @@ import {
 import {
   Clock, Wallet, Calendar, MapPin, Shield, Database, FileText,
   Plus, Check, X, AlertCircle, Download, RefreshCw, ChevronDown, ChevronUp,
-  FileArchive, Trash2, Eye, Upload
+  FileArchive, Trash2, Eye, Upload, Users, Info
 } from 'lucide-react';
 
 const TabButton = ({ active, onClick, icon: Icon, label }) => (
@@ -565,19 +565,42 @@ const SitesTab = ({ labours, setError, setSuccess, isAdmin }) => {
   const [showForm, setShowForm] = useState(false);
   const [formData, setFormData] = useState({ name: '', address: '' });
   const [assignData, setAssignData] = useState({ labour_id: '', site_id: '' });
+  const [hoveredSite, setHoveredSite] = useState(null);
+  const [siteLabours, setSiteLabours] = useState({});
+  const [hoveredUnassigned, setHoveredUnassigned] = useState(false);
+  const [unassignedLabours, setUnassignedLabours] = useState([]);
 
   useEffect(() => { fetchData(); }, []);
 
   const fetchData = async () => {
     try {
       setLoading(true);
-      const [sitesRes, summaryRes] = await Promise.all([sitesAPI.getAll(), sitesAPI.getSummary()]);
+      const [sitesRes, summaryRes, unassignedRes] = await Promise.all([
+        sitesAPI.getAll(), 
+        sitesAPI.getSummary(),
+        sitesAPI.getUnassignedLabours()
+      ]);
       setSites(sitesRes.data);
       setSummary(summaryRes.data);
+      setUnassignedLabours(unassignedRes.data.labours || []);
     } catch (err) {
       setError('Failed to load sites');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchSiteLabours = async (siteId) => {
+    if (siteLabours[siteId]) return; // Already fetched
+    
+    try {
+      const res = await sitesAPI.getLabours(siteId);
+      setSiteLabours(prev => ({
+        ...prev,
+        [siteId]: res.data.labours || []
+      }));
+    } catch (err) {
+      console.error('Failed to fetch site labours:', err);
     }
   };
 
@@ -601,7 +624,17 @@ const SitesTab = ({ labours, setError, setSuccess, isAdmin }) => {
       await sitesAPI.assign(assignData.labour_id, assignData.site_id);
       setSuccess('Labour assigned to site');
       setAssignData({ labour_id: '', site_id: '' });
-      fetchData();
+      
+      // Refresh data
+      await fetchData();
+      
+      // Clear cached site labours for the assigned site
+      setSiteLabours(prev => {
+        const newSiteLabours = { ...prev };
+        delete newSiteLabours[assignData.site_id];
+        return newSiteLabours;
+      });
+      
       setTimeout(() => setSuccess(''), 3000);
     } catch (err) {
       setError(err.response?.data?.detail || 'Failed to assign');
@@ -621,9 +654,36 @@ const SitesTab = ({ labours, setError, setSuccess, isAdmin }) => {
           <p className="text-2xl font-bold text-green-600">{summary?.assigned_labours || 0}</p>
           <p className="text-sm text-gray-600 dark:text-gray-400">Assigned</p>
         </div>
-        <div className="bg-orange-50 dark:bg-orange-900/30 p-4 rounded-lg text-center">
+        <div 
+          className="bg-orange-50 dark:bg-orange-900/30 p-4 rounded-lg text-center relative cursor-pointer"
+          onMouseEnter={() => setHoveredUnassigned(true)}
+          onMouseLeave={() => setHoveredUnassigned(false)}
+        >
           <p className="text-2xl font-bold text-orange-600">{summary?.unassigned_labours || 0}</p>
           <p className="text-sm text-gray-600 dark:text-gray-400">Unassigned</p>
+          <Info size={14} className="inline-block ml-1 text-orange-500" />
+          
+          {hoveredUnassigned && unassignedLabours.length > 0 && (
+            <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 w-64 bg-gray-900 text-white p-3 rounded-lg shadow-lg z-10">
+              <div className="text-xs font-semibold mb-2 text-orange-300">Unassigned Labours:</div>
+              <div className="max-h-32 overflow-y-auto space-y-1">
+                {unassignedLabours.slice(0, 10).map(labour => (
+                  <div key={labour.id} className="text-xs flex items-center gap-2">
+                    <Users size={12} />
+                    {labour.name}
+                  </div>
+                ))}
+                {unassignedLabours.length > 10 && (
+                  <div className="text-xs text-gray-400 italic">
+                    ... and {unassignedLabours.length - 10} more
+                  </div>
+                )}
+              </div>
+              <div className="absolute top-full left-1/2 transform -translate-x-1/2 -mt-1">
+                <div className="w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-900"></div>
+              </div>
+            </div>
+          )}
         </div>
         <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg text-center">
           <p className="text-2xl font-bold text-gray-600 dark:text-gray-300">{summary?.total_labours || 0}</p>
@@ -661,13 +721,44 @@ const SitesTab = ({ labours, setError, setSuccess, isAdmin }) => {
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {summary?.sites?.map((site) => (
-          <div key={site.site_id} className="border dark:border-gray-700 rounded-lg p-4">
+          <div 
+            key={site.site_id} 
+            className="border dark:border-gray-700 rounded-lg p-4 relative cursor-pointer hover:shadow-md transition-shadow"
+            onMouseEnter={() => {
+              setHoveredSite(site.site_id);
+              fetchSiteLabours(site.site_id);
+            }}
+            onMouseLeave={() => setHoveredSite(null)}
+          >
             <div className="flex items-center gap-2 mb-2">
               <MapPin className="text-primary-600" size={20} />
               <h4 className="font-semibold dark:text-gray-100">{site.name}</h4>
+              <Info size={14} className="ml-auto text-gray-400" />
             </div>
             {site.address && <p className="text-sm text-gray-500 dark:text-gray-400 mb-2">{site.address}</p>}
             <p className="text-sm"><span className="font-medium">{site.labour_count}</span> labours assigned</p>
+            
+            {hoveredSite === site.site_id && siteLabours[site.site_id] && (
+              <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 w-64 bg-gray-900 text-white p-3 rounded-lg shadow-lg z-10">
+                <div className="text-xs font-semibold mb-2 text-blue-300">Labours at {site.name}:</div>
+                <div className="max-h-32 overflow-y-auto space-y-1">
+                  {siteLabours[site.site_id].length > 0 ? (
+                    siteLabours[site.site_id].map(labour => (
+                      <div key={labour.id} className="text-xs flex items-center gap-2">
+                        <Users size={12} />
+                        {labour.name}
+                        <span className="text-gray-400">₹{labour.daily_wage}/day</span>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-xs text-gray-400 italic">No labours assigned</div>
+                  )}
+                </div>
+                <div className="absolute top-full left-1/2 transform -translate-x-1/2 -mt-1">
+                  <div className="w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-900"></div>
+                </div>
+              </div>
+            )}
           </div>
         ))}
       </div>
