@@ -230,7 +230,6 @@ const Attendance = () => {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [popupLabourId, setPopupLabourId] = useState(null);
-  const [popupFlip, setPopupFlip] = useState(false);
   const originalAttendance = useRef({});
   const originalComments = useRef({});
   const popupBtnRefs = useRef({});
@@ -351,16 +350,14 @@ const Attendance = () => {
 
   const openPopup = (labourId) => {
     if (popupLabourId === labourId) { setPopupLabourId(null); return; }
-    // Check if popup should flip upward (not enough space below)
-    const btn = popupBtnRefs.current[labourId];
-    if (btn) {
-      const rect = btn.getBoundingClientRect();
-      const spaceBelow = window.innerHeight - rect.bottom;
-      setPopupFlip(spaceBelow < 300);
-    } else {
-      setPopupFlip(false);
-    }
     setPopupLabourId(labourId);
+  };
+
+  const shouldFlipPopup = (labourId) => {
+    const btn = popupBtnRefs.current[labourId];
+    if (!btn) return false;
+    const rect = btn.getBoundingClientRect();
+    return (window.innerHeight - rect.bottom) < 300;
   };
 
   const selectPopupStatus = (statusKey) => {
@@ -567,7 +564,7 @@ const Attendance = () => {
                               <MoreHorizontal size={20} />
                             </button>
                             {popupLabourId === labour.id && (
-                              <div className={`absolute right-0 w-56 bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 z-50 overflow-hidden ${popupFlip ? 'bottom-full mb-1' : 'top-full mt-1'}`}>
+                              <div className={`absolute right-0 w-56 bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 z-50 overflow-hidden ${shouldFlipPopup(labour.id) ? 'bottom-full mb-1' : 'top-full mt-1'}`}>
                                 <div className="py-1">
                                   {Object.entries(STATUS_META).map(([key, meta]) => {
                                     const isSelected = attendance[labour.id] === key;
