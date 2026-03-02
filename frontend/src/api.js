@@ -298,27 +298,6 @@ export const reportsAPI = {
   getPayroll: (year, month) => api.get(`/reports/payroll?year=${year}&month=${month}`, { responseType: 'text' }),
 };
 
-export const pushAPI = {
-  getVapidPublicKey: () => api.get('/push/vapid-public-key'),
-  subscribe: (subscription) => api.post('/push/subscribe', subscription),
-  unsubscribe: (endpoint) => api.delete('/push/unsubscribe', { data: { endpoint } }),
-};
-
-export const notificationsAPI = {
-  getAll: (unreadOnly = false) =>
-    api.get(`/notifications/?unread_only=${unreadOnly}`),
-  getUnreadCount: () =>
-    cached('notifications:count', () => api.get('/notifications/unread-count'), 30_000),
-  markRead: (ids) => {
-    invalidateCache('notifications:count');
-    return api.post('/notifications/mark-read', { notification_ids: ids });
-  },
-  markAllRead: () => {
-    invalidateCache('notifications:count');
-    return api.post('/notifications/mark-all-read');
-  },
-};
-
 export const documentsAPI = {
   list: (labourId) => api.get(`/documents/${labourId}`),
   upload: (labourId, file, docType) => {

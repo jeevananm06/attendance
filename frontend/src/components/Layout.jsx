@@ -14,14 +14,10 @@ import {
   UserCircle,
   MoreHorizontal,
   UserCog,
-  Bell,
-  BellOff,
   Moon,
   Sun
 } from 'lucide-react';
-import NotificationBell from './NotificationBell';
 import OfflineIndicator from './OfflineIndicator';
-import { usePushNotifications } from '../hooks/usePushNotifications';
 import { useDarkMode } from '../hooks/useDarkMode';
 import { useOfflineSync } from '../hooks/useOfflineSync';
 
@@ -39,7 +35,6 @@ const navItems = [
 const Layout = ({ children }) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { user, logout, isAdmin } = useAuth();
-  const { isSupported, isSubscribed, subscribe, unsubscribe, isLoading } = usePushNotifications();
   const { isDark, toggle: toggleDark } = useDarkMode();
   const { isOnline, pendingCount, flushPending } = useOfflineSync();
   const location = useLocation();
@@ -139,17 +134,6 @@ const Layout = ({ children }) => {
             >
               {isDark ? <Sun size={20} /> : <Moon size={20} />}
             </button>
-            {isSupported && (
-              <button
-                onClick={isSubscribed ? unsubscribe : subscribe}
-                disabled={isLoading}
-                title={isSubscribed ? 'Disable push notifications' : 'Enable push notifications'}
-                className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400 disabled:opacity-50"
-              >
-                {isSubscribed ? <BellOff size={20} /> : <Bell size={20} />}
-              </button>
-            )}
-            <NotificationBell />
           </div>
         </header>
 
