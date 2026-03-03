@@ -22,17 +22,23 @@ async def create_new_backup(
     current_user: User = Depends(get_current_admin)
 ):
     """Create a new backup of all data (Admin only)"""
-    backup = create_backup(current_user.username)
-    
-    create_audit_log(
-        user=current_user.username,
-        action=AuditAction.CREATE,
-        entity_type="backup",
-        entity_id=backup.id,
-        new_value=backup.filename
-    )
-    
-    return backup
+    try:
+        backup = create_backup(current_user.username)
+        
+        create_audit_log(
+            user=current_user.username,
+            action=AuditAction.CREATE,
+            entity_type="backup",
+            entity_id=backup.id,
+            new_value=backup.filename
+        )
+        
+        return backup
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to create backup: {str(e)}"
+        )
 
 
 @router.post("/restore/{backup_id}")
