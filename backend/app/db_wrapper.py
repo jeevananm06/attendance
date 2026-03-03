@@ -48,85 +48,104 @@ if USE_POSTGRES:
     def init_leave_balance(labour_id: str):
         return None
 
+    _pg_backup_storage = {}  # In-memory storage for backups: {backup_id: {"path": path, "record": BackupRecord}}
+
     def create_backup(created_by: str):
+        global _pg_backup_storage
         import os
         import tempfile
         import zipfile
         import json
         from datetime import datetime
         import uuid
+        from pathlib import Path
+        from .db_operations import (
+            export_labours_csv as _export_labours,
+            export_attendance_csv as _export_attendance,
+            export_salary_csv as _export_salary
+        )
         
         backup_id = str(uuid.uuid4())[:8]
         now = datetime.now()
         filename = f"backup_{now.strftime('%Y%m%d_%H%M%S')}.zip"
         
-        # Create temporary directory for backup
+        # Use system temp directory for persistent storage during runtime
+        backup_dir = os.path.join(tempfile.gettempdir(), 'attendance_backups')
+        os.makedirs(backup_dir, exist_ok=True)
+        backup_path = os.path.join(backup_dir, filename)
+        
+        # Create a temp dir for CSV files before zipping
         with tempfile.TemporaryDirectory() as temp_dir:
-            backup_path = os.path.join(temp_dir, filename)
+            # Export individual tables as CSV
+            labours_csv = _export_labours()
+            attendance_csv = _export_attendance()
+            salary_csv = _export_salary()
             
-            # Create zip file with CSV exports
+            # Write CSV files to temp directory
+            labours_path = os.path.join(temp_dir, 'labours.csv')
+            with open(labours_path, 'w', encoding='utf-8') as f:
+                f.write(labours_csv)
+            
+            attendance_path = os.path.join(temp_dir, 'attendance.csv')
+            with open(attendance_path, 'w', encoding='utf-8') as f:
+                f.write(attendance_csv)
+            
+            salary_path = os.path.join(temp_dir, 'salary.csv')
+            with open(salary_path, 'w', encoding='utf-8') as f:
+                f.write(salary_csv)
+            
+            # Create a summary JSON file
+            summary = {
+                "backup_id": backup_id,
+                "created_at": now.isoformat(),
+                "created_by": created_by,
+                "tables": ["labours", "attendance", "salary"]
+            }
+            summary_path = os.path.join(temp_dir, 'backup_info.json')
+            with open(summary_path, 'w', encoding='utf-8') as f:
+                json.dump(summary, f, indent=2)
+            
+            # Create zip file
             with zipfile.ZipFile(backup_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
-                try:
-                    # Export individual tables as CSV
-                    labours_csv = export_labours_csv()
-                    attendance_csv = export_attendance_csv()
-                    salary_csv = export_salary_csv()
-                    
-                    # Write CSV files to temp directory and add to zip
-                    labours_path = os.path.join(temp_dir, 'labours.csv')
-                    with open(labours_path, 'w', encoding='utf-8') as f:
-                        f.write(labours_csv)
-                    zipf.write(labours_path, 'labours.csv')
-                    
-                    attendance_path = os.path.join(temp_dir, 'attendance.csv')
-                    with open(attendance_path, 'w', encoding='utf-8') as f:
-                        f.write(attendance_csv)
-                    zipf.write(attendance_path, 'attendance.csv')
-                    
-                    salary_path = os.path.join(temp_dir, 'salary.csv')
-                    with open(salary_path, 'w', encoding='utf-8') as f:
-                        f.write(salary_csv)
-                    zipf.write(salary_path, 'salary.csv')
-                    
-                    # Create a summary JSON file
-                    summary = {
-                        "backup_id": backup_id,
-                        "created_at": now.isoformat(),
-                        "created_by": created_by,
-                        "tables": ["labours", "attendance", "salary"]
-                    }
-                    summary_path = os.path.join(temp_dir, 'backup_info.json')
-                    with open(summary_path, 'w', encoding='utf-8') as f:
-                        json.dump(summary, f, indent=2)
-                    zipf.write(summary_path, 'backup_info.json')
-                    
-                except Exception as e:
-                    print(f"Error creating backup: {e}")
-                    raise e
-            
-            # Read the zip file content to get size
-            with open(backup_path, 'rb') as f:
-                zip_content = f.read()
+                zipf.write(labours_path, 'labours.csv')
+                zipf.write(attendance_path, 'attendance.csv')
+                zipf.write(salary_path, 'salary.csv')
+                zipf.write(summary_path, 'backup_info.json')
+        
+        # Get file size
+        size_bytes = os.path.getsize(backup_path)
         
         from .models import BackupRecord
-        return BackupRecord(
+        record = BackupRecord(
             id=backup_id,
             timestamp=now,
             filename=filename,
-            size_bytes=len(zip_content),
+            size_bytes=size_bytes,
             created_by=created_by
         )
+        
+        # Store backup info for later retrieval
+        _pg_backup_storage[backup_id] = {
+            "path": Path(backup_path),
+            "record": record
+        }
+        
+        return record
 
     def get_backups():
-        # For now, return empty list - would need to implement backup storage in DB
-        return []
+        global _pg_backup_storage
+        return [info["record"] for info in _pg_backup_storage.values()]
 
     def restore_backup(backup_id: str, restored_by: str):
         # Not implemented for PostgreSQL mode
         return False
 
     def get_backup_file_path(backup_id: str):
-        # Not implemented for PostgreSQL mode
+        global _pg_backup_storage
+        if backup_id in _pg_backup_storage:
+            path = _pg_backup_storage[backup_id]["path"]
+            if path.exists():
+                return path
         return None
 
 else:
