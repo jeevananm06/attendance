@@ -52,6 +52,7 @@ if USE_POSTGRES:
         import os
         import tempfile
         import zipfile
+        import json
         from datetime import datetime
         import uuid
         
@@ -66,42 +67,47 @@ if USE_POSTGRES:
             # Create zip file with CSV exports
             with zipfile.ZipFile(backup_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
                 try:
-                    # Export all data as CSV and add to zip
-                    
-                    # Export individual tables
+                    # Export individual tables as CSV
                     labours_csv = export_labours_csv()
                     attendance_csv = export_attendance_csv()
                     salary_csv = export_salary_csv()
                     
                     # Write CSV files to temp directory and add to zip
-                    with open(os.path.join(temp_dir, 'labours.csv'), 'w') as f:
+                    labours_path = os.path.join(temp_dir, 'labours.csv')
+                    with open(labours_path, 'w', encoding='utf-8') as f:
                         f.write(labours_csv)
-                    with open(os.path.join(temp_dir, 'attendance.csv'), 'w') as f:
+                    zipf.write(labours_path, 'labours.csv')
+                    
+                    attendance_path = os.path.join(temp_dir, 'attendance.csv')
+                    with open(attendance_path, 'w', encoding='utf-8') as f:
                         f.write(attendance_csv)
-                    with open(os.path.join(temp_dir, 'salary.csv'), 'w') as f:
+                    zipf.write(attendance_path, 'attendance.csv')
+                    
+                    salary_path = os.path.join(temp_dir, 'salary.csv')
+                    with open(salary_path, 'w', encoding='utf-8') as f:
                         f.write(salary_csv)
+                    zipf.write(salary_path, 'salary.csv')
                     
-                    # Add files to zip
-                    zipf.write(os.path.join(temp_dir, 'labours.csv'), 'labours.csv')
-                    zipf.write(os.path.join(temp_dir, 'attendance.csv'), 'attendance.csv')
-                    zipf.write(os.path.join(temp_dir, 'salary.csv'), 'salary.csv')
-                    
-                    # Get all data in one file
-                    all_data_csv = export_all_data()
-                    with open(os.path.join(temp_dir, 'all_data.csv'), 'w') as f:
-                        f.write(all_data_csv)
-                    zipf.write(os.path.join(temp_dir, 'all_data.csv'), 'all_data.csv')
+                    # Create a summary JSON file
+                    summary = {
+                        "backup_id": backup_id,
+                        "created_at": now.isoformat(),
+                        "created_by": created_by,
+                        "tables": ["labours", "attendance", "salary"]
+                    }
+                    summary_path = os.path.join(temp_dir, 'backup_info.json')
+                    with open(summary_path, 'w', encoding='utf-8') as f:
+                        json.dump(summary, f, indent=2)
+                    zipf.write(summary_path, 'backup_info.json')
                     
                 except Exception as e:
                     print(f"Error creating backup: {e}")
                     raise e
             
-            # Read the zip file content
+            # Read the zip file content to get size
             with open(backup_path, 'rb') as f:
                 zip_content = f.read()
         
-        # Store backup in database (we'll need to create a backup storage mechanism)
-        # For now, return a mock backup record
         from .models import BackupRecord
         return BackupRecord(
             id=backup_id,
