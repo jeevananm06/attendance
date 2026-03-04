@@ -94,6 +94,7 @@ class SalaryDB(Base):
     is_paid = Column(Boolean, default=False)
     paid_date = Column(Date, nullable=True)
     paid_by = Column(String(100), nullable=True)
+    payment_comment = Column(String(500), nullable=True)  # Comment for excess payments
     created_at = Column(DateTime, default=datetime.utcnow)
     
     # Relationships

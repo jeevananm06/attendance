@@ -430,7 +430,8 @@ def get_salary_records(labour_id: str = None, is_paid: bool = None) -> List[Sala
             paid_amount=r.paid_amount or 0.0,
             is_paid=r.is_paid,
             paid_date=r.paid_date,
-            paid_by=r.paid_by
+            paid_by=r.paid_by,
+            payment_comment=r.payment_comment
         ) for r in records]
     finally:
         db.close()
@@ -506,7 +507,7 @@ def create_salary_record(labour_id: str, week_start: date, week_end: date,
         db.close()
 
 
-def mark_salary_paid(labour_id: str, week_end: date, paid_by: str, amount_paid: float = None) -> Optional[dict]:
+def mark_salary_paid(labour_id: str, week_end: date, paid_by: str, amount_paid: float = None, payment_comment: str = None) -> Optional[dict]:
     db = get_db_session()
     try:
         records = db.query(SalaryDB).filter(
@@ -523,6 +524,9 @@ def mark_salary_paid(labour_id: str, week_end: date, paid_by: str, amount_paid: 
         today = date.today()
         # Calculate total still owed (total_amount - paid_amount for each record)
         total_due = sum(r.total_amount - (r.paid_amount or 0) for r in records)
+        
+        # Check if this is an excess payment
+        is_excess_payment = amount_paid is not None and amount_paid > total_due
 
         # Full payment
         if amount_paid is None or amount_paid >= total_due:
@@ -531,12 +535,20 @@ def mark_salary_paid(labour_id: str, week_end: date, paid_by: str, amount_paid: 
                 record.is_paid = True
                 record.paid_date = today
                 record.paid_by = paid_by
+                # Store comment on the last record if excess payment
+                if is_excess_payment and payment_comment:
+                    record.payment_comment = payment_comment
             db.commit()
-            return {
+            
+            result = {
                 "weeks_paid": len(records),
-                "amount_paid": total_due,
+                "amount_paid": amount_paid if is_excess_payment else total_due,
                 "remaining": 0.0,
             }
+            if is_excess_payment:
+                result["excess_amount"] = amount_paid - total_due
+                result["payment_comment"] = payment_comment
+            return result
 
         # Partial payment — allocate to oldest weeks first
         remaining_budget = amount_paid

@@ -36,6 +36,7 @@ const Salary = () => {
   const [calculatingLabour, setCalculatingLabour] = useState(null);
   const [payPanel, setPayPanel] = useState(null); // { labourId, weekEnd, total }
   const [payAmount, setPayAmount] = useState('');
+  const [paymentComment, setPaymentComment] = useState('');
   const [slip, setSlip] = useState(null);
 
   const now = new Date();
@@ -120,7 +121,7 @@ const Salary = () => {
     setPayAmount(String(labour.total_pending));
   };
 
-  const closePayPanel = () => { setPayPanel(null); setPayAmount(''); };
+  const closePayPanel = () => { setPayPanel(null); setPayAmount(''); setPaymentComment(''); };
 
   const handleOpenSlip = async (labour) => {
     try {
@@ -149,12 +150,28 @@ const Salary = () => {
     const { labourId, weekEnd, total } = payPanel;
     const entered = parseFloat(payAmount);
     if (isNaN(entered) || entered <= 0) { setError('Enter a valid amount'); return; }
+    
+    // Require comment for excess payments
+    const isExcessPayment = entered > total;
+    if (isExcessPayment && !paymentComment.trim()) {
+      setError('Please provide a reason for the excess payment');
+      return;
+    }
+    
     try {
       setPayingLabour(labourId);
       setError('');
-      const res = await salaryAPI.pay(labourId, weekEnd, entered >= total ? null : entered);
-      const { amount_paid, remaining, weeks_paid } = res.data;
-      setSuccess(`Paid ₹${amount_paid.toLocaleString()} (${weeks_paid} week${weeks_paid !== 1 ? 's' : ''})${ remaining > 0 ? ` · ₹${remaining.toLocaleString()} still pending` : ' · fully cleared'}`);
+      const res = await salaryAPI.pay(labourId, weekEnd, entered >= total ? null : entered, isExcessPayment ? paymentComment.trim() : null);
+      const { amount_paid, remaining, weeks_paid, excess_amount } = res.data;
+      let msg = `Paid ₹${amount_paid.toLocaleString()} (${weeks_paid} week${weeks_paid !== 1 ? 's' : ''})`;
+      if (excess_amount > 0) {
+        msg += ` · Excess: ₹${excess_amount.toLocaleString()}`;
+      } else if (remaining > 0) {
+        msg += ` · ₹${remaining.toLocaleString()} still pending`;
+      } else {
+        msg += ' · fully cleared';
+      }
+      setSuccess(msg);
       setTimeout(() => setSuccess(''), 5000);
       closePayPanel();
       fetchData(true);
@@ -374,7 +391,6 @@ const Salary = () => {
                                   <input
                                     type="number"
                                     min="1"
-                                    max={labour.total_pending}
                                     value={payAmount}
                                     onChange={(e) => setPayAmount(e.target.value)}
                                     className="w-32 border border-gray-300 dark:border-gray-600 rounded px-2 py-1.5 text-sm bg-white dark:bg-gray-700 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500"
@@ -399,13 +415,27 @@ const Salary = () => {
                                 {(() => {
                                   const entered = parseFloat(payAmount);
                                   const remaining = isNaN(entered) ? labour.total_pending : Math.max(0, labour.total_pending - entered);
-                                  const color = remaining === 0 ? 'text-green-600' : 'text-orange-500';
+                                  const excess = isNaN(entered) ? 0 : Math.max(0, entered - labour.total_pending);
+                                  const color = remaining === 0 ? (excess > 0 ? 'text-blue-600' : 'text-green-600') : 'text-orange-500';
                                   return (
-                                    <p className={`text-xs mt-1 ml-5 font-medium ${color}`}>
-                                      {remaining === 0
-                                        ? '✓ Full payment — all weeks cleared'
-                                        : `₹${remaining.toLocaleString()} will remain pending`}
-                                    </p>
+                                    <>
+                                      <p className={`text-xs mt-1 ml-5 font-medium ${color}`}>
+                                        {excess > 0
+                                          ? `⚠ Excess payment of ₹${excess.toLocaleString()} — comment required`
+                                          : remaining === 0
+                                            ? '✓ Full payment — all weeks cleared'
+                                            : `₹${remaining.toLocaleString()} will remain pending`}
+                                      </p>
+                                      {excess > 0 && (
+                                        <input
+                                          type="text"
+                                          placeholder="Reason for excess payment (required)"
+                                          value={paymentComment}
+                                          onChange={(e) => setPaymentComment(e.target.value)}
+                                          className="mt-2 ml-5 w-64 border border-blue-300 dark:border-blue-600 rounded px-2 py-1.5 text-sm bg-white dark:bg-gray-700 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        />
+                                      )}
+                                    </>
                                   );
                                 })()}
                               </div>

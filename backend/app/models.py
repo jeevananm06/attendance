@@ -118,12 +118,14 @@ class SalaryRecord(BaseModel):
     is_paid: bool = False
     paid_date: Optional[date] = None
     paid_by: Optional[str] = None
+    payment_comment: Optional[str] = None  # Comment for excess payments
 
 
 class SalaryPayment(BaseModel):
     labour_id: str
     week_end: date  # Friday of the week
     amount_paid: Optional[float] = None  # None = pay full amount; otherwise partial
+    payment_comment: Optional[str] = None  # Comment required when paying more than due
 
 
 class LabourStats(BaseModel):

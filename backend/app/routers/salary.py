@@ -180,7 +180,8 @@ async def pay_salary(
         labour_id=payment.labour_id,
         week_end=payment.week_end,
         paid_by=current_user.username,
-        amount_paid=payment.amount_paid
+        amount_paid=payment.amount_paid,
+        payment_comment=payment.payment_comment
     )
 
     if not result:
