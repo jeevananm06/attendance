@@ -6,7 +6,7 @@ from datetime import date
 
 from ..models import SalaryRecord, SalaryPayment, User
 from ..auth import get_current_manager_or_admin, get_current_admin
-from ..db_wrapper import get_salary_records, mark_salary_paid, get_all_labours, get_labour, create_notification, get_pending_advances
+from ..db_wrapper import get_salary_records, mark_salary_paid, get_all_labours, get_labour, create_notification, get_pending_advances, get_advances, repay_advance_partial, mark_advance_deducted
 from ..whatsapp_service import send_whatsapp_message
 from ..push_service import send_push_to_user
 
@@ -162,7 +162,8 @@ async def pay_salary(
     current_user: User = Depends(get_current_admin)
 ):
     """Mark salary as paid for a labour up to a specific week.
-    If amount_paid is provided and less than total due, marks oldest weeks paid first."""
+    If amount_paid is provided and less than total due, marks oldest weeks paid first.
+    Optionally deduct advances from the payment."""
     labour = get_labour(payment.labour_id)
     if not labour:
         raise HTTPException(
@@ -175,6 +176,53 @@ async def pay_salary(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="amount_paid must be greater than 0"
         )
+
+    # Handle advance deduction
+    advance_deducted = 0.0
+    advances_updated = []
+    
+    if payment.advance_deduction and payment.advance_deduction != "none":
+        pending_advances = get_advances(labour_id=payment.labour_id, is_deducted=False)
+        total_pending_advance = sum(a.amount - (a.repaid_amount or 0.0) for a in pending_advances)
+        
+        if total_pending_advance > 0:
+            if payment.advance_deduction == "full":
+                # Deduct all pending advances
+                for adv in pending_advances:
+                    remaining = adv.amount - (adv.repaid_amount or 0.0)
+                    if remaining > 0:
+                        mark_advance_deducted(adv.id)
+                        advance_deducted += remaining
+                        advances_updated.append({"id": adv.id, "amount": remaining, "type": "full"})
+            
+            elif payment.advance_deduction == "partial":
+                # Deduct specified amount
+                deduct_amount = payment.advance_deduction_amount or 0.0
+                if deduct_amount <= 0:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="advance_deduction_amount must be greater than 0 for partial deduction"
+                    )
+                if deduct_amount > total_pending_advance:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail=f"Deduction amount ({deduct_amount}) exceeds pending advances ({total_pending_advance})"
+                    )
+                
+                # Deduct from oldest advances first
+                remaining_to_deduct = deduct_amount
+                for adv in sorted(pending_advances, key=lambda x: x.date):
+                    if remaining_to_deduct <= 0:
+                        break
+                    adv_remaining = adv.amount - (adv.repaid_amount or 0.0)
+                    if adv_remaining <= 0:
+                        continue
+                    
+                    to_deduct = min(remaining_to_deduct, adv_remaining)
+                    repay_advance_partial(adv.id, to_deduct)
+                    advance_deducted += to_deduct
+                    remaining_to_deduct -= to_deduct
+                    advances_updated.append({"id": adv.id, "amount": to_deduct, "type": "partial"})
 
     result = mark_salary_paid(
         labour_id=payment.labour_id,
@@ -190,13 +238,19 @@ async def pay_salary(
             detail="No unpaid salary records found for this period"
         )
 
+    # Calculate net payment (salary paid minus advance deducted)
+    net_payment = result['amount_paid'] - advance_deducted
+
     # In-app notification
     try:
+        msg_text = f"Paid ₹{result['amount_paid']:.0f} to {labour.name}"
+        if advance_deducted > 0:
+            msg_text += f" (₹{advance_deducted:.0f} advance deducted, net: ₹{net_payment:.0f})"
         create_notification(
             user=current_user.username,
             notif_type="salary_paid",
             title="Salary Paid",
-            message=f"Paid \u20b9{result['amount_paid']:.0f} to {labour.name}",
+            message=msg_text,
             labour_id=payment.labour_id
         )
     except Exception:
@@ -204,27 +258,44 @@ async def pay_salary(
 
     # WhatsApp notification to labour
     if labour.phone:
-        msg = (
-            f"Dear {labour.name}, your salary of \u20b9{result['amount_paid']:.0f} "
-            f"has been paid. - AttendanceMS"
-        )
+        if advance_deducted > 0:
+            msg = (
+                f"Dear {labour.name}, your salary of ₹{result['amount_paid']:.0f} "
+                f"has been processed. Advance deducted: ₹{advance_deducted:.0f}. "
+                f"Net payment: ₹{net_payment:.0f}. - AttendanceMS"
+            )
+        else:
+            msg = (
+                f"Dear {labour.name}, your salary of ₹{result['amount_paid']:.0f} "
+                f"has been paid. - AttendanceMS"
+            )
         background_tasks.add_task(send_whatsapp_message, labour.phone, msg)
 
     # Push notification to the user who paid
+    push_msg = f"Paid ₹{result['amount_paid']:.0f} to {labour.name}"
+    if advance_deducted > 0:
+        push_msg += f" (net: ₹{net_payment:.0f})"
     background_tasks.add_task(
         send_push_to_user,
         current_user.username,
         "Salary Paid",
-        f"Paid \u20b9{result['amount_paid']:.0f} to {labour.name}"
+        push_msg
     )
 
-    return {
+    response = {
         "message": f"Salary paid for {labour.name}",
         "paid_by": current_user.username,
         "weeks_paid": result["weeks_paid"],
         "amount_paid": result["amount_paid"],
         "remaining": result["remaining"],
     }
+    
+    if advance_deducted > 0:
+        response["advance_deducted"] = advance_deducted
+        response["net_payment"] = net_payment
+        response["advances_updated"] = len(advances_updated)
+    
+    return response
 
 
 @router.get("/slip/{labour_id}")

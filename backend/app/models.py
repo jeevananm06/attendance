@@ -126,6 +126,8 @@ class SalaryPayment(BaseModel):
     week_end: date  # Friday of the week
     amount_paid: Optional[float] = None  # None = pay full amount; otherwise partial
     payment_comment: Optional[str] = None  # Comment required when paying more than due
+    advance_deduction: Optional[str] = None  # "full", "partial", or "none" (default: none)
+    advance_deduction_amount: Optional[float] = None  # Amount to deduct if partial
 
 
 class LabourStats(BaseModel):

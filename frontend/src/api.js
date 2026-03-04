@@ -148,12 +148,15 @@ export const salaryAPI = {
     if (weekEnd) url += `?week_end=${weekEnd}`;
     return api.post(url);
   },
-  pay: (labourId, weekEnd, amountPaid = null, paymentComment = null) => {
+  pay: (labourId, weekEnd, amountPaid = null, paymentComment = null, advanceDeduction = null, advanceDeductionAmount = null) => {
     invalidateCache('salary:pending:all', `salary:pending:${labourId}`, 'salary:summary');
     invalidateCache(...Object.keys(_cache).filter((k) => k.startsWith('salary:records:')));
+    invalidateCache(...Object.keys(_cache).filter((k) => k.startsWith('advances:')));
     const body = { labour_id: labourId, week_end: weekEnd };
     if (amountPaid !== null) body.amount_paid = amountPaid;
     if (paymentComment !== null) body.payment_comment = paymentComment;
+    if (advanceDeduction !== null) body.advance_deduction = advanceDeduction;
+    if (advanceDeductionAmount !== null) body.advance_deduction_amount = advanceDeductionAmount;
     return api.post('/salary/pay', body);
   },
   getSummary: () =>

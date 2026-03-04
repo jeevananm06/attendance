@@ -37,6 +37,8 @@ const Salary = () => {
   const [payPanel, setPayPanel] = useState(null); // { labourId, weekEnd, total }
   const [payAmount, setPayAmount] = useState('');
   const [paymentComment, setPaymentComment] = useState('');
+  const [advanceDeduction, setAdvanceDeduction] = useState('none'); // 'none', 'full', 'partial'
+  const [advanceDeductionAmount, setAdvanceDeductionAmount] = useState('');
   const [slip, setSlip] = useState(null);
 
   const now = new Date();
@@ -122,7 +124,13 @@ const Salary = () => {
     setPayAmount(String(labour.total_pending));
   };
 
-  const closePayPanel = () => { setPayPanel(null); setPayAmount(''); setPaymentComment(''); };
+  const closePayPanel = () => { 
+    setPayPanel(null); 
+    setPayAmount(''); 
+    setPaymentComment(''); 
+    setAdvanceDeduction('none');
+    setAdvanceDeductionAmount('');
+  };
 
   const handleOpenSlip = async (labour) => {
     try {
@@ -159,17 +167,41 @@ const Salary = () => {
       return;
     }
     
+    // Validate partial advance deduction amount
+    const pendingAdvance = advances[labourId] || 0;
+    const partialDeductAmt = parseFloat(advanceDeductionAmount);
+    if (advanceDeduction === 'partial') {
+      if (isNaN(partialDeductAmt) || partialDeductAmt <= 0) {
+        setError('Enter a valid advance deduction amount');
+        return;
+      }
+      if (partialDeductAmt > pendingAdvance) {
+        setError(`Deduction amount cannot exceed pending advance (₹${pendingAdvance.toLocaleString()})`);
+        return;
+      }
+    }
+    
     try {
       setPayingLabour(labourId);
       setError('');
-      const res = await salaryAPI.pay(labourId, weekEnd, entered >= total ? null : entered, isExcessPayment ? paymentComment.trim() : null);
-      const { amount_paid, remaining, weeks_paid, excess_amount } = res.data;
+      const res = await salaryAPI.pay(
+        labourId, 
+        weekEnd, 
+        entered >= total ? null : entered, 
+        isExcessPayment ? paymentComment.trim() : null,
+        advanceDeduction !== 'none' ? advanceDeduction : null,
+        advanceDeduction === 'partial' ? partialDeductAmt : null
+      );
+      const { amount_paid, remaining, weeks_paid, excess_amount, advance_deducted, net_payment } = res.data;
       let msg = `Paid ₹${amount_paid.toLocaleString()} (${weeks_paid} week${weeks_paid !== 1 ? 's' : ''})`;
+      if (advance_deducted > 0) {
+        msg += ` · Advance deducted: ₹${advance_deducted.toLocaleString()} · Net: ₹${net_payment.toLocaleString()}`;
+      }
       if (excess_amount > 0) {
         msg += ` · Excess: ₹${excess_amount.toLocaleString()}`;
       } else if (remaining > 0) {
         msg += ` · ₹${remaining.toLocaleString()} still pending`;
-      } else {
+      } else if (!advance_deducted) {
         msg += ' · fully cleared';
       }
       setSuccess(msg);
@@ -418,6 +450,9 @@ const Salary = () => {
                                   const remaining = isNaN(entered) ? labour.total_pending : Math.max(0, labour.total_pending - entered);
                                   const excess = isNaN(entered) ? 0 : Math.max(0, entered - labour.total_pending);
                                   const color = remaining === 0 ? (excess > 0 ? 'text-blue-600' : 'text-green-600') : 'text-orange-500';
+                                  const pendingAdvance = advances[labour.labour_id] || 0;
+                                  const deductAmt = advanceDeduction === 'full' ? pendingAdvance : (advanceDeduction === 'partial' ? (parseFloat(advanceDeductionAmount) || 0) : 0);
+                                  const netPayment = entered - deductAmt;
                                   return (
                                     <>
                                       <p className={`text-xs mt-1 ml-5 font-medium ${color}`}>
@@ -435,6 +470,63 @@ const Salary = () => {
                                           onChange={(e) => setPaymentComment(e.target.value)}
                                           className="mt-2 ml-5 w-64 border border-blue-300 dark:border-blue-600 rounded px-2 py-1.5 text-sm bg-white dark:bg-gray-700 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
                                         />
+                                      )}
+                                      
+                                      {/* Advance Deduction Section */}
+                                      {pendingAdvance > 0 && (
+                                        <div className="mt-3 ml-5 p-2 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded">
+                                          <p className="text-xs font-medium text-amber-700 dark:text-amber-400 mb-2">
+                                            Pending Advance: ₹{pendingAdvance.toLocaleString()}
+                                          </p>
+                                          <div className="flex flex-wrap gap-2 items-center">
+                                            <label className="flex items-center gap-1 text-xs">
+                                              <input
+                                                type="radio"
+                                                name={`advance-${labour.labour_id}`}
+                                                checked={advanceDeduction === 'none'}
+                                                onChange={() => { setAdvanceDeduction('none'); setAdvanceDeductionAmount(''); }}
+                                                className="w-3 h-3"
+                                              />
+                                              <span className="text-gray-600 dark:text-gray-400">No deduction</span>
+                                            </label>
+                                            <label className="flex items-center gap-1 text-xs">
+                                              <input
+                                                type="radio"
+                                                name={`advance-${labour.labour_id}`}
+                                                checked={advanceDeduction === 'full'}
+                                                onChange={() => { setAdvanceDeduction('full'); setAdvanceDeductionAmount(''); }}
+                                                className="w-3 h-3"
+                                              />
+                                              <span className="text-gray-600 dark:text-gray-400">Full (₹{pendingAdvance.toLocaleString()})</span>
+                                            </label>
+                                            <label className="flex items-center gap-1 text-xs">
+                                              <input
+                                                type="radio"
+                                                name={`advance-${labour.labour_id}`}
+                                                checked={advanceDeduction === 'partial'}
+                                                onChange={() => setAdvanceDeduction('partial')}
+                                                className="w-3 h-3"
+                                              />
+                                              <span className="text-gray-600 dark:text-gray-400">Partial</span>
+                                            </label>
+                                            {advanceDeduction === 'partial' && (
+                                              <input
+                                                type="number"
+                                                min="1"
+                                                max={pendingAdvance}
+                                                placeholder="Amount"
+                                                value={advanceDeductionAmount}
+                                                onChange={(e) => setAdvanceDeductionAmount(e.target.value)}
+                                                className="w-24 border border-amber-300 dark:border-amber-600 rounded px-2 py-1 text-xs bg-white dark:bg-gray-700 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-amber-500"
+                                              />
+                                            )}
+                                          </div>
+                                          {deductAmt > 0 && !isNaN(entered) && (
+                                            <p className="text-xs mt-2 text-amber-700 dark:text-amber-400">
+                                              Net payment after deduction: <strong>₹{netPayment.toLocaleString()}</strong>
+                                            </p>
+                                          )}
+                                        </div>
                                       )}
                                     </>
                                   );
