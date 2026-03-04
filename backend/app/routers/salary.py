@@ -323,6 +323,9 @@ async def get_pay_register(
                     "total_amount": r.total_amount,
                     "paid_amount": r.paid_amount,
                     "is_paid": r.is_paid,
+                    "paid_date": r.paid_date.isoformat() if r.paid_date else None,
+                    "paid_by": r.paid_by,
+                    "payment_comment": r.payment_comment,
                 }
                 for r in sorted(labour_records, key=lambda x: x.week_end)
             ],

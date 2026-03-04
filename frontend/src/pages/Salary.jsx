@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { salaryAPI, laboursAPI, advancesAPI } from '../api';
 import {
   Wallet,
@@ -44,6 +44,7 @@ const Salary = () => {
   const [regMonth, setRegMonth] = useState(now.getMonth() + 1);
   const [register, setRegister] = useState(null);
   const [regLoading, setRegLoading] = useState(false);
+  const [expandedRegLabour, setExpandedRegLabour] = useState(null);
 
   useEffect(() => {
     fetchData();
@@ -545,15 +546,95 @@ const Salary = () => {
                     </thead>
                     <tbody>
                       {register.labours.map((l) => (
-                        <tr key={l.labour_id} className="border-t">
-                          <td className="px-3 py-2 font-medium text-gray-900 dark:text-gray-100">{l.labour_name}</td>
-                          <td className="px-3 py-2 text-center text-gray-600 dark:text-gray-400">{l.weeks.length}</td>
-                          <td className="px-3 py-2 text-right text-gray-800 dark:text-gray-200">₹{l.total_earned.toLocaleString()}</td>
-                          <td className="px-3 py-2 text-right text-green-700">₹{l.total_paid.toLocaleString()}</td>
-                          <td className={`px-3 py-2 text-right font-semibold ${l.balance > 0 ? 'text-orange-600' : 'text-green-600'}`}>
-                            ₹{l.balance.toLocaleString()}
-                          </td>
-                        </tr>
+                        <React.Fragment key={l.labour_id}>
+                          <tr 
+                            className={`border-t cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors ${expandedRegLabour === l.labour_id ? 'bg-blue-50 dark:bg-blue-900/20' : ''}`}
+                            onClick={() => setExpandedRegLabour(expandedRegLabour === l.labour_id ? null : l.labour_id)}
+                          >
+                            <td className="px-3 py-2 font-medium text-gray-900 dark:text-gray-100 flex items-center gap-2">
+                              {expandedRegLabour === l.labour_id ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                              {l.labour_name}
+                            </td>
+                            <td className="px-3 py-2 text-center text-gray-600 dark:text-gray-400">{l.weeks.length}</td>
+                            <td className="px-3 py-2 text-right text-gray-800 dark:text-gray-200">₹{l.total_earned.toLocaleString()}</td>
+                            <td className="px-3 py-2 text-right text-green-700">₹{l.total_paid.toLocaleString()}</td>
+                            <td className={`px-3 py-2 text-right font-semibold ${l.balance > 0 ? 'text-orange-600' : 'text-green-600'}`}>
+                              ₹{l.balance.toLocaleString()}
+                            </td>
+                          </tr>
+                          {expandedRegLabour === l.labour_id && (
+                            <tr>
+                              <td colSpan={5} className="bg-gray-50 dark:bg-gray-800 px-4 py-3">
+                                <div className="space-y-3">
+                                  <div className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+                                    <FileText size={16} />
+                                    Weekly Payment Details
+                                  </div>
+                                  <div className="overflow-x-auto">
+                                    <table className="w-full text-xs">
+                                      <thead className="bg-gray-100 dark:bg-gray-700">
+                                        <tr>
+                                          <th className="text-left px-2 py-1.5 text-gray-600 dark:text-gray-400">Week</th>
+                                          <th className="text-center px-2 py-1.5 text-gray-600 dark:text-gray-400">Days</th>
+                                          <th className="text-right px-2 py-1.5 text-gray-600 dark:text-gray-400">Earned</th>
+                                          <th className="text-right px-2 py-1.5 text-gray-600 dark:text-gray-400">Paid</th>
+                                          <th className="text-right px-2 py-1.5 text-gray-600 dark:text-gray-400">Balance</th>
+                                          <th className="text-center px-2 py-1.5 text-gray-600 dark:text-gray-400">Status</th>
+                                          <th className="text-left px-2 py-1.5 text-gray-600 dark:text-gray-400">Paid Date</th>
+                                          <th className="text-left px-2 py-1.5 text-gray-600 dark:text-gray-400">Paid By</th>
+                                          <th className="text-left px-2 py-1.5 text-gray-600 dark:text-gray-400">Comment</th>
+                                        </tr>
+                                      </thead>
+                                      <tbody>
+                                        {l.weeks.map((w, idx) => (
+                                          <tr key={idx} className="border-t border-gray-200 dark:border-gray-600">
+                                            <td className="px-2 py-1.5 text-gray-700 dark:text-gray-300">
+                                              {new Date(w.week_start).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })} - {new Date(w.week_end).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}
+                                            </td>
+                                            <td className="px-2 py-1.5 text-center text-gray-600 dark:text-gray-400">{w.days_present}</td>
+                                            <td className="px-2 py-1.5 text-right text-gray-700 dark:text-gray-300">₹{w.total_amount.toLocaleString()}</td>
+                                            <td className="px-2 py-1.5 text-right text-green-600">₹{w.paid_amount.toLocaleString()}</td>
+                                            <td className={`px-2 py-1.5 text-right ${(w.total_amount - w.paid_amount) > 0 ? 'text-orange-500' : 'text-green-500'}`}>
+                                              ₹{(w.total_amount - w.paid_amount).toLocaleString()}
+                                            </td>
+                                            <td className="px-2 py-1.5 text-center">
+                                              {w.is_paid ? (
+                                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                                                  <Check size={10} /> Paid
+                                                </span>
+                                              ) : w.paid_amount > 0 ? (
+                                                <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-xs bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400">
+                                                  Partial
+                                                </span>
+                                              ) : (
+                                                <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-xs bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400">
+                                                  Pending
+                                                </span>
+                                              )}
+                                            </td>
+                                            <td className="px-2 py-1.5 text-gray-600 dark:text-gray-400">
+                                              {w.paid_date ? new Date(w.paid_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '-'}
+                                            </td>
+                                            <td className="px-2 py-1.5 text-gray-600 dark:text-gray-400">{w.paid_by || '-'}</td>
+                                            <td className="px-2 py-1.5 text-gray-600 dark:text-gray-400 max-w-[150px] truncate" title={w.payment_comment || ''}>
+                                              {w.payment_comment || '-'}
+                                            </td>
+                                          </tr>
+                                        ))}
+                                      </tbody>
+                                    </table>
+                                  </div>
+                                  <div className="flex gap-4 text-xs text-gray-500 dark:text-gray-400 pt-2 border-t border-gray-200 dark:border-gray-600">
+                                    <span>Daily Wage: <strong className="text-gray-700 dark:text-gray-300">₹{l.daily_wage.toLocaleString()}</strong></span>
+                                    <span>Total Weeks: <strong className="text-gray-700 dark:text-gray-300">{l.weeks.length}</strong></span>
+                                    <span>Paid Weeks: <strong className="text-green-600">{l.weeks.filter(w => w.is_paid).length}</strong></span>
+                                    <span>Pending Weeks: <strong className="text-orange-500">{l.weeks.filter(w => !w.is_paid).length}</strong></span>
+                                  </div>
+                                </div>
+                              </td>
+                            </tr>
+                          )}
+                        </React.Fragment>
                       ))}
                     </tbody>
                     <tfoot className="border-t-2 border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700">
