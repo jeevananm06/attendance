@@ -98,7 +98,7 @@ const Login = () => {
 
           <div className="mt-6 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
             <p className="text-sm text-gray-600 dark:text-gray-400 text-center">
-              <strong>Default Admin:</strong> admin / admin123
+              Don't have an account? <span className="text-primary-600">Contact your administrator</span>
             </p>
           </div>
         </div>
