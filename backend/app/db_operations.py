@@ -1249,6 +1249,7 @@ def create_refresh_token(username: str, token: str, expires_at: datetime) -> boo
         
         # Create new refresh token
         refresh_token = RefreshTokenDB(
+            id=str(uuid.uuid4()),
             user_id=username,
             token=token,
             expires_at=expires_at
