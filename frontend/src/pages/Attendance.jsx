@@ -247,38 +247,28 @@ const Attendance = () => {
     else fetchLaboursOnly();
   }, [selectedDate, view]);
 
-  // Fetch site groupings and bucket allLabours into sites / unassigned
+  // Fetch site groupings in a single API call
   const fetchSiteGroupings = async (allLabours) => {
     try {
-      const [sitesRes, unassignedRes] = await Promise.all([
-        sitesAPI.getAll(),
-        sitesAPI.getUnassignedLabours(),
-      ]);
+      const res = await sitesAPI.getGroupedLabours();
+      const { groups: apiGroups, unassigned: apiUnassigned } = res.data;
 
-      const activeSites = sitesRes.data.filter((s) => s.is_active);
+      // Map API labours to allLabours (to keep consistent object refs)
+      const labourMap = new Map(allLabours.map((l) => [l.id, l]));
 
-      // Fetch each site's labours in parallel
-      const siteLabourResults = await Promise.all(
-        activeSites.map((site) => sitesAPI.getLabours(site.id))
-      );
-
-      const groups = activeSites
-        .map((site, i) => {
-          // Response is {site, labour_count, labours: [...]}
-          const siteLaboursData = siteLabourResults[i].data?.labours ?? siteLabourResults[i].data ?? [];
-          const siteLabourIds = new Set(siteLaboursData.map((l) => l.id));
-          const siteLabours = allLabours
-            .filter((l) => siteLabourIds.has(l.id))
-            .sort((a, b) => a.name.localeCompare(b.name));
-          return { site, labours: siteLabours };
-        })
+      const groups = apiGroups
+        .map((g) => ({
+          site: g.site,
+          labours: g.labours
+            .map((l) => labourMap.get(l.id))
+            .filter(Boolean)
+            .sort((a, b) => a.name.localeCompare(b.name)),
+        }))
         .filter((g) => g.labours.length > 0);
 
-      // Response is {unassigned_count, labours: [...]}
-      const unassignedData = unassignedRes.data?.labours ?? unassignedRes.data ?? [];
-      const unassignedIds = new Set(unassignedData.map((l) => l.id));
-      const unassigned = allLabours
-        .filter((l) => unassignedIds.has(l.id))
+      const unassigned = apiUnassigned
+        .map((l) => labourMap.get(l.id))
+        .filter(Boolean)
         .sort((a, b) => a.name.localeCompare(b.name));
 
       setSiteGroups(groups);
@@ -295,7 +285,6 @@ const Attendance = () => {
       });
     } catch (err) {
       console.error('Failed to load site groupings', err);
-      // Fallback: show all labours under "Unassigned"
       setSiteGroups([]);
       setUnassignedLabours(allLabours);
       setExpandedSites((prev) => ({ ...prev, unassigned: true }));

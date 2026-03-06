@@ -105,6 +105,37 @@ async def get_unassigned_labours(
         }
 
 
+@router.get("/grouped-labours")
+async def get_grouped_labours(
+    current_user: User = Depends(get_current_manager_or_admin)
+):
+    """Get all labours grouped by site in a single call"""
+    sites = get_sites()
+    all_labours = get_all_labours()
+
+    assigned_labour_ids = set()
+    groups = []
+
+    for site in sites:
+        if not site.is_active:
+            continue
+        labour_ids = get_labours_by_site(site.id)
+        site_labours = [l for l in all_labours if l.id in labour_ids]
+        assigned_labour_ids.update(labour_ids)
+        if site_labours:
+            groups.append({
+                "site": site,
+                "labours": site_labours
+            })
+
+    unassigned = [l for l in all_labours if l.id not in assigned_labour_ids]
+
+    return {
+        "groups": groups,
+        "unassigned": unassigned
+    }
+
+
 @router.get("/{site_id}", response_model=Site)
 async def get_site_by_id(
     site_id: str,

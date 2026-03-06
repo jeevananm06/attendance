@@ -324,6 +324,7 @@ export const sitesAPI = {
   getLabourSite: (labourId) => api.get(`/sites/labour/${labourId}/site`),
   getSummary: () => api.get('/sites/summary'),
   getUnassignedLabours: () => api.get('/sites/unassigned-labours'),
+  getGroupedLabours: () => api.get('/sites/grouped-labours'),
 };
 
 export const auditAPI = {
