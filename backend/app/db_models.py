@@ -214,3 +214,14 @@ class PushSubscriptionDB(Base):
     p256dh = Column(Text, nullable=False)
     auth = Column(Text, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class RefreshTokenDB(Base):
+    __tablename__ = "refresh_tokens"
+
+    id = Column(String(36), primary_key=True, index=True)
+    user_id = Column(String(100), nullable=False, index=True)
+    token = Column(String(255), nullable=False, unique=True)
+    expires_at = Column(DateTime, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    is_revoked = Column(Boolean, default=False)

@@ -4,8 +4,9 @@ from jose import JWTError, jwt
 from passlib.context import CryptContext
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
+import secrets
 
-from .config import SECRET_KEY, ALGORITHM, ACCESS_TOKEN_EXPIRE_MINUTES
+from .config import SECRET_KEY, ALGORITHM, ACCESS_TOKEN_EXPIRE_MINUTES, REFRESH_TOKEN_EXPIRE_DAYS
 from .models import TokenData, User, UserRole
 from .db_wrapper import get_user
 
@@ -39,6 +40,16 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
     to_encode.update({"exp": expire})
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
+
+
+def create_refresh_token() -> str:
+    """Create a cryptographically secure refresh token"""
+    return secrets.token_urlsafe(32)
+
+
+def create_refresh_token_expires_at() -> datetime:
+    """Create expiration date for refresh token"""
+    return datetime.utcnow() + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
 
 
 async def get_current_user(token: str = Depends(oauth2_scheme)) -> User:

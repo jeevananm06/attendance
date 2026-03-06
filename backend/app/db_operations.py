@@ -12,7 +12,7 @@ from sqlalchemy import and_, or_
 from .db_models import (
     UserDB, LabourDB, AttendanceDB, SalaryDB, OvertimeDB,
     AdvanceDB, LeaveDB, SiteDB, SiteAssignmentDB, AuditLogDB, BackupDB,
-    NotificationDB, PushSubscriptionDB
+    NotificationDB, PushSubscriptionDB, RefreshTokenDB
 )
 from .models import (
     User, Labour, Attendance, SalaryRecord, UserRole, AttendanceStatus,
@@ -1234,6 +1234,77 @@ def get_push_subscriptions(user: str) -> List[dict]:
     try:
         rows = db.query(PushSubscriptionDB).filter(PushSubscriptionDB.user == user).all()
         return [{"endpoint": r.endpoint, "keys": {"p256dh": r.p256dh, "auth": r.auth}} for r in rows]
+    finally:
+        db.close()
+
+
+# ============== REFRESH TOKEN OPERATIONS ==============
+
+def create_refresh_token(username: str, token: str, expires_at: datetime) -> bool:
+    """Create a new refresh token"""
+    db = get_db_session()
+    try:
+        # Revoke any existing tokens for this user
+        db.query(RefreshTokenDB).filter(RefreshTokenDB.user_id == username).update({"is_revoked": True})
+        
+        # Create new refresh token
+        refresh_token = RefreshTokenDB(
+            user_id=username,
+            token=token,
+            expires_at=expires_at
+        )
+        db.add(refresh_token)
+        db.commit()
+        return True
+    except Exception:
+        db.rollback()
+        return False
+    finally:
+        db.close()
+
+
+def get_refresh_token(token: str) -> Optional[RefreshTokenDB]:
+    """Get refresh token by token string"""
+    db = get_db_session()
+    try:
+        return db.query(RefreshTokenDB).filter(
+            and_(
+                RefreshTokenDB.token == token,
+                RefreshTokenDB.is_revoked == False,
+                RefreshTokenDB.expires_at > datetime.utcnow()
+            )
+        ).first()
+    finally:
+        db.close()
+
+
+def revoke_refresh_token(token: str) -> bool:
+    """Revoke a refresh token"""
+    db = get_db_session()
+    try:
+        refresh_token = db.query(RefreshTokenDB).filter(RefreshTokenDB.token == token).first()
+        if refresh_token:
+            refresh_token.is_revoked = True
+            db.commit()
+            return True
+        return False
+    except Exception:
+        db.rollback()
+        return False
+    finally:
+        db.close()
+
+
+def revoke_all_refresh_tokens(username: str) -> bool:
+    """Revoke all refresh tokens for a user"""
+    db = get_db_session()
+    try:
+        db.query(RefreshTokenDB).filter(RefreshTokenDB.user_id == username).update({"is_revoked": True})
+        db.commit()
+        return True
+    except Exception:
+        db.rollback()
+        return False
     finally:
         db.close()
 

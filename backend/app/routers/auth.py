@@ -1,6 +1,7 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Response, Request
 from fastapi.security import OAuth2PasswordRequestForm
 from datetime import timedelta
+from typing import Optional
 
 from ..models import Token, UserCreate, UserUpdate, User, UserRole
 from ..auth import (
@@ -8,16 +9,19 @@ from ..auth import (
     create_access_token, 
     get_password_hash,
     get_current_admin,
-    get_current_user
+    get_current_user,
+    create_refresh_token,
+    create_refresh_token_expires_at
 )
 from ..config import ACCESS_TOKEN_EXPIRE_MINUTES
 from ..db_wrapper import create_user, get_user, get_all_users, update_user
+from ..db_operations import create_refresh_token as save_refresh_token, get_refresh_token, revoke_refresh_token
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
 
 @router.post("/login", response_model=Token)
-async def login(form_data: OAuth2PasswordRequestForm = Depends()):
+async def login(response: Response, form_data: OAuth2PasswordRequestForm = Depends()):
     user = authenticate_user(form_data.username, form_data.password)
     if not user:
         raise HTTPException(
@@ -25,11 +29,29 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()):
             detail="Incorrect username or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
+    
+    # Create access token
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
         data={"sub": user.username, "role": user.role.value},
         expires_delta=access_token_expires
     )
+    
+    # Create and store refresh token
+    refresh_token_str = create_refresh_token()
+    refresh_token_expires_at = create_refresh_token_expires_at()
+    save_refresh_token(user.username, refresh_token_str, refresh_token_expires_at)
+    
+    # Set refresh token in httpOnly cookie (secure in production)
+    response.set_cookie(
+        key="refresh_token",
+        value=refresh_token_str,
+        expires=refresh_token_expires_at,
+        httponly=True,
+        secure=False,  # Set to True in production with HTTPS
+        samesite="lax"
+    )
+    
     return {"access_token": access_token, "token_type": "bearer"}
 
 
@@ -106,3 +128,84 @@ async def update_user_info(
         )
     
     return {"message": f"User {username} updated successfully"}
+
+
+@router.post("/refresh", response_model=Token)
+async def refresh_access_token(request: Request, response: Response, refresh_token: Optional[str] = None):
+    """Refresh access token using refresh token from cookie or body"""
+    # Get refresh token from cookie or request body
+    token_str = refresh_token
+    if not token_str:
+        token_str = request.cookies.get("refresh_token")
+    
+    if not token_str:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Refresh token required"
+        )
+    
+    # Validate refresh token
+    token_data = get_refresh_token(token_str)
+    if not token_data:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired refresh token"
+        )
+    
+    # Get user to include correct role in new access token
+    user = get_user(token_data.user_id)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="User not found"
+        )
+    
+    # Create new access token
+    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = create_access_token(
+        data={"sub": user.username, "role": user.role.value},
+        expires_delta=access_token_expires
+    )
+    
+    # Create new refresh token and revoke old one
+    new_refresh_token_str = create_refresh_token()
+    new_refresh_token_expires_at = create_refresh_token_expires_at()
+    
+    # Save new refresh token and revoke old one
+    save_refresh_token(token_data.user_id, new_refresh_token_str, new_refresh_token_expires_at)
+    revoke_refresh_token(token_str)
+    
+    # Set new refresh token in httpOnly cookie
+    response.set_cookie(
+        key="refresh_token",
+        value=new_refresh_token_str,
+        expires=new_refresh_token_expires_at,
+        httponly=True,
+        secure=False,  # Set to True in production with HTTPS
+        samesite="lax"
+    )
+    
+    return {"access_token": access_token, "token_type": "bearer"}
+
+
+@router.post("/logout")
+async def logout(request: Request, response: Response, refresh_token: Optional[str] = None):
+    """Logout user by revoking refresh token and clearing cookie"""
+    # Get refresh token from cookie or request body
+    token_str = refresh_token
+    if not token_str:
+        token_str = request.cookies.get("refresh_token")
+    
+    # Revoke refresh token if exists
+    if token_str:
+        revoke_refresh_token(token_str)
+    
+    # Clear refresh token cookie
+    response.delete_cookie(
+        key="refresh_token",
+        httponly=True,
+        secure=False,  # Set to True in production with HTTPS
+        samesite="lax"
+    )
+    
+    return {"message": "Successfully logged out"}

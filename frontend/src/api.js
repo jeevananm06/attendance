@@ -35,6 +35,7 @@ const api = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
+  withCredentials: true, // Send cookies for refresh token
 });
 
 api.interceptors.request.use((config) => {
@@ -45,15 +46,73 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
+// Flag to prevent multiple refresh attempts
+let isRefreshing = false;
+let failedQueue = [];
+
+const processQueue = (error, token = null) => {
+  failedQueue.forEach((prom) => {
+    if (error) {
+      prom.reject(error);
+    } else {
+      prom.resolve(token);
+    }
+  });
+  failedQueue = [];
+};
+
 api.interceptors.response.use(
   (response) => response,
-  (error) => {
-    if (error.response?.status === 401) {
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
-      invalidateCache();
-      window.location.href = '/login';
+  async (error) => {
+    const originalRequest = error.config;
+    
+    // If 401 and not already tried to refresh
+    if (error.response?.status === 401 && !originalRequest._retry) {
+      if (isRefreshing) {
+        // If already refreshing, add to queue
+        return new Promise((resolve, reject) => {
+          failedQueue.push({ resolve, reject });
+        }).then((token) => {
+          originalRequest.headers.Authorization = `Bearer ${token}`;
+          return api(originalRequest);
+        }).catch((err) => {
+          return Promise.reject(err);
+        });
+      }
+      
+      originalRequest._retry = true;
+      isRefreshing = true;
+      
+      try {
+        // Try to refresh the token
+        const refreshResponse = await api.post('/auth/refresh', {}, { withCredentials: true });
+        const newToken = refreshResponse.data.access_token;
+        
+        // Update token in localStorage
+        localStorage.setItem('token', newToken);
+        
+        // Update default authorization header
+        api.defaults.headers.common.Authorization = `Bearer ${newToken}`;
+        
+        // Process queued requests
+        processQueue(null, newToken);
+        
+        // Retry original request with new token
+        originalRequest.headers.Authorization = `Bearer ${newToken}`;
+        return api(originalRequest);
+      } catch (refreshError) {
+        // Refresh failed, clear auth and redirect to login
+        processQueue(refreshError, null);
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        invalidateCache();
+        window.location.href = '/login';
+        return Promise.reject(refreshError);
+      } finally {
+        isRefreshing = false;
+      }
     }
+    
     return Promise.reject(error);
   }
 );
@@ -71,6 +130,8 @@ export const authAPI = {
   getMe: () => api.get('/auth/me'),
   getUsers: () => api.get('/auth/users'),
   updateUser: (username, data) => api.put(`/auth/users/${username}`, data),
+  refresh: () => api.post('/auth/refresh', {}),
+  logout: () => api.post('/auth/logout', {}),
 };
 
 export const laboursAPI = {

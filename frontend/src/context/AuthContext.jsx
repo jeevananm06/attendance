@@ -39,7 +39,16 @@ export const AuthProvider = ({ children }) => {
     return userData;
   };
 
-  const logout = () => {
+  const logout = async () => {
+    try {
+      // Call backend logout to revoke refresh token
+      await authAPI.logout();
+    } catch (error) {
+      // Even if logout fails, clear local storage
+      console.error('Logout error:', error);
+    }
+    
+    // Clear local storage and state
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     invalidateCache();
