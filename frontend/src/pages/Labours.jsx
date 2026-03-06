@@ -11,7 +11,8 @@ import {
   Phone,
   Calendar,
   IndianRupee,
-  AlertCircle
+  AlertCircle,
+  RotateCcw
 } from 'lucide-react';
 
 const Labours = () => {
@@ -87,6 +88,17 @@ const Labours = () => {
         fetchLabours();
       } catch (err) {
         setError('Failed to delete labour');
+      }
+    }
+  };
+
+  const handleReactivate = async (labour) => {
+    if (window.confirm(`Are you sure you want to reactivate ${labour.name}?`)) {
+      try {
+        await laboursAPI.update(labour.id, { is_active: true });
+        fetchLabours();
+      } catch (err) {
+        setError('Failed to reactivate labour');
       }
     }
   };
@@ -204,12 +216,21 @@ const Labours = () => {
                 >
                   <Edit2 size={18} />
                 </button>
-                {labour.is_active && (
+                {labour.is_active ? (
                   <button
                     onClick={() => handleDelete(labour)}
-                    className="p-2 text-gray-500 dark:text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                    className="p-2 text-gray-500 dark:text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                    title="Deactivate"
                   >
                     <Trash2 size={18} />
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => handleReactivate(labour)}
+                    className="p-2 text-gray-500 dark:text-gray-400 hover:text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-lg transition-colors"
+                    title="Reactivate"
+                  >
+                    <RotateCcw size={18} />
                   </button>
                 )}
               </div>
