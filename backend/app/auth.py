@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 from jose import JWTError, jwt
 from passlib.context import CryptContext
@@ -48,8 +48,8 @@ def create_refresh_token() -> str:
 
 
 def create_refresh_token_expires_at() -> datetime:
-    """Create expiration date for refresh token"""
-    return datetime.utcnow() + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
+    """Create expiration date for refresh token (UTC timezone-aware)"""
+    return datetime.now(timezone.utc) + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
 
 
 async def get_current_user(token: str = Depends(oauth2_scheme)) -> User:
