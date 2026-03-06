@@ -70,6 +70,41 @@ async def add_site(
     return site
 
 
+@router.get("/unassigned-labours")
+async def get_unassigned_labours(
+    current_user: User = Depends(get_current_manager_or_admin)
+):
+    """Get all labours that are not assigned to any site"""
+    try:
+        all_labours = get_all_labours()
+        sites = get_sites()
+
+        assigned_labour_ids = set()
+        for site in sites:
+            try:
+                labour_ids = get_labours_by_site(site.id)
+                assigned_labour_ids.update(labour_ids)
+            except Exception as e:
+                print(f"Error getting labours for site {site.id}: {e}")
+                continue
+
+        unassigned_labours = [
+            labour for labour in all_labours
+            if labour.id not in assigned_labour_ids
+        ]
+
+        return {
+            "unassigned_count": len(unassigned_labours),
+            "labours": unassigned_labours
+        }
+    except Exception as e:
+        print(f"Error in get_unassigned_labours: {e}")
+        return {
+            "unassigned_count": 0,
+            "labours": []
+        }
+
+
 @router.get("/{site_id}", response_model=Site)
 async def get_site_by_id(
     site_id: str,
@@ -172,40 +207,3 @@ async def get_labour_assigned_site(
     }
 
 
-@router.get("/unassigned-labours")
-async def get_unassigned_labours(
-    current_user: User = Depends(get_current_manager_or_admin)
-):
-    """Get all labours that are not assigned to any site"""
-    try:
-        all_labours = get_all_labours()
-        sites = get_sites()
-        
-        # Get all assigned labour IDs
-        assigned_labour_ids = set()
-        for site in sites:
-            try:
-                labour_ids = get_labours_by_site(site.id)
-                assigned_labour_ids.update(labour_ids)
-            except Exception as e:
-                # Log error but continue with other sites
-                print(f"Error getting labours for site {site.id}: {e}")
-                continue
-        
-        # Filter unassigned labours
-        unassigned_labours = [
-            labour for labour in all_labours 
-            if labour.id not in assigned_labour_ids
-        ]
-        
-        return {
-            "unassigned_count": len(unassigned_labours),
-            "labours": unassigned_labours
-        }
-    except Exception as e:
-        # Return empty result if there's an error
-        print(f"Error in get_unassigned_labours: {e}")
-        return {
-            "unassigned_count": 0,
-            "labours": []
-        }

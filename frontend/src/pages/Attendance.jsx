@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { attendanceAPI, laboursAPI } from '../api';
+import { useState, useEffect, useCallback, useRef, Fragment } from 'react';
+import { attendanceAPI, laboursAPI, sitesAPI } from '../api';
 import { useAuth } from '../context/AuthContext';
 import {
   Calendar,
@@ -13,7 +13,8 @@ import {
   ChevronDown,
   ChevronUp,
   CalendarCheck,
-  MoreHorizontal
+  MoreHorizontal,
+  MapPin
 } from 'lucide-react';
 
 const STATUS_META = {
@@ -212,15 +213,13 @@ const MonthlyLabourCard = ({ labour, year, month }) => {
 };
 
 const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-const DAY_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 const Attendance = () => {
-  const { isAdmin, isManager, isLabour } = useAuth();
+  const { isAdmin, isManager } = useAuth();
   const canEditAttendance = isAdmin || isManager;
-  const canViewMonthly = isAdmin; // Only admin can see monthly view
-  
-  const [view, setView] = useState('daily');
+  const canViewMonthly = isAdmin;
 
+  const [view, setView] = useState('daily');
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [labours, setLabours] = useState([]);
   const [attendance, setAttendance] = useState({});
@@ -234,6 +233,11 @@ const Attendance = () => {
   const originalComments = useRef({});
   const popupBtnRefs = useRef({});
 
+  // Site grouping state
+  const [siteGroups, setSiteGroups] = useState([]);
+  const [unassignedLabours, setUnassignedLabours] = useState([]);
+  const [expandedSites, setExpandedSites] = useState({});
+
   const now = new Date();
   const [selectedYear, setSelectedYear] = useState(now.getFullYear());
   const [selectedMonth, setSelectedMonth] = useState(now.getMonth());
@@ -243,11 +247,72 @@ const Attendance = () => {
     else fetchLaboursOnly();
   }, [selectedDate, view]);
 
+  // Fetch site groupings and bucket allLabours into sites / unassigned
+  const fetchSiteGroupings = async (allLabours) => {
+    try {
+      const [sitesRes, unassignedRes] = await Promise.all([
+        sitesAPI.getAll(),
+        sitesAPI.getUnassignedLabours(),
+      ]);
+
+      const activeSites = sitesRes.data.filter((s) => s.is_active);
+
+      // Fetch each site's labours in parallel
+      const siteLabourResults = await Promise.all(
+        activeSites.map((site) => sitesAPI.getLabours(site.id))
+      );
+
+      const groups = activeSites
+        .map((site, i) => {
+          // Response is {site, labour_count, labours: [...]}
+          const siteLaboursData = siteLabourResults[i].data?.labours ?? siteLabourResults[i].data ?? [];
+          const siteLabourIds = new Set(siteLaboursData.map((l) => l.id));
+          const siteLabours = allLabours
+            .filter((l) => siteLabourIds.has(l.id))
+            .sort((a, b) => a.name.localeCompare(b.name));
+          return { site, labours: siteLabours };
+        })
+        .filter((g) => g.labours.length > 0);
+
+      // Response is {unassigned_count, labours: [...]}
+      const unassignedData = unassignedRes.data?.labours ?? unassignedRes.data ?? [];
+      const unassignedIds = new Set(unassignedData.map((l) => l.id));
+      const unassigned = allLabours
+        .filter((l) => unassignedIds.has(l.id))
+        .sort((a, b) => a.name.localeCompare(b.name));
+
+      setSiteGroups(groups);
+      setUnassignedLabours(unassigned);
+
+      // Expand any new site by default; preserve toggled state
+      setExpandedSites((prev) => {
+        const next = { ...prev };
+        groups.forEach((g) => {
+          if (!(g.site.id in next)) next[g.site.id] = true;
+        });
+        if (!('unassigned' in next)) next['unassigned'] = true;
+        return next;
+      });
+    } catch (err) {
+      console.error('Failed to load site groupings', err);
+      // Fallback: show all labours under "Unassigned"
+      setSiteGroups([]);
+      setUnassignedLabours(allLabours);
+      setExpandedSites((prev) => ({ ...prev, unassigned: true }));
+    }
+  };
+
+  const toggleSite = (siteId) => {
+    setExpandedSites((prev) => ({ ...prev, [siteId]: !prev[siteId] }));
+  };
+
   const fetchLaboursOnly = async () => {
     try {
       setLoading(true);
       const res = await laboursAPI.getAll();
-      setLabours([...res.data].sort((a, b) => a.name.localeCompare(b.name)));
+      const sorted = [...res.data].sort((a, b) => a.name.localeCompare(b.name));
+      setLabours(sorted);
+      await fetchSiteGroupings(sorted);
     } catch (err) {
       setError('Failed to load labours');
     } finally {
@@ -260,9 +325,10 @@ const Attendance = () => {
       if (!silent) setLoading(true);
       const [laboursRes, attendanceRes] = await Promise.all([
         laboursAPI.getAll(),
-        attendanceAPI.getByDate(selectedDate)
+        attendanceAPI.getByDate(selectedDate),
       ]);
-      setLabours([...laboursRes.data].sort((a, b) => a.name.localeCompare(b.name)));
+      const sorted = [...laboursRes.data].sort((a, b) => a.name.localeCompare(b.name));
+      setLabours(sorted);
       const statusMap = {};
       const commentMap = {};
       attendanceRes.data.forEach((r) => {
@@ -273,6 +339,7 @@ const Attendance = () => {
       setComments(commentMap);
       originalAttendance.current = { ...statusMap };
       originalComments.current = { ...commentMap };
+      await fetchSiteGroupings(sorted);
     } catch (err) {
       setError('Failed to load data');
     } finally {
@@ -280,11 +347,10 @@ const Attendance = () => {
     }
   };
 
-
   const handleStatusChange = (labourId, status) => {
     setAttendance((prev) => ({
       ...prev,
-      [labourId]: prev[labourId] === status ? undefined : status
+      [labourId]: prev[labourId] === status ? undefined : status,
     }));
   };
 
@@ -296,7 +362,6 @@ const Attendance = () => {
     try {
       setSaving(true);
       setError('');
-      // Only send records that actually changed (status or comment differs from original)
       const records = Object.entries(attendance)
         .filter(([labour_id, s]) => {
           if (!s) return false;
@@ -308,7 +373,6 @@ const Attendance = () => {
         .map(([labour_id, status]) => ({ labour_id, status, comment: comments[labour_id] || null }));
       if (records.length === 0) { setError('No changes to save'); return; }
       await attendanceAPI.markBulk({ date: selectedDate, records });
-      // Update originals to reflect saved state
       originalAttendance.current = { ...attendance };
       originalComments.current = { ...comments };
       setSuccess(`Saved ${records.length} record${records.length > 1 ? 's' : ''} successfully!`);
@@ -358,7 +422,7 @@ const Attendance = () => {
       const flip = (window.innerHeight - rect.bottom) < 300;
       setPopupPos({
         top: flip ? rect.top : rect.bottom + 4,
-        left: rect.right - 224, // 224 = w-56 = 14rem
+        left: rect.right - 224,
         flip,
       });
     }
@@ -368,15 +432,12 @@ const Attendance = () => {
   const selectPopupStatus = (statusKey) => {
     if (!popupLabourId) return;
     const current = attendance[popupLabourId];
-    // Toggle: if same status clicked, unmark it
     const newStatus = current === statusKey ? undefined : statusKey;
     setAttendance((prev) => ({ ...prev, [popupLabourId]: newStatus }));
     setPopupLabourId(null);
   };
 
-  const closePopup = () => {
-    setPopupLabourId(null);
-  };
+  const closePopup = () => { setPopupLabourId(null); };
 
   const attVals = Object.values(attendance);
   const dailyStats = {
@@ -388,6 +449,14 @@ const Attendance = () => {
     doubleDuty:  attVals.filter((s) => s === 'double_duty').length,
     notMarked:   labours.length - attVals.filter(Boolean).length,
   };
+
+  // Combined ordered list: named sites first (alphabetical by site name), then Unassigned
+  const allSiteGroups = [
+    ...siteGroups,
+    ...(unassignedLabours.length > 0
+      ? [{ site: { id: 'unassigned', name: 'Unassigned' }, labours: unassignedLabours }]
+      : []),
+  ];
 
   if (loading) {
     return (
@@ -414,7 +483,6 @@ const Attendance = () => {
       {/* Top bar */}
       <div className="card">
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-          {/* Only show view toggle if user can view monthly */}
           {canViewMonthly ? (
             <div className="flex bg-gray-100 dark:bg-gray-700 rounded-lg p-1 gap-1">
               <button
@@ -490,7 +558,7 @@ const Attendance = () => {
         </div>
       </div>
 
-      {/* Status popup (fixed position, outside table to avoid overflow/stacking issues) */}
+      {/* Status popup */}
       {popupLabourId && (
         <>
           <div className="fixed inset-0 z-[60]" onClick={closePopup} />
@@ -520,9 +588,7 @@ const Attendance = () => {
                     </span>
                     <span className="flex-1 text-left font-medium">{meta.desc}</span>
                     <span className="text-xs text-gray-400">{meta.days}d</span>
-                    {isSelected && (
-                      <Check size={16} className="text-primary-600" />
-                    )}
+                    {isSelected && <Check size={16} className="text-primary-600" />}
                   </button>
                 );
               })}
@@ -534,6 +600,7 @@ const Attendance = () => {
       {/* DAILY VIEW */}
       {view === 'daily' && (
         <>
+          {/* Stats row */}
           <div className="grid grid-cols-3 md:grid-cols-7 gap-3">
             {[
               { label: 'Total',      value: dailyStats.total,       bg: 'bg-white dark:bg-gray-800 border dark:border-gray-700', tc: 'text-gray-800 dark:text-gray-100', sc: 'text-gray-500 dark:text-gray-400' },
@@ -552,77 +619,104 @@ const Attendance = () => {
           </div>
 
           <div className="card">
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b dark:border-gray-700">
-                    <th className="text-left py-3 px-4 font-semibold text-gray-700 dark:text-gray-300">Name</th>
-                    <th className="text-center py-3 px-4 font-semibold text-gray-700 dark:text-gray-300">Status</th>
-                    <th className="text-left py-3 px-4 font-semibold text-gray-700 dark:text-gray-300">Comment</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {labours.map((labour) => (
-                    <tr key={labour.id} className="border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700">
-                      <td className="py-4 px-4">
-                        <p className="font-medium text-gray-800 dark:text-gray-100">{labour.name}</p>
-                        {labour.phone && <p className="text-sm text-gray-500 dark:text-gray-400">{labour.phone}</p>}
-                      </td>
-                      <td className="py-4 px-4">
-                        <div className="flex justify-center gap-2 items-center">
-                          {[
-                            { status: 'present',  icon: <Check size={20} />,  hover: 'hover:bg-green-100' },
-                            { status: 'half_day', icon: <Clock size={20} />,  hover: 'hover:bg-yellow-100' },
-                            { status: 'absent',   icon: <X size={20} />,      hover: 'hover:bg-red-100' },
-                          ].map(({ status, icon, hover }) => (
-                            <button
-                              key={status}
-                              onClick={() => handleStatusChange(labour.id, status)}
-                              className={`p-2 rounded-lg transition-colors ${
-                                attendance[labour.id] === status
-                                  ? getStatusColor(status)
-                                  : `bg-gray-100 ${hover} text-gray-600`
-                              }`}
-                              title={STATUS_META[status]?.desc}
-                            >
-                              {icon}
-                            </button>
-                          ))}
-                          {/* Show selected extra status badge if any */}
-                          {(attendance[labour.id] === 'present_half' || attendance[labour.id] === 'double_duty') && (
-                            <span className={`px-2 py-1 rounded-lg text-xs font-bold ${getStatusColor(attendance[labour.id])}`}>
-                              {STATUS_META[attendance[labour.id]]?.label}
-                            </span>
-                          )}
-                          {/* 3-dot menu for extra options */}
-                          <button
-                            ref={(el) => (popupBtnRefs.current[labour.id] = el)}
-                            onClick={() => openPopup(labour.id)}
-                            className="p-2 rounded-lg transition-colors bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-500"
-                            title="More options"
-                          >
-                            <MoreHorizontal size={20} />
-                          </button>
-                        </div>
-                      </td>
-                      <td className="py-4 px-4">
-                        <input
-                          type="text"
-                          placeholder="Add comment..."
-                          value={comments[labour.id] || ''}
-                          onChange={(e) => handleCommentChange(labour.id, e.target.value)}
-                          className="w-full border border-gray-200 dark:border-gray-600 rounded px-2 py-1 text-sm bg-white dark:bg-gray-700 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-primary-500"
-                        />
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            {labours.length === 0 && (
+            {allSiteGroups.length === 0 ? (
               <div className="text-center py-12 text-gray-500 dark:text-gray-400">
                 <Calendar size={48} className="mx-auto mb-4 opacity-50" />
                 <p>No labours found. Add labours first.</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b dark:border-gray-700">
+                      <th className="text-left py-3 px-4 font-semibold text-gray-700 dark:text-gray-300">Name</th>
+                      <th className="text-center py-3 px-4 font-semibold text-gray-700 dark:text-gray-300">Status</th>
+                      <th className="text-left py-3 px-4 font-semibold text-gray-700 dark:text-gray-300">Comment</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {allSiteGroups.map(({ site, labours: siteLabours }) => (
+                      <Fragment key={site.id}>
+                        {/* Site header row */}
+                        <tr
+                          className="bg-gray-50 dark:bg-gray-700/60 cursor-pointer select-none hover:bg-gray-100 dark:hover:bg-gray-700"
+                          onClick={() => toggleSite(site.id)}
+                        >
+                          <td colSpan={3} className="py-2 px-4">
+                            <div className="flex items-center gap-2">
+                              <MapPin size={14} className="text-primary-500 flex-shrink-0" />
+                              <span className="font-semibold text-gray-700 dark:text-gray-200 text-sm uppercase tracking-wide">
+                                {site.name}
+                              </span>
+                              <span className="text-xs text-gray-400 dark:text-gray-500 font-normal normal-case tracking-normal">
+                                ({siteLabours.length} {siteLabours.length === 1 ? 'labour' : 'labours'})
+                              </span>
+                              <span className="ml-auto text-gray-400">
+                                {expandedSites[site.id]
+                                  ? <ChevronUp size={14} />
+                                  : <ChevronDown size={14} />}
+                              </span>
+                            </div>
+                          </td>
+                        </tr>
+
+                        {/* Labour rows for this site */}
+                        {expandedSites[site.id] && siteLabours.map((labour) => (
+                          <tr key={labour.id} className="border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700">
+                            <td className="py-4 px-4">
+                              <p className="font-medium text-gray-800 dark:text-gray-100">{labour.name}</p>
+                              {labour.phone && <p className="text-sm text-gray-500 dark:text-gray-400">{labour.phone}</p>}
+                            </td>
+                            <td className="py-4 px-4">
+                              <div className="flex justify-center gap-2 items-center">
+                                {[
+                                  { status: 'present',  icon: <Check size={20} />,  hover: 'hover:bg-green-100' },
+                                  { status: 'half_day', icon: <Clock size={20} />,  hover: 'hover:bg-yellow-100' },
+                                  { status: 'absent',   icon: <X size={20} />,      hover: 'hover:bg-red-100' },
+                                ].map(({ status, icon, hover }) => (
+                                  <button
+                                    key={status}
+                                    onClick={() => handleStatusChange(labour.id, status)}
+                                    className={`p-2 rounded-lg transition-colors ${
+                                      attendance[labour.id] === status
+                                        ? getStatusColor(status)
+                                        : `bg-gray-100 ${hover} text-gray-600`
+                                    }`}
+                                    title={STATUS_META[status]?.desc}
+                                  >
+                                    {icon}
+                                  </button>
+                                ))}
+                                {(attendance[labour.id] === 'present_half' || attendance[labour.id] === 'double_duty') && (
+                                  <span className={`px-2 py-1 rounded-lg text-xs font-bold ${getStatusColor(attendance[labour.id])}`}>
+                                    {STATUS_META[attendance[labour.id]]?.label}
+                                  </span>
+                                )}
+                                <button
+                                  ref={(el) => (popupBtnRefs.current[labour.id] = el)}
+                                  onClick={() => openPopup(labour.id)}
+                                  className="p-2 rounded-lg transition-colors bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-500"
+                                  title="More options"
+                                >
+                                  <MoreHorizontal size={20} />
+                                </button>
+                              </div>
+                            </td>
+                            <td className="py-4 px-4">
+                              <input
+                                type="text"
+                                placeholder="Add comment..."
+                                value={comments[labour.id] || ''}
+                                onChange={(e) => handleCommentChange(labour.id, e.target.value)}
+                                className="w-full border border-gray-200 dark:border-gray-600 rounded px-2 py-1 text-sm bg-white dark:bg-gray-700 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-primary-500"
+                              />
+                            </td>
+                          </tr>
+                        ))}
+                      </Fragment>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             )}
           </div>
@@ -631,20 +725,48 @@ const Attendance = () => {
 
       {/* MONTHLY VIEW */}
       {view === 'monthly' && (
-        <div className="space-y-3">
-          {labours.length === 0 ? (
+        <div className="space-y-4">
+          {allSiteGroups.length === 0 ? (
             <div className="card text-center py-12 text-gray-500 dark:text-gray-400">
               <Calendar size={48} className="mx-auto mb-4 opacity-50" />
               <p>No labours found.</p>
             </div>
           ) : (
-            labours.map((labour) => (
-              <MonthlyLabourCard
-                key={`${labour.id}-${selectedYear}-${selectedMonth}`}
-                labour={labour}
-                year={selectedYear}
-                month={selectedMonth}
-              />
+            allSiteGroups.map(({ site, labours: siteLabours }) => (
+              <div key={site.id} className="space-y-2">
+                {/* Site header */}
+                <div
+                  className="flex items-center gap-2 px-4 py-2.5 bg-gray-100 dark:bg-gray-700 rounded-lg cursor-pointer select-none hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                  onClick={() => toggleSite(site.id)}
+                >
+                  <MapPin size={16} className="text-primary-500 flex-shrink-0" />
+                  <span className="font-semibold text-gray-700 dark:text-gray-200 uppercase tracking-wide text-sm">
+                    {site.name}
+                  </span>
+                  <span className="text-xs text-gray-400 dark:text-gray-500 font-normal normal-case tracking-normal">
+                    ({siteLabours.length} {siteLabours.length === 1 ? 'labour' : 'labours'})
+                  </span>
+                  <span className="ml-auto text-gray-400">
+                    {expandedSites[site.id]
+                      ? <ChevronUp size={16} />
+                      : <ChevronDown size={16} />}
+                  </span>
+                </div>
+
+                {/* Labour cards for this site */}
+                {expandedSites[site.id] && (
+                  <div className="space-y-2 pl-2">
+                    {siteLabours.map((labour) => (
+                      <MonthlyLabourCard
+                        key={`${labour.id}-${selectedYear}-${selectedMonth}`}
+                        labour={labour}
+                        year={selectedYear}
+                        month={selectedMonth}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
             ))
           )}
         </div>

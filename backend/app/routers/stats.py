@@ -8,7 +8,6 @@ from ..db_wrapper import (
     get_all_labours,
     get_attendance_by_labour,
     get_attendance_by_date,
-    get_attendance_bulk,
     get_salary_records,
     get_salary_records_bulk,
     get_sites,
