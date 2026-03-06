@@ -42,14 +42,15 @@ async def login(response: Response, form_data: OAuth2PasswordRequestForm = Depen
     refresh_token_expires_at = create_refresh_token_expires_at()
     save_refresh_token(user.username, refresh_token_str, refresh_token_expires_at)
     
-    # Set refresh token in httpOnly cookie (secure in production)
+    # Set refresh token in httpOnly cookie
+    # secure=True and samesite="none" required for cross-origin cookies (Vercel frontend + Render backend)
     response.set_cookie(
         key="refresh_token",
         value=refresh_token_str,
         expires=refresh_token_expires_at,
         httponly=True,
-        secure=False,  # Set to True in production with HTTPS
-        samesite="lax"
+        secure=True,
+        samesite="none"
     )
     
     return {"access_token": access_token, "token_type": "bearer"}
@@ -181,8 +182,8 @@ async def refresh_access_token(request: Request, response: Response, refresh_tok
         value=new_refresh_token_str,
         expires=new_refresh_token_expires_at,
         httponly=True,
-        secure=False,  # Set to True in production with HTTPS
-        samesite="lax"
+        secure=True,
+        samesite="none"
     )
     
     return {"access_token": access_token, "token_type": "bearer"}
@@ -204,8 +205,8 @@ async def logout(request: Request, response: Response, refresh_token: Optional[s
     response.delete_cookie(
         key="refresh_token",
         httponly=True,
-        secure=False,  # Set to True in production with HTTPS
-        samesite="lax"
+        secure=True,
+        samesite="none"
     )
     
     return {"message": "Successfully logged out"}
