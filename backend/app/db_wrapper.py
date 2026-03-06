@@ -190,6 +190,21 @@ else:
         init_csv_files
     )
 
+    def get_salary_records_bulk(labour_ids: list) -> dict:
+        from .database import get_salary_records
+        return {labour_id: get_salary_records(labour_id=labour_id) for labour_id in labour_ids}
+
+    def get_all_pending_advances_bulk() -> dict:
+        from .database import get_advances
+        all_advances = get_advances()
+        result = {}
+        for adv in all_advances:
+            if not getattr(adv, 'is_deducted', False):
+                pending = adv.amount - (getattr(adv, 'repaid_amount', 0.0) or 0.0)
+                if pending > 0:
+                    result[adv.labour_id] = result.get(adv.labour_id, 0.0) + pending
+        return result
+
     def mark_advance_deducted(advance_id: str):
         from .database import get_advances
         import pandas as pd
