@@ -225,3 +225,33 @@ class RefreshTokenDB(Base):
     expires_at = Column(DateTime, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
     is_revoked = Column(Boolean, default=False)
+
+
+class CafeItemDB(Base):
+    __tablename__ = "cafe_items"
+
+    id = Column(String(36), primary_key=True, index=True)
+    name = Column(String(200), nullable=False)
+    category = Column(String(100), nullable=False)
+    unit = Column(String(50), nullable=False)
+    description = Column(Text, nullable=True)
+    active = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow)
+
+
+class CafeStockEntryDB(Base):
+    __tablename__ = "cafe_stock_entries"
+
+    id = Column(String(36), primary_key=True, index=True)
+    site_id = Column(String(36), ForeignKey("sites.id"), nullable=False)
+    item_id = Column(String(36), ForeignKey("cafe_items.id"), nullable=False)
+    quantity = Column(Float, nullable=False)
+    unit_price = Column(Float, nullable=True)
+    total_cost = Column(Float, nullable=True)
+    supplier = Column(String(200), nullable=True)
+    entry_date = Column(Date, nullable=False)
+    comments = Column(Text, nullable=True)
+    created_by = Column(String(100), nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow)

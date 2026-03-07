@@ -392,4 +392,43 @@ export const documentsAPI = {
   delete: (labourId, docId) => api.delete(`/documents/${labourId}/${docId}`),
 };
 
+export const cafeItemsAPI = {
+  getAll: (includeInactive = false) =>
+    cached(`cafe:items:${includeInactive}`, () => api.get(`/cafe/items/?include_inactive=${includeInactive}`), 60_000),
+  create: (data) => { invalidateCache('cafe:items:false', 'cafe:items:true'); return api.post('/cafe/items/', data); },
+  update: (id, data) => { invalidateCache('cafe:items:false', 'cafe:items:true'); return api.put(`/cafe/items/${id}`, data); },
+  deactivate: (id) => { invalidateCache('cafe:items:false', 'cafe:items:true'); return api.delete(`/cafe/items/${id}`); },
+};
+
+export const cafeStockAPI = {
+  getEntries: (params = {}) => {
+    const q = new URLSearchParams();
+    if (params.site_id) q.append('site_id', params.site_id);
+    if (params.item_id) q.append('item_id', params.item_id);
+    if (params.start_date) q.append('start_date', params.start_date);
+    if (params.end_date) q.append('end_date', params.end_date);
+    if (params.limit) q.append('limit', params.limit);
+    if (params.offset) q.append('offset', params.offset);
+    return api.get(`/cafe/stock/?${q.toString()}`);
+  },
+  create: (data) => api.post('/cafe/stock/', data),
+  update: (id, data) => api.put(`/cafe/stock/${id}`, data),
+  delete: (id) => api.delete(`/cafe/stock/${id}`),
+  getDashboard: () => cached('cafe:dashboard', () => api.get('/cafe/stock/dashboard'), 30_000),
+  getAnalytics: (params = {}) => {
+    const q = new URLSearchParams();
+    if (params.site_id) q.append('site_id', params.site_id);
+    if (params.start_date) q.append('start_date', params.start_date);
+    if (params.end_date) q.append('end_date', params.end_date);
+    return api.get(`/cafe/stock/analytics?${q.toString()}`);
+  },
+  exportCsv: (params = {}) => {
+    const q = new URLSearchParams();
+    if (params.site_id) q.append('site_id', params.site_id);
+    if (params.start_date) q.append('start_date', params.start_date);
+    if (params.end_date) q.append('end_date', params.end_date);
+    return api.get(`/cafe/stock/export/csv?${q.toString()}`, { responseType: 'blob' });
+  },
+};
+
 export default api;
