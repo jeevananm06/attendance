@@ -27,8 +27,9 @@ export const AuthProvider = ({ children }) => {
 
   const login = async (username, password) => {
     const response = await authAPI.login(username, password);
-    const { access_token } = response.data;
+    const { access_token, refresh_token } = response.data;
     localStorage.setItem('token', access_token);
+    if (refresh_token) localStorage.setItem('refresh_token', refresh_token);
 
     // Decode role from JWT payload instead of making a second request
     const payload = JSON.parse(atob(access_token.split('.')[1]));
@@ -50,6 +51,7 @@ export const AuthProvider = ({ children }) => {
     
     // Clear local storage and state
     localStorage.removeItem('token');
+    localStorage.removeItem('refresh_token');
     localStorage.removeItem('user');
     invalidateCache();
     setUser(null);

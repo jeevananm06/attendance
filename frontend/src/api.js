@@ -85,19 +85,25 @@ api.interceptors.response.use(
       isRefreshing = true;
       
       try {
-        // Try to refresh the token
-        const refreshResponse = await api.post('/auth/refresh', {}, { withCredentials: true });
-        const newToken = refreshResponse.data.access_token;
-        
-        // Update token in localStorage
+        // Try to refresh using refresh_token from localStorage
+        const storedRefreshToken = localStorage.getItem('refresh_token');
+        if (!storedRefreshToken) throw new Error('No refresh token');
+
+        const refreshResponse = await api.post('/auth/refresh', null, {
+          params: { refresh_token: storedRefreshToken },
+        });
+        const { access_token: newToken, refresh_token: newRefreshToken } = refreshResponse.data;
+
+        // Update both tokens in localStorage
         localStorage.setItem('token', newToken);
-        
+        if (newRefreshToken) localStorage.setItem('refresh_token', newRefreshToken);
+
         // Update default authorization header
         api.defaults.headers.common.Authorization = `Bearer ${newToken}`;
-        
+
         // Process queued requests
         processQueue(null, newToken);
-        
+
         // Retry original request with new token
         originalRequest.headers.Authorization = `Bearer ${newToken}`;
         return api(originalRequest);
@@ -105,6 +111,7 @@ api.interceptors.response.use(
         // Refresh failed, clear auth and redirect to login
         processQueue(refreshError, null);
         localStorage.removeItem('token');
+        localStorage.removeItem('refresh_token');
         localStorage.removeItem('user');
         invalidateCache();
         window.location.href = '/login';
@@ -131,8 +138,14 @@ export const authAPI = {
   getMe: () => api.get('/auth/me'),
   getUsers: () => api.get('/auth/users'),
   updateUser: (username, data) => api.put(`/auth/users/${username}`, data),
-  refresh: () => api.post('/auth/refresh', {}),
-  logout: () => api.post('/auth/logout', {}),
+  refresh: () => {
+    const rt = localStorage.getItem('refresh_token');
+    return api.post('/auth/refresh', null, { params: { refresh_token: rt } });
+  },
+  logout: () => {
+    const rt = localStorage.getItem('refresh_token');
+    return api.post('/auth/logout', null, { params: { refresh_token: rt } });
+  },
 };
 
 export const laboursAPI = {

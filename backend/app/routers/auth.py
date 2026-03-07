@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Response, Request
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from fastapi.security import OAuth2PasswordRequestForm
 from datetime import timedelta
 from typing import Optional
@@ -21,7 +21,7 @@ router = APIRouter(prefix="/auth", tags=["Authentication"])
 
 
 @router.post("/login", response_model=Token)
-async def login(response: Response, form_data: OAuth2PasswordRequestForm = Depends()):
+async def login(form_data: OAuth2PasswordRequestForm = Depends()):
     user = authenticate_user(form_data.username, form_data.password)
     if not user:
         raise HTTPException(
@@ -29,31 +29,20 @@ async def login(response: Response, form_data: OAuth2PasswordRequestForm = Depen
             detail="Incorrect username or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    
+
     # Create access token
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
         data={"sub": user.username, "role": user.role.value},
         expires_delta=access_token_expires
     )
-    
+
     # Create and store refresh token
     refresh_token_str = create_refresh_token()
     refresh_token_expires_at = create_refresh_token_expires_at()
     save_refresh_token(user.username, refresh_token_str, refresh_token_expires_at)
-    
-    # Set refresh token in httpOnly cookie
-    # secure=True and samesite="none" required for cross-origin cookies (Vercel frontend + Render backend)
-    response.set_cookie(
-        key="refresh_token",
-        value=refresh_token_str,
-        expires=refresh_token_expires_at,
-        httponly=True,
-        secure=True,
-        samesite="none"
-    )
-    
-    return {"access_token": access_token, "token_type": "bearer"}
+
+    return {"access_token": access_token, "token_type": "bearer", "refresh_token": refresh_token_str}
 
 
 @router.post("/register", response_model=dict)
@@ -132,19 +121,19 @@ async def update_user_info(
 
 
 @router.post("/refresh", response_model=Token)
-async def refresh_access_token(request: Request, response: Response, refresh_token: Optional[str] = None):
-    """Refresh access token using refresh token from cookie or body"""
-    # Get refresh token from cookie or request body
+async def refresh_access_token(request: Request, refresh_token: Optional[str] = None):
+    """Refresh access token using refresh token from request body"""
     token_str = refresh_token
     if not token_str:
+        # Fallback to cookie for backward compatibility
         token_str = request.cookies.get("refresh_token")
-    
+
     if not token_str:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Refresh token required"
         )
-    
+
     # Validate refresh token
     token_data = get_refresh_token(token_str)
     if not token_data:
@@ -152,7 +141,7 @@ async def refresh_access_token(request: Request, response: Response, refresh_tok
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or expired refresh token"
         )
-    
+
     # Get user to include correct role in new access token
     user = get_user(token_data.user_id)
     if not user:
@@ -160,53 +149,31 @@ async def refresh_access_token(request: Request, response: Response, refresh_tok
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="User not found"
         )
-    
+
     # Create new access token
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
         data={"sub": user.username, "role": user.role.value},
         expires_delta=access_token_expires
     )
-    
-    # Create new refresh token and revoke old one
+
+    # Create new refresh token and revoke old one (token rotation)
     new_refresh_token_str = create_refresh_token()
     new_refresh_token_expires_at = create_refresh_token_expires_at()
-    
-    # Save new refresh token and revoke old one
     save_refresh_token(token_data.user_id, new_refresh_token_str, new_refresh_token_expires_at)
     revoke_refresh_token(token_str)
-    
-    # Set new refresh token in httpOnly cookie
-    response.set_cookie(
-        key="refresh_token",
-        value=new_refresh_token_str,
-        expires=new_refresh_token_expires_at,
-        httponly=True,
-        secure=True,
-        samesite="none"
-    )
-    
-    return {"access_token": access_token, "token_type": "bearer"}
+
+    return {"access_token": access_token, "token_type": "bearer", "refresh_token": new_refresh_token_str}
 
 
 @router.post("/logout")
-async def logout(request: Request, response: Response, refresh_token: Optional[str] = None):
-    """Logout user by revoking refresh token and clearing cookie"""
-    # Get refresh token from cookie or request body
+async def logout(request: Request, refresh_token: Optional[str] = None):
+    """Logout user by revoking refresh token"""
     token_str = refresh_token
     if not token_str:
         token_str = request.cookies.get("refresh_token")
-    
-    # Revoke refresh token if exists
+
     if token_str:
         revoke_refresh_token(token_str)
-    
-    # Clear refresh token cookie
-    response.delete_cookie(
-        key="refresh_token",
-        httponly=True,
-        secure=True,
-        samesite="none"
-    )
-    
+
     return {"message": "Successfully logged out"}
