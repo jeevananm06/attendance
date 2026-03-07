@@ -114,7 +114,7 @@ const App = () => {
           <Route
             path="/cafe"
             element={
-              <ProtectedRoute allowedRoles={['admin', 'manager']}>
+              <ProtectedRoute allowedRoles={['admin']}>
                 <CafeDashboard />
               </ProtectedRoute>
             }
@@ -122,7 +122,7 @@ const App = () => {
           <Route
             path="/cafe/entry"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute allowedRoles={['admin']}>
                 <CafeEntry />
               </ProtectedRoute>
             }
@@ -130,7 +130,7 @@ const App = () => {
           <Route
             path="/cafe/history"
             element={
-              <ProtectedRoute allowedRoles={['admin', 'manager']}>
+              <ProtectedRoute allowedRoles={['admin']}>
                 <CafeHistory />
               </ProtectedRoute>
             }
@@ -146,7 +146,7 @@ const App = () => {
           <Route
             path="/cafe/items"
             element={
-              <ProtectedRoute allowedRoles={['admin', 'manager']}>
+              <ProtectedRoute allowedRoles={['admin']}>
                 <CafeItems />
               </ProtectedRoute>
             }
