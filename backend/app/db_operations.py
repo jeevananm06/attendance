@@ -35,7 +35,8 @@ def get_user(username: str) -> Optional[User]:
             username=user.username,
             role=UserRole(user.role),
             hashed_password=user.hashed_password,
-            is_active=user.is_active
+            is_active=user.is_active,
+            cafe_price_access=bool(getattr(user, 'cafe_price_access', False)),
         )
     finally:
         db.close()
@@ -48,7 +49,8 @@ def create_user(user: User) -> User:
             username=user.username,
             role=user.role.value,
             hashed_password=user.hashed_password,
-            is_active=getattr(user, 'is_active', True)
+            is_active=getattr(user, 'is_active', True),
+            cafe_price_access=getattr(user, 'cafe_price_access', False),
         )
         db.add(db_user)
         db.commit()
@@ -61,7 +63,15 @@ def get_all_users() -> List[dict]:
     db = get_db_session()
     try:
         users = db.query(UserDB).all()
-        return [{"username": u.username, "role": u.role, "is_active": u.is_active} for u in users]
+        return [
+            {
+                "username": u.username,
+                "role": u.role,
+                "is_active": u.is_active,
+                "cafe_price_access": bool(getattr(u, 'cafe_price_access', False)),
+            }
+            for u in users
+        ]
     finally:
         db.close()
 
@@ -1308,6 +1318,308 @@ def revoke_all_refresh_tokens(username: str) -> bool:
         return False
     finally:
         db.close()
+
+
+# ============== CAFE INVENTORY OPERATIONS ==============
+
+from .db_models import CafeItemDB, CafeStockEntryDB
+
+
+def create_cafe_item(name: str, category: str, unit: str, description: str = None):
+    from .models import CafeItem
+    db = get_db_session()
+    try:
+        now = datetime.utcnow()
+        item_id = str(uuid.uuid4())[:8]
+        db_item = CafeItemDB(
+            id=item_id, name=name, category=category, unit=unit,
+            description=description, active=True, created_at=now, updated_at=now
+        )
+        db.add(db_item)
+        db.commit()
+        return CafeItem(id=item_id, name=name, category=category, unit=unit,
+                        description=description, active=True, created_at=now, updated_at=now)
+    finally:
+        db.close()
+
+
+def get_cafe_items(include_inactive: bool = False) -> list:
+    from .models import CafeItem
+    db = get_db_session()
+    try:
+        q = db.query(CafeItemDB)
+        if not include_inactive:
+            q = q.filter(CafeItemDB.active == True)
+        rows = q.order_by(CafeItemDB.category, CafeItemDB.name).all()
+        return [CafeItem(id=r.id, name=r.name, category=r.category, unit=r.unit,
+                         description=r.description, active=r.active,
+                         created_at=r.created_at, updated_at=r.updated_at) for r in rows]
+    finally:
+        db.close()
+
+
+def get_cafe_item(item_id: str):
+    from .models import CafeItem
+    db = get_db_session()
+    try:
+        r = db.query(CafeItemDB).filter(CafeItemDB.id == item_id).first()
+        if not r:
+            return None
+        return CafeItem(id=r.id, name=r.name, category=r.category, unit=r.unit,
+                        description=r.description, active=r.active,
+                        created_at=r.created_at, updated_at=r.updated_at)
+    finally:
+        db.close()
+
+
+def update_cafe_item(item_id: str, **kwargs):
+    from .models import CafeItem
+    db = get_db_session()
+    try:
+        r = db.query(CafeItemDB).filter(CafeItemDB.id == item_id).first()
+        if not r:
+            return None
+        for key, val in kwargs.items():
+            if val is not None and hasattr(r, key):
+                setattr(r, key, val)
+        r.updated_at = datetime.utcnow()
+        db.commit()
+        return CafeItem(id=r.id, name=r.name, category=r.category, unit=r.unit,
+                        description=r.description, active=r.active,
+                        created_at=r.created_at, updated_at=r.updated_at)
+    finally:
+        db.close()
+
+
+def create_cafe_stock_entry(site_id: str, item_id: str, quantity: float,
+                             unit_price: float, supplier: str, entry_date,
+                             comments: str, created_by: str):
+    from .models import CafeStockEntry
+    db = get_db_session()
+    try:
+        now = datetime.utcnow()
+        entry_id = str(uuid.uuid4())[:8]
+        total_cost = round(quantity * unit_price, 2) if unit_price is not None else None
+        db_entry = CafeStockEntryDB(
+            id=entry_id, site_id=site_id, item_id=item_id, quantity=quantity,
+            unit_price=unit_price, total_cost=total_cost, supplier=supplier,
+            entry_date=entry_date, comments=comments, created_by=created_by,
+            created_at=now, updated_at=now
+        )
+        db.add(db_entry)
+        db.commit()
+
+        item = db.query(CafeItemDB).filter(CafeItemDB.id == item_id).first()
+        site = db.query(SiteDB).filter(SiteDB.id == site_id).first()
+        return CafeStockEntry(
+            id=entry_id, site_id=site_id, item_id=item_id,
+            site_name=site.name if site else None,
+            item_name=item.name if item else None,
+            item_unit=item.unit if item else None,
+            item_category=item.category if item else None,
+            quantity=quantity, unit_price=unit_price, total_cost=total_cost,
+            supplier=supplier, entry_date=entry_date, comments=comments,
+            created_by=created_by, created_at=now, updated_at=now
+        )
+    finally:
+        db.close()
+
+
+def get_cafe_stock_entries(site_id: str = None, item_id: str = None,
+                            start_date=None, end_date=None,
+                            limit: int = 100, offset: int = 0) -> list:
+    from .models import CafeStockEntry
+    db = get_db_session()
+    try:
+        q = db.query(CafeStockEntryDB)
+        if site_id:
+            q = q.filter(CafeStockEntryDB.site_id == site_id)
+        if item_id:
+            q = q.filter(CafeStockEntryDB.item_id == item_id)
+        if start_date:
+            q = q.filter(CafeStockEntryDB.entry_date >= start_date)
+        if end_date:
+            q = q.filter(CafeStockEntryDB.entry_date <= end_date)
+        rows = q.order_by(CafeStockEntryDB.entry_date.desc(), CafeStockEntryDB.created_at.desc()) \
+                .offset(offset).limit(limit).all()
+
+        item_map = {r.id: r for r in db.query(CafeItemDB).all()}
+        site_map = {r.id: r for r in db.query(SiteDB).all()}
+
+        result = []
+        for r in rows:
+            item = item_map.get(r.item_id)
+            site = site_map.get(r.site_id)
+            result.append(CafeStockEntry(
+                id=r.id, site_id=r.site_id, item_id=r.item_id,
+                site_name=site.name if site else None,
+                item_name=item.name if item else None,
+                item_unit=item.unit if item else None,
+                item_category=item.category if item else None,
+                quantity=r.quantity, unit_price=r.unit_price, total_cost=r.total_cost,
+                supplier=r.supplier, entry_date=r.entry_date, comments=r.comments,
+                created_by=r.created_by, created_at=r.created_at, updated_at=r.updated_at
+            ))
+        return result
+    finally:
+        db.close()
+
+
+def get_cafe_stock_entry(entry_id: str):
+    from .models import CafeStockEntry
+    db = get_db_session()
+    try:
+        r = db.query(CafeStockEntryDB).filter(CafeStockEntryDB.id == entry_id).first()
+        if not r:
+            return None
+        item = db.query(CafeItemDB).filter(CafeItemDB.id == r.item_id).first()
+        site = db.query(SiteDB).filter(SiteDB.id == r.site_id).first()
+        return CafeStockEntry(
+            id=r.id, site_id=r.site_id, item_id=r.item_id,
+            site_name=site.name if site else None,
+            item_name=item.name if item else None,
+            item_unit=item.unit if item else None,
+            item_category=item.category if item else None,
+            quantity=r.quantity, unit_price=r.unit_price, total_cost=r.total_cost,
+            supplier=r.supplier, entry_date=r.entry_date, comments=r.comments,
+            created_by=r.created_by, created_at=r.created_at, updated_at=r.updated_at
+        )
+    finally:
+        db.close()
+
+
+def update_cafe_stock_entry(entry_id: str, **kwargs):
+    from .models import CafeStockEntry
+    db = get_db_session()
+    try:
+        r = db.query(CafeStockEntryDB).filter(CafeStockEntryDB.id == entry_id).first()
+        if not r:
+            return None
+        for key, val in kwargs.items():
+            if val is not None and hasattr(r, key):
+                setattr(r, key, val)
+        # Recalculate total_cost if quantity or unit_price changed
+        if r.unit_price is not None and r.quantity is not None:
+            r.total_cost = round(r.quantity * r.unit_price, 2)
+        r.updated_at = datetime.utcnow()
+        db.commit()
+        item = db.query(CafeItemDB).filter(CafeItemDB.id == r.item_id).first()
+        site = db.query(SiteDB).filter(SiteDB.id == r.site_id).first()
+        return CafeStockEntry(
+            id=r.id, site_id=r.site_id, item_id=r.item_id,
+            site_name=site.name if site else None,
+            item_name=item.name if item else None,
+            item_unit=item.unit if item else None,
+            item_category=item.category if item else None,
+            quantity=r.quantity, unit_price=r.unit_price, total_cost=r.total_cost,
+            supplier=r.supplier, entry_date=r.entry_date, comments=r.comments,
+            created_by=r.created_by, created_at=r.created_at, updated_at=r.updated_at
+        )
+    finally:
+        db.close()
+
+
+def delete_cafe_stock_entry(entry_id: str) -> bool:
+    db = get_db_session()
+    try:
+        deleted = db.query(CafeStockEntryDB).filter(CafeStockEntryDB.id == entry_id).delete()
+        db.commit()
+        return deleted > 0
+    finally:
+        db.close()
+
+
+def get_cafe_analytics(site_id: str = None, start_date=None, end_date=None) -> dict:
+    from sqlalchemy import func, desc
+    db = get_db_session()
+    try:
+        def base_filter(q):
+            if site_id:
+                q = q.filter(CafeStockEntryDB.site_id == site_id)
+            if start_date:
+                q = q.filter(CafeStockEntryDB.entry_date >= start_date)
+            if end_date:
+                q = q.filter(CafeStockEntryDB.entry_date <= end_date)
+            return q
+
+        # By item
+        by_item_q = base_filter(
+            db.query(
+                CafeItemDB.name.label('item_name'),
+                CafeItemDB.category.label('category'),
+                CafeItemDB.unit.label('unit'),
+                func.sum(CafeStockEntryDB.quantity).label('total_quantity'),
+                func.sum(CafeStockEntryDB.total_cost).label('total_cost'),
+                func.count(CafeStockEntryDB.id).label('entry_count')
+            ).join(CafeItemDB, CafeStockEntryDB.item_id == CafeItemDB.id)
+        ).group_by(CafeItemDB.id, CafeItemDB.name, CafeItemDB.category, CafeItemDB.unit) \
+         .order_by(desc('total_quantity'))
+        by_item = [{"item_name": r.item_name, "category": r.category, "unit": r.unit,
+                    "total_quantity": float(r.total_quantity or 0),
+                    "total_cost": float(r.total_cost or 0),
+                    "entry_count": r.entry_count} for r in by_item_q.all()]
+
+        # By site
+        by_site_q = base_filter(
+            db.query(
+                SiteDB.name.label('site_name'),
+                func.sum(CafeStockEntryDB.quantity).label('total_quantity'),
+                func.sum(CafeStockEntryDB.total_cost).label('total_cost'),
+                func.count(CafeStockEntryDB.id).label('entry_count')
+            ).join(SiteDB, CafeStockEntryDB.site_id == SiteDB.id)
+        ).group_by(SiteDB.id, SiteDB.name).order_by(desc('total_cost'))
+        by_site = [{"site_name": r.site_name,
+                    "total_quantity": float(r.total_quantity or 0),
+                    "total_cost": float(r.total_cost or 0),
+                    "entry_count": r.entry_count} for r in by_site_q.all()]
+
+        # Trend by date
+        trend_q = base_filter(
+            db.query(
+                CafeStockEntryDB.entry_date,
+                func.sum(CafeStockEntryDB.total_cost).label('total_cost'),
+                func.sum(CafeStockEntryDB.quantity).label('total_quantity'),
+                func.count(CafeStockEntryDB.id).label('count')
+            )
+        ).group_by(CafeStockEntryDB.entry_date).order_by(CafeStockEntryDB.entry_date)
+        trend = [{"date": str(r.entry_date),
+                  "total_cost": float(r.total_cost or 0),
+                  "total_quantity": float(r.total_quantity or 0),
+                  "count": r.count} for r in trend_q.all()]
+
+        # Summary totals
+        summary_q = base_filter(
+            db.query(
+                func.count(CafeStockEntryDB.id).label('total_entries'),
+                func.sum(CafeStockEntryDB.total_cost).label('total_cost'),
+                func.sum(CafeStockEntryDB.quantity).label('total_quantity'),
+            )
+        ).first()
+        summary = {
+            "total_entries": summary_q.total_entries or 0,
+            "total_cost": float(summary_q.total_cost or 0),
+            "total_quantity": float(summary_q.total_quantity or 0),
+        }
+
+        return {"by_item": by_item, "by_site": by_site, "trend": trend, "summary": summary}
+    finally:
+        db.close()
+
+
+def export_cafe_stock_csv(site_id: str = None, start_date=None, end_date=None) -> str:
+    entries = get_cafe_stock_entries(site_id=site_id, start_date=start_date, end_date=end_date, limit=10000)
+    if not entries:
+        return "id,entry_date,site_name,item_name,category,unit,quantity,unit_price,total_cost,supplier,comments,created_by\n"
+    lines = ["id,entry_date,site_name,item_name,category,unit,quantity,unit_price,total_cost,supplier,comments,created_by"]
+    for e in entries:
+        supplier = (e.supplier or '').replace(',', ';')
+        comments = (e.comments or '').replace(',', ';')
+        lines.append(
+            f"{e.id},{e.entry_date},{e.site_name or ''},{e.item_name or ''},"
+            f"{e.item_category or ''},{e.item_unit or ''},{e.quantity},"
+            f"{e.unit_price or ''},{e.total_cost or ''},{supplier},{comments},{e.created_by}"
+        )
+    return "\n".join(lines)
 
 
 # ============== INITIALIZATION ==============
