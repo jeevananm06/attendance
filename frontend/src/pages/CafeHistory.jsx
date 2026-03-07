@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Search, Download, Trash2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Search, Download, Trash2, ChevronLeft, ChevronRight, Edit2, X, CheckCircle } from 'lucide-react';
 import { cafeItemsAPI, cafeStockAPI, sitesAPI } from '../api';
 import { useAuth } from '../context/AuthContext';
 
@@ -8,6 +8,7 @@ const PAGE_SIZE = 30;
 const CafeHistory = () => {
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
+  const isManagerOrAdmin = user?.role === 'admin' || user?.role === 'manager';
   const canSeeCost = user?.role === 'admin' || (user?.role === 'manager' && user?.cafe_price_access);
 
   const today = new Date().toISOString().split('T')[0];
@@ -20,7 +21,13 @@ const CafeHistory = () => {
   const [loading, setLoading] = useState(true);
   const [offset, setOffset] = useState(0);
   const [exporting, setExporting] = useState(false);
-  const [deleteId, setDeleteId] = useState(null);
+
+  // Edit modal state
+  const [editEntry, setEditEntry] = useState(null);
+  const [editForm, setEditForm] = useState({});
+  const [editSaving, setEditSaving] = useState(false);
+  const [editSuccess, setEditSuccess] = useState(false);
+  const [editError, setEditError] = useState('');
 
   useEffect(() => {
     Promise.all([sitesAPI.getAll(), cafeItemsAPI.getAll(true)]).then(([s, i]) => {
@@ -87,7 +94,56 @@ const CafeHistory = () => {
     } catch {
       alert('Delete failed');
     }
-    setDeleteId(null);
+  };
+
+  const openEdit = (e) => {
+    setEditEntry(e);
+    setEditForm({
+      quantity: e.quantity,
+      unit_price: e.unit_price ?? '',
+      supplier: e.supplier ?? '',
+      entry_date: e.entry_date,
+      comments: e.comments ?? '',
+    });
+    setEditError('');
+    setEditSuccess(false);
+  };
+
+  const closeEdit = () => {
+    setEditEntry(null);
+    setEditError('');
+    setEditSuccess(false);
+  };
+
+  const handleEditChange = (ev) => {
+    setEditForm((prev) => ({ ...prev, [ev.target.name]: ev.target.value }));
+  };
+
+  const handleEditSubmit = async (ev) => {
+    ev.preventDefault();
+    setEditSaving(true);
+    setEditError('');
+    try {
+      const payload = {
+        quantity: parseFloat(editForm.quantity),
+        supplier: editForm.supplier || null,
+        entry_date: editForm.entry_date,
+        comments: editForm.comments || null,
+      };
+      if (canSeeCost && editForm.unit_price !== '') {
+        payload.unit_price = parseFloat(editForm.unit_price);
+      }
+      await cafeStockAPI.update(editEntry.id, payload);
+      setEditSuccess(true);
+      fetchEntries(offset);
+      setTimeout(() => {
+        closeEdit();
+      }, 900);
+    } catch (err) {
+      setEditError(err.response?.data?.detail || 'Failed to save changes');
+    } finally {
+      setEditSaving(false);
+    }
   };
 
   return (
@@ -142,7 +198,7 @@ const CafeHistory = () => {
                   <th className="text-left py-3 px-4 text-gray-500 dark:text-gray-400 font-medium">Supplier</th>
                   <th className="text-left py-3 px-4 text-gray-500 dark:text-gray-400 font-medium">Comments</th>
                   <th className="text-left py-3 px-4 text-gray-500 dark:text-gray-400 font-medium">By</th>
-                  {isAdmin && <th className="py-3 px-4" />}
+                  {isManagerOrAdmin && <th className="py-3 px-4" />}
                 </tr>
               </thead>
               <tbody>
@@ -162,11 +218,26 @@ const CafeHistory = () => {
                     <td className="py-2 px-4 text-gray-500 dark:text-gray-400 text-xs">{e.supplier || '-'}</td>
                     <td className="py-2 px-4 text-gray-500 dark:text-gray-400 text-xs max-w-[150px] truncate">{e.comments || '-'}</td>
                     <td className="py-2 px-4 text-gray-400 text-xs">{e.created_by}</td>
-                    {isAdmin && (
+                    {isManagerOrAdmin && (
                       <td className="py-2 px-4">
-                        <button onClick={() => handleDelete(e.id)} className="text-red-400 hover:text-red-600 transition-colors">
-                          <Trash2 size={15} />
-                        </button>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => openEdit(e)}
+                            className="text-gray-400 hover:text-amber-600 transition-colors"
+                            title="Edit entry"
+                          >
+                            <Edit2 size={15} />
+                          </button>
+                          {isAdmin && (
+                            <button
+                              onClick={() => handleDelete(e.id)}
+                              className="text-red-400 hover:text-red-600 transition-colors"
+                              title="Delete entry"
+                            >
+                              <Trash2 size={15} />
+                            </button>
+                          )}
+                        </div>
                       </td>
                     )}
                   </tr>
@@ -196,6 +267,123 @@ const CafeHistory = () => {
             >
               Next <ChevronRight size={16} />
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Modal */}
+      {editEntry && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl w-full max-w-md">
+            <div className="flex items-center justify-between p-5 border-b dark:border-gray-700">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-100">Edit Stock Entry</h2>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                  {editEntry.item_name} · {editEntry.site_name}
+                </p>
+              </div>
+              <button onClick={closeEdit} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg">
+                <X size={20} />
+              </button>
+            </div>
+
+            <form onSubmit={handleEditSubmit} className="p-5 space-y-4">
+              {editSuccess && (
+                <div className="flex items-center gap-2 p-3 bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400 rounded-lg text-sm">
+                  <CheckCircle size={16} /> Saved successfully!
+                </div>
+              )}
+              {editError && (
+                <div className="p-3 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 rounded-lg text-sm">
+                  {editError}
+                </div>
+              )}
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="label">Quantity * ({editEntry.item_unit})</label>
+                  <input
+                    type="number"
+                    name="quantity"
+                    value={editForm.quantity}
+                    onChange={handleEditChange}
+                    className="input"
+                    min="0"
+                    step="any"
+                    required
+                  />
+                </div>
+                {canSeeCost && (
+                  <div>
+                    <label className="label">Unit Price (₹)</label>
+                    <input
+                      type="number"
+                      name="unit_price"
+                      value={editForm.unit_price}
+                      onChange={handleEditChange}
+                      className="input"
+                      min="0"
+                      step="any"
+                      placeholder="0.00"
+                    />
+                  </div>
+                )}
+              </div>
+
+              {canSeeCost && editForm.quantity && editForm.unit_price && (
+                <div className="p-2 bg-amber-50 dark:bg-amber-900/20 rounded-lg text-xs text-amber-800 dark:text-amber-300">
+                  Total: <strong>₹{(parseFloat(editForm.quantity) * parseFloat(editForm.unit_price)).toFixed(2)}</strong>
+                </div>
+              )}
+
+              <div>
+                <label className="label">Entry Date *</label>
+                <input
+                  type="date"
+                  name="entry_date"
+                  value={editForm.entry_date}
+                  onChange={handleEditChange}
+                  className="input"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="label">Supplier</label>
+                <input
+                  type="text"
+                  name="supplier"
+                  value={editForm.supplier}
+                  onChange={handleEditChange}
+                  className="input"
+                  placeholder="Supplier name"
+                />
+              </div>
+
+              <div>
+                <label className="label">Comments</label>
+                <textarea
+                  name="comments"
+                  value={editForm.comments}
+                  onChange={handleEditChange}
+                  className="input"
+                  rows={2}
+                  placeholder="Any notes..."
+                />
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button type="button" onClick={closeEdit} className="btn-secondary flex-1">
+                  Cancel
+                </button>
+                <button type="submit" disabled={editSaving} className="btn-primary flex-1 flex items-center justify-center gap-2">
+                  {editSaving ? (
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  ) : null}
+                  {editSaving ? 'Saving...' : 'Save Changes'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
