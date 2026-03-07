@@ -35,7 +35,8 @@ def get_user(username: str) -> Optional[User]:
             username=user.username,
             role=UserRole(user.role),
             hashed_password=user.hashed_password,
-            is_active=user.is_active
+            is_active=user.is_active,
+            cafe_price_access=bool(getattr(user, 'cafe_price_access', False)),
         )
     finally:
         db.close()
@@ -48,7 +49,8 @@ def create_user(user: User) -> User:
             username=user.username,
             role=user.role.value,
             hashed_password=user.hashed_password,
-            is_active=getattr(user, 'is_active', True)
+            is_active=getattr(user, 'is_active', True),
+            cafe_price_access=getattr(user, 'cafe_price_access', False),
         )
         db.add(db_user)
         db.commit()
@@ -61,7 +63,15 @@ def get_all_users() -> List[dict]:
     db = get_db_session()
     try:
         users = db.query(UserDB).all()
-        return [{"username": u.username, "role": u.role, "is_active": u.is_active} for u in users]
+        return [
+            {
+                "username": u.username,
+                "role": u.role,
+                "is_active": u.is_active,
+                "cafe_price_access": bool(getattr(u, 'cafe_price_access', False)),
+            }
+            for u in users
+        ]
     finally:
         db.close()
 

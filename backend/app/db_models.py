@@ -37,11 +37,12 @@ class LeaveStatusEnum(str, enum.Enum):
 
 class UserDB(Base):
     __tablename__ = "users"
-    
+
     username = Column(String(100), primary_key=True, index=True)
     role = Column(String(20), default="manager")
     hashed_password = Column(String(255), nullable=False)
     is_active = Column(Boolean, default=True)
+    cafe_price_access = Column(Boolean, default=False)
     created_at = Column(DateTime, default=datetime.utcnow)
 
 

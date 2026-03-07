@@ -5,7 +5,7 @@ import { useAuth } from '../context/AuthContext';
 
 const CafeEntry = () => {
   const { user } = useAuth();
-  const canSeePrice = user?.role === 'admin' || user?.role === 'manager';
+  const canSeePrice = user?.role === 'admin' || (user?.role === 'manager' && user?.cafe_price_access);
 
   const today = new Date().toISOString().split('T')[0];
 

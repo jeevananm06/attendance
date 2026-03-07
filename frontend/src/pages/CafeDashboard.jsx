@@ -39,7 +39,7 @@ const CafeDashboard = () => {
     <div className="card text-red-600 dark:text-red-400">{error}</div>
   );
 
-  const canSeeCost = user?.role === 'admin' || user?.role === 'manager';
+  const canSeeCost = user?.role === 'admin' || (user?.role === 'manager' && user?.cafe_price_access);
 
   return (
     <div className="space-y-6">

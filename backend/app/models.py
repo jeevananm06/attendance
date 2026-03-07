@@ -15,6 +15,7 @@ class User(BaseModel):
     role: UserRole
     hashed_password: str
     is_active: bool = True
+    cafe_price_access: bool = False
 
 
 class UserCreate(BaseModel):
@@ -27,6 +28,7 @@ class UserUpdate(BaseModel):
     password: Optional[str] = None
     role: Optional[UserRole] = None
     is_active: Optional[bool] = None
+    cafe_price_access: Optional[bool] = None
 
 
 class UserLogin(BaseModel):

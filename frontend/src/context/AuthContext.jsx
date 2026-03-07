@@ -31,9 +31,13 @@ export const AuthProvider = ({ children }) => {
     localStorage.setItem('token', access_token);
     if (refresh_token) localStorage.setItem('refresh_token', refresh_token);
 
-    // Decode role from JWT payload instead of making a second request
+    // Decode role and permissions from JWT payload instead of making a second request
     const payload = JSON.parse(atob(access_token.split('.')[1]));
-    const userData = { username: payload.sub, role: payload.role };
+    const userData = {
+      username: payload.sub,
+      role: payload.role,
+      cafe_price_access: payload.cafe_price_access || false,
+    };
     localStorage.setItem('user', JSON.stringify(userData));
     setUser(userData);
 

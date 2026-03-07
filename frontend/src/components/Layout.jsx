@@ -41,7 +41,7 @@ const cafeNavItems = [
   { path: '/cafe', icon: Coffee, label: 'Cafe Overview', roles: ['admin', 'manager'] },
   { path: '/cafe/entry', icon: PackagePlus, label: 'Stock Entry' },
   { path: '/cafe/history', icon: ClipboardList, label: 'Entry History', roles: ['admin', 'manager'] },
-  { path: '/cafe/analytics', icon: TrendingUp, label: 'Cafe Analytics', roles: ['admin', 'manager'] },
+  { path: '/cafe/analytics', icon: TrendingUp, label: 'Cafe Analytics', roles: ['admin'] },
   { path: '/cafe/items', icon: Package, label: 'Manage Items', roles: ['admin', 'manager'] },
 ];
 

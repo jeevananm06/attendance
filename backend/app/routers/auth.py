@@ -33,7 +33,7 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()):
     # Create access token
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
-        data={"sub": user.username, "role": user.role.value},
+        data={"sub": user.username, "role": user.role.value, "cafe_price_access": user.cafe_price_access},
         expires_delta=access_token_expires
     )
 
@@ -108,7 +108,8 @@ async def update_user_info(
         username,
         hashed_password=hashed_password,
         role=user_data.role,
-        is_active=user_data.is_active
+        is_active=user_data.is_active,
+        cafe_price_access=user_data.cafe_price_access,
     )
     
     if not updated:
@@ -153,7 +154,7 @@ async def refresh_access_token(request: Request, refresh_token: Optional[str] = 
     # Create new access token
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
-        data={"sub": user.username, "role": user.role.value},
+        data={"sub": user.username, "role": user.role.value, "cafe_price_access": user.cafe_price_access},
         expires_delta=access_token_expires
     )
 

@@ -138,7 +138,7 @@ const App = () => {
           <Route
             path="/cafe/analytics"
             element={
-              <ProtectedRoute allowedRoles={['admin', 'manager']}>
+              <ProtectedRoute allowedRoles={['admin']}>
                 <CafeAnalytics />
               </ProtectedRoute>
             }

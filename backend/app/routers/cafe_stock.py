@@ -15,13 +15,19 @@ from ..db_wrapper import (
 
 router = APIRouter(prefix="/cafe/stock", tags=["Cafe Stock"])
 
-PRICE_ROLES = {"admin", "manager"}
+def _can_see_price(user: User) -> bool:
+    """Return True if the user is allowed to see price/cost fields."""
+    if user.role == "admin":
+        return True
+    if user.role == "manager" and getattr(user, "cafe_price_access", False):
+        return True
+    return False
 
 
-def _strip_price(entry: CafeStockEntry, role: str) -> dict:
-    """Remove price fields for labour role"""
+def _strip_price(entry: CafeStockEntry, user: User) -> dict:
+    """Remove price fields for users without price access."""
     d = entry.dict()
-    if role not in PRICE_ROLES:
+    if not _can_see_price(user):
         d["unit_price"] = None
         d["total_cost"] = None
     return d
@@ -47,10 +53,10 @@ async def cafe_dashboard(
     return {
         "today_count": len(today_entries),
         "month_count": len(month_entries),
-        "month_cost": round(month_cost, 2),
+        "month_cost": round(month_cost, 2) if _can_see_price(current_user) else None,
         "total_entries": len(all_entries),
         "total_sites": len(sites),
-        "recent_entries": [_strip_price(e, current_user.role) for e in recent],
+        "recent_entries": [_strip_price(e, current_user) for e in recent],
     }
 
 
@@ -59,11 +65,10 @@ async def cafe_analytics(
     site_id: Optional[str] = None,
     start_date: Optional[date] = None,
     end_date: Optional[date] = None,
-    current_user: User = Depends(get_current_manager_or_admin)
+    current_user: User = Depends(get_current_admin)
 ):
-    """Analytics data for charts"""
+    """Analytics data for charts (admin only)"""
     data = get_cafe_analytics(site_id=site_id, start_date=start_date, end_date=end_date)
-    # Strip cost data for manager? No - manager can see analytics costs per spec
     return data
 
 
@@ -99,7 +104,7 @@ async def list_entries(
         start_date=start_date, end_date=end_date,
         limit=limit, offset=offset
     )
-    return [_strip_price(e, current_user.role) for e in entries]
+    return [_strip_price(e, current_user) for e in entries]
 
 
 @router.post("/", response_model=dict)
@@ -108,9 +113,9 @@ async def create_entry(
     current_user: User = Depends(get_current_authenticated_user)
 ):
     """Log a new stock entry (all authenticated users)"""
-    # Labour cannot submit unit_price
+    # Only users with price access can submit unit_price
     unit_price = data.unit_price
-    if current_user.role not in PRICE_ROLES:
+    if not _can_see_price(current_user):
         unit_price = None
 
     entry = create_cafe_stock_entry(
@@ -125,7 +130,7 @@ async def create_entry(
     )
     if not entry:
         raise HTTPException(status_code=500, detail="Failed to create stock entry")
-    return _strip_price(entry, current_user.role)
+    return _strip_price(entry, current_user)
 
 
 @router.get("/{entry_id}", response_model=dict)
@@ -136,7 +141,7 @@ async def get_entry(
     entry = get_cafe_stock_entry(entry_id)
     if not entry:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Entry not found")
-    return _strip_price(entry, current_user.role)
+    return _strip_price(entry, current_user)
 
 
 @router.put("/{entry_id}", response_model=dict)
@@ -150,11 +155,11 @@ async def update_entry(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Entry not found")
 
     update_data = {k: v for k, v in data.dict().items() if v is not None}
-    if current_user.role not in PRICE_ROLES:
+    if not _can_see_price(current_user):
         update_data.pop("unit_price", None)
 
     entry = update_cafe_stock_entry(entry_id, **update_data)
-    return _strip_price(entry, current_user.role)
+    return _strip_price(entry, current_user)
 
 
 @router.delete("/{entry_id}")

@@ -8,7 +8,7 @@ const PAGE_SIZE = 30;
 const CafeHistory = () => {
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
-  const canSeeCost = user?.role === 'admin' || user?.role === 'manager';
+  const canSeeCost = user?.role === 'admin' || (user?.role === 'manager' && user?.cafe_price_access);
 
   const today = new Date().toISOString().split('T')[0];
   const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
