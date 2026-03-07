@@ -113,18 +113,30 @@ async def startup_event():
             print(f"DB MIGRATION WARNING: {e}", flush=True)
 
     # Add cafe_price_access column to users table if it doesn't exist yet
-    try:
-        from .db_connection import engine
-        from sqlalchemy import text
-        with engine.connect() as conn:
-            conn.execute(text(
-                "ALTER TABLE users ADD COLUMN cafe_price_access BOOLEAN DEFAULT 0"
-            ))
-            conn.commit()
-        print("DB MIGRATION: cafe_price_access column added to users", flush=True)
-    except Exception as e:
-        # Column already exists — ignore
-        print(f"DB MIGRATION (cafe_price_access): {e}", flush=True)
+    if USE_POSTGRES:
+        try:
+            from .db_connection import engine
+            from sqlalchemy import text
+            with engine.connect() as conn:
+                conn.execute(text(
+                    "ALTER TABLE users ADD COLUMN IF NOT EXISTS cafe_price_access BOOLEAN DEFAULT FALSE"
+                ))
+                conn.commit()
+            print("DB MIGRATION: cafe_price_access column ensured in users", flush=True)
+        except Exception as e:
+            print(f"DB MIGRATION (cafe_price_access): {e}", flush=True)
+    else:
+        try:
+            from .db_connection import engine
+            from sqlalchemy import text
+            with engine.connect() as conn:
+                conn.execute(text(
+                    "ALTER TABLE users ADD COLUMN cafe_price_access BOOLEAN DEFAULT 0"
+                ))
+                conn.commit()
+            print("DB MIGRATION: cafe_price_access column added to users (sqlite)", flush=True)
+        except Exception as e:
+            print(f"DB MIGRATION (cafe_price_access sqlite): {e}", flush=True)
     
     try:
         existing = get_user("admin")
