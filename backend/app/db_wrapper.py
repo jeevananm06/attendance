@@ -19,7 +19,7 @@ if USE_POSTGRES:
         # Attendance operations
         get_attendance_by_date, get_attendance_by_labour, get_attendance_bulk, mark_attendance, delete_attendance, purge_absent_attendance_records,
         # Salary operations
-        get_salary_records, get_salary_records_bulk, create_salary_record, mark_salary_paid,
+        get_salary_records, get_salary_records_bulk, create_salary_record, mark_salary_paid, delete_unpaid_salary_records,
         # Overtime operations
         create_overtime, get_overtime_records,
         # Advance operations
@@ -190,7 +190,7 @@ else:
 
     from .database import (
         # Salary operations
-        get_salary_records, create_salary_record, mark_salary_paid,
+        get_salary_records, create_salary_record, mark_salary_paid, delete_unpaid_salary_records,
         # Overtime operations
         create_overtime, get_overtime_records,
         # Advance operations

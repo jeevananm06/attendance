@@ -367,6 +367,18 @@ def get_salary_records(labour_id: str = None, is_paid: bool = None) -> List[Sala
     return records
 
 
+def delete_unpaid_salary_records(labour_id: str) -> int:
+    """Delete all unpaid salary records for a labour. Returns count deleted."""
+    if not SALARY_FILE.exists():
+        return 0
+    df = pd.read_csv(SALARY_FILE)
+    mask = (df["labour_id"] == labour_id) & (df["is_paid"] == False)
+    count = int(mask.sum())
+    df = df[~mask]
+    df.to_csv(SALARY_FILE, index=False)
+    return count
+
+
 def create_salary_record(labour_id: str, week_start: date, week_end: date, 
                          days_present: float, daily_wage: float) -> SalaryRecord:
     salary_id = str(uuid.uuid4())[:8]

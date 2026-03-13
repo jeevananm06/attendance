@@ -447,6 +447,19 @@ def get_salary_records(labour_id: str = None, is_paid: bool = None) -> List[Sala
         db.close()
 
 
+def delete_unpaid_salary_records(labour_id: str) -> int:
+    """Delete all unpaid salary records for a labour. Returns count deleted."""
+    db = get_db_session()
+    try:
+        count = db.query(SalaryDB).filter(
+            and_(SalaryDB.labour_id == labour_id, SalaryDB.is_paid == False)
+        ).delete()
+        db.commit()
+        return count
+    finally:
+        db.close()
+
+
 def create_salary_record(labour_id: str, week_start: date, week_end: date,
                          days_present: float, daily_wage: float) -> SalaryRecord:
     db = get_db_session()
