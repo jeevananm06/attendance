@@ -241,7 +241,7 @@ const Stats = () => {
         </div>
       )}
 
-      {/* Weekly Wages by Site — Stacked Bar Chart (Admin only) */}
+      {/* Weekly Wages by Site — Line Chart (Admin only) */}
       {isAdmin && siteWeekly && siteWeekly.site_names.length > 0 && (
         <div className="card">
           <div className="flex items-center gap-2 mb-4">
@@ -251,7 +251,7 @@ const Stats = () => {
             </h3>
           </div>
           <ResponsiveContainer width="100%" height={300}>
-            <BarChart
+            <LineChart
               data={siteWeekly.weeks}
               margin={{ top: 5, right: 20, left: 10, bottom: 5 }}
             >
@@ -261,16 +261,18 @@ const Stats = () => {
               <Tooltip formatter={(value) => `₹${Number(value).toLocaleString()}`} />
               <Legend />
               {siteWeekly.site_names.map((site, idx) => (
-                <Bar
+                <Line
                   key={site}
+                  type="monotone"
                   dataKey={site}
                   name={site}
-                  stackId="wages"
-                  fill={SITE_COLORS[idx % SITE_COLORS.length]}
-                  radius={idx === siteWeekly.site_names.length - 1 ? [4, 4, 0, 0] : [0, 0, 0, 0]}
+                  stroke={SITE_COLORS[idx % SITE_COLORS.length]}
+                  strokeWidth={2}
+                  dot={{ r: 4 }}
+                  activeDot={{ r: 6 }}
                 />
               ))}
-            </BarChart>
+            </LineChart>
           </ResponsiveContainer>
         </div>
       )}
