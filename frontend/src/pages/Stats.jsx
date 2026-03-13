@@ -27,6 +27,10 @@ import {
 } from 'recharts';
 
 const COLORS = ['#22c55e', '#eab308', '#ef4444', '#6b7280'];
+const SITE_COLORS = [
+  '#3b82f6', '#f97316', '#a855f7', '#ec4899',
+  '#14b8a6', '#f59e0b', '#ef4444', '#6366f1',
+];
 
 const Stats = () => {
   const { isAdmin } = useAuth();
@@ -34,6 +38,7 @@ const Stats = () => {
   const [weeklyStats, setWeeklyStats] = useState(null);
   const [labourStats, setLabourStats] = useState(null);
   const [siteCosts, setSiteCosts] = useState(null);
+  const [siteWeekly, setSiteWeekly] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [selectedLabour, setSelectedLabour] = useState(null);
@@ -57,6 +62,7 @@ const Stats = () => {
       setLabourStats(labourRes.data);
       if (isAdmin) {
         statsAPI.getSiteCosts().then(r => setSiteCosts(r.data)).catch(() => {});
+        statsAPI.getWeeklyBySite(8).then(r => setSiteWeekly(r.data)).catch(() => {});
       }
     } catch (err) {
       setError('Failed to load statistics');
@@ -230,6 +236,40 @@ const Stats = () => {
               <Bar dataKey="total_earned" name="Earned" fill="#3b82f6" radius={[4, 4, 0, 0]} />
               <Bar dataKey="total_paid" name="Paid" fill="#22c55e" radius={[4, 4, 0, 0]} />
               <Bar dataKey="balance" name="Balance" fill="#f97316" radius={[4, 4, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      )}
+
+      {/* Weekly Wages by Site — Stacked Bar Chart (Admin only) */}
+      {isAdmin && siteWeekly && siteWeekly.site_names.length > 0 && (
+        <div className="card">
+          <div className="flex items-center gap-2 mb-4">
+            <MapPin className="text-primary-600" size={20} />
+            <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100">
+              Weekly Wages by Site (Last 8 Weeks)
+            </h3>
+          </div>
+          <ResponsiveContainer width="100%" height={300}>
+            <BarChart
+              data={siteWeekly.weeks}
+              margin={{ top: 5, right: 20, left: 10, bottom: 5 }}
+            >
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="label" tick={{ fontSize: 12 }} />
+              <YAxis tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`} />
+              <Tooltip formatter={(value) => `₹${Number(value).toLocaleString()}`} />
+              <Legend />
+              {siteWeekly.site_names.map((site, idx) => (
+                <Bar
+                  key={site}
+                  dataKey={site}
+                  name={site}
+                  stackId="wages"
+                  fill={SITE_COLORS[idx % SITE_COLORS.length]}
+                  radius={idx === siteWeekly.site_names.length - 1 ? [4, 4, 0, 0] : [0, 0, 0, 0]}
+                />
+              ))}
             </BarChart>
           </ResponsiveContainer>
         </div>

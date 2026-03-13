@@ -225,6 +225,54 @@ async def get_site_cost_stats(
     }
 
 
+@router.get("/weekly-by-site")
+async def get_weekly_wages_by_site(
+    weeks: int = 8,
+    current_user: User = Depends(get_current_admin)
+):
+    """Get weekly wage breakdown per site for last N weeks (Admin only)"""
+    from ..salary_calculator import get_week_boundaries
+
+    today = date.today()
+    sites = get_sites()
+    all_salary = get_salary_records()
+    all_labours = get_all_labours(include_inactive=True)
+
+    # Build site_name → set(labour_ids) map
+    site_labour_map = {}
+    all_assigned_ids = set()
+    for site in sites:
+        ids = set(get_labours_by_site(site.id))
+        if ids:
+            site_labour_map[site.name] = ids
+            all_assigned_ids |= ids
+
+    unassigned_ids = set(l.id for l in all_labours) - all_assigned_ids
+    if unassigned_ids:
+        site_labour_map["Unassigned"] = unassigned_ids
+
+    site_names = list(site_labour_map.keys())
+    result = []
+
+    for i in range(weeks - 1, -1, -1):
+        target_date = today - timedelta(weeks=i)
+        week_start, week_end = get_week_boundaries(target_date)
+        week_records = [r for r in all_salary if r.week_end == week_end]
+
+        entry = {
+            "week_end": week_end.isoformat(),
+            "label": week_end.strftime("%d %b"),
+        }
+        for site_name, labour_ids in site_labour_map.items():
+            entry[site_name] = sum(
+                r.total_amount for r in week_records if r.labour_id in labour_ids
+            )
+
+        result.append(entry)
+
+    return {"weeks": result, "site_names": site_names}
+
+
 @router.get("/trends")
 async def get_attendance_trends(
     labour_id: str,

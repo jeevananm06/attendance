@@ -261,6 +261,8 @@ export const statsAPI = {
   getWeekly: (weeks = 4) => cached(`stats:weekly:${weeks}`, () => api.get(`/stats/weekly?weeks=${weeks}`), 60_000),
   getAllLabourStats: () => cached('stats:all-labours', () => api.get('/stats/all-labours'), 60_000),
   getSiteCosts: () => cached('stats:sites', () => api.get('/stats/sites'), 60_000),
+  getWeeklyBySite: (weeks = 8) =>
+    cached(`stats:weekly-by-site:${weeks}`, () => api.get(`/stats/weekly-by-site?weeks=${weeks}`), 60_000),
   getTrends: (labourId, weeks = 12) =>
     api.get(`/stats/trends?labour_id=${labourId}&weeks=${weeks}`),
 };
@@ -388,7 +390,8 @@ export const documentsAPI = {
       headers: { 'Content-Type': 'multipart/form-data' }
     });
   },
-  getDownloadUrl: (labourId, docId) => `${api.defaults.baseURL}/documents/${labourId}/${docId}/download`,
+  download: (labourId, docId) =>
+    api.get(`/documents/${labourId}/${docId}/download`, { responseType: 'blob' }),
   delete: (labourId, docId) => api.delete(`/documents/${labourId}/${docId}`),
 };
 
