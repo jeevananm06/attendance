@@ -6,7 +6,7 @@ from datetime import date
 
 from ..models import SalaryRecord, SalaryPayment, User
 from ..auth import get_current_manager_or_admin, get_current_admin
-from ..db_wrapper import get_salary_records, mark_salary_paid, get_all_labours, get_labour, create_notification, get_pending_advances, get_advances, repay_advance_partial, mark_advance_deducted
+from ..db_wrapper import get_salary_records, mark_salary_paid, get_all_labours, get_labour, create_notification, get_pending_advances, get_advances, repay_advance_partial, mark_advance_deducted, delete_unpaid_salary_records
 from ..whatsapp_service import send_whatsapp_message
 from ..push_service import send_push_to_user
 
@@ -129,7 +129,11 @@ async def calculate_salary_for_labour(
     
     if week_end is None:
         week_end = get_last_friday()
-    
+
+    # Wipe existing unpaid records so stale periods (e.g. from a joined_date
+    # change) don't persist alongside the freshly calculated ones
+    delete_unpaid_salary_records(labour_id)
+
     records = calculate_all_pending_weeks(labour_id, week_end)
     return {
         "labour_id": labour_id,
