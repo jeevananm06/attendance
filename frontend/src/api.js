@@ -388,7 +388,8 @@ export const documentsAPI = {
       headers: { 'Content-Type': 'multipart/form-data' }
     });
   },
-  getDownloadUrl: (labourId, docId) => `${api.defaults.baseURL}/documents/${labourId}/${docId}/download`,
+  download: (labourId, docId) =>
+    api.get(`/documents/${labourId}/${docId}/download`, { responseType: 'blob' }),
   delete: (labourId, docId) => api.delete(`/documents/${labourId}/${docId}`),
 };
 

@@ -840,6 +840,25 @@ const DocumentsTab = ({ labours, isAdmin, setError, setSuccess }) => {
     }
   };
 
+  const handleView = async (doc) => {
+    try {
+      const res = await documentsAPI.download(selectedLabour, doc.id);
+      const blob = new Blob([res.data], { type: res.headers['content-type'] });
+      const url = URL.createObjectURL(blob);
+      const a = window.open(url, '_blank');
+      if (!a) {
+        // Fallback: force download if popup blocked
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = doc.original_name;
+        link.click();
+      }
+      setTimeout(() => URL.revokeObjectURL(url), 10000);
+    } catch (err) {
+      setError('Failed to open document');
+    }
+  };
+
   const handleDelete = async (docId) => {
     if (!confirm('Delete this document?')) return;
     try {
@@ -910,15 +929,13 @@ const DocumentsTab = ({ labours, isAdmin, setError, setSuccess }) => {
                 </div>
               </div>
               <div className="flex gap-2">
-                <a
-                  href={documentsAPI.getDownloadUrl(selectedLabour, doc.id)}
-                  target="_blank"
-                  rel="noopener noreferrer"
+                <button
+                  onClick={() => handleView(doc)}
                   className="p-2 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 text-blue-600"
                   title="View / Download"
                 >
                   <Eye size={16} />
-                </a>
+                </button>
                 {isAdmin && (
                   <button
                     onClick={() => handleDelete(doc.id)}
