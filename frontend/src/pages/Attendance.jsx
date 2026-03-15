@@ -36,7 +36,7 @@ function toYMD(year, month, day) {
 const MONTH_NAMES = ['January','February','March','April','May','June',
   'July','August','September','October','November','December'];
 
-const MonthlyLabourCard = ({ labour, year, month }) => {
+const MonthlyLabourCard = ({ labour, year, month, isAdmin }) => {
   const [monthAttendance, setMonthAttendance] = useState({});
   const [expanded, setExpanded] = useState(false);
   const [loadingMonth, setLoadingMonth] = useState(false);
@@ -71,7 +71,7 @@ const MonthlyLabourCard = ({ labour, year, month }) => {
       const end   = toYMD(year, month, daysInMonth);
       const res   = await attendanceAPI.getByLabour(labour.id, start, end);
       const map   = {};
-      res.data.forEach((r) => { map[r.date] = r.status; });
+      res.data.forEach((r) => { map[r.date] = { status: r.status, comment: r.comment || '' }; });
       setMonthAttendance(map);
     } catch (e) {
       console.error(e);
@@ -85,11 +85,11 @@ const MonthlyLabourCard = ({ labour, year, month }) => {
   }, [expanded, fetchMonthData]);
 
   const vals = Object.values(monthAttendance);
-  const present     = vals.filter((s) => s === 'present').length;
-  const halfDay     = vals.filter((s) => s === 'half_day').length;
-  const absent      = vals.filter((s) => s === 'absent').length;
-  const presentHalf = vals.filter((s) => s === 'present_half').length;
-  const doubleDuty  = vals.filter((s) => s === 'double_duty').length;
+  const present     = vals.filter((v) => v.status === 'present').length;
+  const halfDay     = vals.filter((v) => v.status === 'half_day').length;
+  const absent      = vals.filter((v) => v.status === 'absent').length;
+  const presentHalf = vals.filter((v) => v.status === 'present_half').length;
+  const doubleDuty  = vals.filter((v) => v.status === 'double_duty').length;
   const daysWorked  = present + halfDay * 0.5 + presentHalf * 1.5 + doubleDuty * 2.0;
   const earned      = daysWorked * labour.daily_wage;
 
@@ -105,7 +105,7 @@ const MonthlyLabourCard = ({ labour, year, month }) => {
           </div>
           <div>
             <p className="font-semibold text-gray-800 dark:text-gray-100">{labour.name}</p>
-            <p className="text-xs text-gray-500 dark:text-gray-400">₹{labour.daily_wage}/day</p>
+            {isAdmin && <p className="text-xs text-gray-500 dark:text-gray-400">₹{labour.daily_wage}/day</p>}
           </div>
         </div>
         <div className="flex items-center gap-3">
@@ -139,7 +139,7 @@ const MonthlyLabourCard = ({ labour, year, month }) => {
             </button>
           </div>
           <div className="text-right">
-            <p className="font-bold text-gray-800 dark:text-gray-100">₹{earned.toLocaleString()}</p>
+            {isAdmin && <p className="font-bold text-gray-800 dark:text-gray-100">₹{earned.toLocaleString()}</p>}
             <p className="text-xs text-gray-400 dark:text-gray-500">{daysWorked} days</p>
           </div>
           {expanded
@@ -174,22 +174,28 @@ const MonthlyLabourCard = ({ labour, year, month }) => {
                   for (let i = 0; i < firstDow; i++) cells.push(<div key={`pad-${i}`} />);
                   for (let d = 1; d <= daysInMonth; d++) {
                     const ymd      = toYMD(year, month, d);
-                    const status   = monthAttendance[ymd];
+                    const entry    = monthAttendance[ymd];
+                    const status   = entry?.status;
+                    const comment  = entry?.comment;
                     const isFuture = ymd > today;
                     const meta     = STATUS_META[status];
                     cells.push(
                       <div
                         key={d}
-                        className={`rounded border text-center py-1 select-none ${
+                        title={comment || undefined}
+                        className={`relative rounded border text-center py-1 select-none ${
                           isFuture
                             ? 'bg-white border-gray-100 text-gray-200'
                             : meta
                               ? `${meta.light} border`
                               : 'bg-white border-gray-200 text-gray-400'
-                        }`}
+                        } ${comment ? 'cursor-help' : ''}`}
                       >
                         <div className="text-[9px] text-gray-400">{d}</div>
                         <div className="text-xs font-bold leading-tight">{meta ? meta.label : '–'}</div>
+                        {comment && (
+                          <div className="absolute bottom-0.5 right-0.5 w-1.5 h-1.5 rounded-full bg-orange-400" title={comment} />
+                        )}
                       </div>
                     );
                   }
@@ -217,7 +223,7 @@ const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Frid
 const Attendance = () => {
   const { isAdmin, isManager } = useAuth();
   const canEditAttendance = isAdmin || isManager;
-  const canViewMonthly = isAdmin;
+  const canViewMonthly = isAdmin || isManager;
 
   const [view, setView] = useState('daily');
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
@@ -751,6 +757,7 @@ const Attendance = () => {
                         labour={labour}
                         year={selectedYear}
                         month={selectedMonth}
+                        isAdmin={isAdmin}
                       />
                     ))}
                   </div>
