@@ -573,21 +573,19 @@ const Salary = () => {
                                           <th className="text-right px-2 py-1.5 text-gray-600 dark:text-gray-400">Paid</th>
                                           <th className="text-right px-2 py-1.5 text-gray-600 dark:text-gray-400">Balance</th>
                                           <th className="text-center px-2 py-1.5 text-gray-600 dark:text-gray-400">Status</th>
-                                          <th className="text-left px-2 py-1.5 text-gray-600 dark:text-gray-400">Paid Date</th>
-                                          <th className="text-left px-2 py-1.5 text-gray-600 dark:text-gray-400">Paid By</th>
-                                          <th className="text-left px-2 py-1.5 text-gray-600 dark:text-gray-400">Comment</th>
+                                          <th className="text-left px-2 py-1.5 text-gray-600 dark:text-gray-400">Payment History</th>
                                         </tr>
                                       </thead>
                                       <tbody>
                                         {l.weeks.map((w, idx) => (
-                                          <tr key={idx} className="border-t border-gray-200 dark:border-gray-600">
-                                            <td className="px-2 py-1.5 text-gray-700 dark:text-gray-300">
-                                              {new Date(w.week_start).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })} - {new Date(w.week_end).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}
+                                          <tr key={idx} className="border-t border-gray-200 dark:border-gray-600 align-top">
+                                            <td className="px-2 py-1.5 text-gray-700 dark:text-gray-300 whitespace-nowrap">
+                                              {new Date(w.week_start).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })} – {new Date(w.week_end).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}
                                             </td>
                                             <td className="px-2 py-1.5 text-center text-gray-600 dark:text-gray-400">{w.days_present}</td>
                                             <td className="px-2 py-1.5 text-right text-gray-700 dark:text-gray-300">₹{w.total_amount.toLocaleString()}</td>
                                             <td className="px-2 py-1.5 text-right text-green-600">₹{w.paid_amount.toLocaleString()}</td>
-                                            <td className={`px-2 py-1.5 text-right ${(w.total_amount - w.paid_amount) > 0 ? 'text-orange-500' : 'text-green-500'}`}>
+                                            <td className={`px-2 py-1.5 text-right font-medium ${(w.total_amount - w.paid_amount) > 0 ? 'text-orange-500' : 'text-green-500'}`}>
                                               ₹{(w.total_amount - w.paid_amount).toLocaleString()}
                                             </td>
                                             <td className="px-2 py-1.5 text-center">
@@ -605,12 +603,28 @@ const Salary = () => {
                                                 </span>
                                               )}
                                             </td>
-                                            <td className="px-2 py-1.5 text-gray-600 dark:text-gray-400">
-                                              {w.paid_date ? new Date(w.paid_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '-'}
-                                            </td>
-                                            <td className="px-2 py-1.5 text-gray-600 dark:text-gray-400">{w.paid_by || '-'}</td>
-                                            <td className="px-2 py-1.5 text-gray-600 dark:text-gray-400 max-w-[150px] truncate" title={w.payment_comment || ''}>
-                                              {w.payment_comment || '-'}
+                                            {/* Payment log entries for this week */}
+                                            <td className="px-2 py-1.5">
+                                              {(!w.payments || w.payments.length === 0) ? (
+                                                <span className="text-gray-400 dark:text-gray-500">—</span>
+                                              ) : (
+                                                <div className="space-y-1">
+                                                  {w.payments.map((p) => (
+                                                    <div key={p.id} className="flex items-start gap-2 text-[11px]">
+                                                      <span className="font-semibold text-green-600 whitespace-nowrap">₹{p.amount.toLocaleString()}</span>
+                                                      <span className="text-gray-500 dark:text-gray-400 whitespace-nowrap">
+                                                        {new Date(p.paid_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: '2-digit' })}
+                                                      </span>
+                                                      <span className="text-gray-500 dark:text-gray-400">by {p.paid_by}</span>
+                                                      {p.comment && (
+                                                        <span className="text-gray-400 dark:text-gray-500 italic truncate max-w-[120px]" title={p.comment}>
+                                                          "{p.comment}"
+                                                        </span>
+                                                      )}
+                                                    </div>
+                                                  ))}
+                                                </div>
+                                              )}
                                             </td>
                                           </tr>
                                         ))}
