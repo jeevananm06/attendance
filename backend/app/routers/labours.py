@@ -4,11 +4,12 @@ from typing import List
 from ..models import Labour, LabourCreate, LabourUpdate, User, UserRole
 from ..auth import get_current_manager_or_admin, get_current_admin, get_current_authenticated_user
 from ..db_wrapper import (
-    get_all_labours, 
-    get_labour, 
-    create_labour, 
-    update_labour, 
-    delete_labour
+    get_all_labours,
+    get_labour,
+    create_labour,
+    update_labour,
+    delete_labour,
+    delete_unpaid_salary_records,
 )
 
 router = APIRouter(prefix="/labours", tags=["Labours"])
@@ -69,7 +70,14 @@ async def update_labour_info(
                 detail="Only admin can update joined date"
             )
         joined_date = labour_data.joined_date
-    
+
+    # If joined_date is changing, wipe unpaid salary records so they are
+    # recalculated cleanly against the new anchor date (prevents overlapping periods)
+    if joined_date is not None:
+        existing = get_labour(labour_id)
+        if existing and existing.joined_date != joined_date:
+            delete_unpaid_salary_records(labour_id)
+
     updated = update_labour(
         labour_id,
         name=labour_data.name,

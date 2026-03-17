@@ -12,7 +12,8 @@ import {
   Edit2,
   HardHat,
   Eye,
-  EyeOff
+  EyeOff,
+  Coffee,
 } from 'lucide-react';
 
 const Users = () => {
@@ -50,17 +51,17 @@ const Users = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
-    
+
     if (!editingUser && formData.password.length < 6) {
       setError('Password must be at least 6 characters');
       return;
     }
-    
+
     if (editingUser && formData.password && formData.password.length < 6) {
       setError('Password must be at least 6 characters');
       return;
     }
-    
+
     try {
       if (editingUser) {
         const updateData = { role: formData.role, is_active: formData.is_active };
@@ -79,6 +80,23 @@ const Users = () => {
       setTimeout(() => setSuccess(''), 3000);
     } catch (err) {
       setError(err.response?.data?.detail || 'Failed to save user');
+    }
+  };
+
+  const handleToggleCafePriceAccess = async (username, currentValue) => {
+    try {
+      await authAPI.updateUser(username, { cafe_price_access: !currentValue });
+      setUsers((prev) =>
+        prev.map((u) =>
+          u.username === username ? { ...u, cafe_price_access: !currentValue } : u
+        )
+      );
+      setSuccess(
+        `Cafe price access ${!currentValue ? 'granted to' : 'revoked from'} "${username}"`
+      );
+      setTimeout(() => setSuccess(''), 3000);
+    } catch {
+      setError('Failed to update cafe price access');
     }
   };
 
@@ -160,7 +178,7 @@ const Users = () => {
             <div className="flex items-start justify-between">
               <div className="flex items-center gap-4">
                 <div className={`w-12 h-12 rounded-full flex items-center justify-center ${
-                  user.role === 'admin' ? 'bg-purple-100' : 
+                  user.role === 'admin' ? 'bg-purple-100' :
                   user.role === 'labour' ? 'bg-orange-100' : 'bg-blue-100'
                 }`}>
                   {user.role === 'admin' ? (
@@ -173,7 +191,7 @@ const Users = () => {
                 </div>
                 <div>
                   <h3 className="font-semibold text-gray-800 dark:text-gray-100">{user.username}</h3>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap mt-0.5">
                     <span className={`text-xs px-2 py-0.5 rounded-full capitalize ${
                       user.role === 'admin' ? 'bg-purple-100 text-purple-700' :
                       user.role === 'labour' ? 'bg-orange-100 text-orange-700' :
@@ -196,6 +214,24 @@ const Users = () => {
                 <Edit2 size={18} />
               </button>
             </div>
+
+            {/* Cafe Price Access toggle — managers only */}
+            {user.role === 'manager' && (
+              <div className="mt-3 pt-3 border-t border-gray-100 dark:border-gray-700">
+                <button
+                  onClick={() => handleToggleCafePriceAccess(user.username, user.cafe_price_access)}
+                  title={user.cafe_price_access ? 'Click to revoke cafe price access' : 'Click to grant cafe price access'}
+                  className={`flex items-center gap-2 text-xs px-3 py-1.5 rounded-full border transition-colors w-full justify-center ${
+                    user.cafe_price_access
+                      ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-300 dark:border-amber-700 text-amber-700 dark:text-amber-400 hover:bg-amber-100'
+                      : 'bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-600 text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
+                  }`}
+                >
+                  <Coffee size={13} />
+                  {user.cafe_price_access ? 'Cafe Price Access: ON' : 'Cafe Price Access: OFF'}
+                </button>
+              </div>
+            )}
           </div>
         ))}
       </div>

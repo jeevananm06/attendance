@@ -22,6 +22,7 @@ def generate_html_report(title: str, content: str) -> str:
     <!DOCTYPE html>
     <html>
     <head>
+        <meta charset="UTF-8">
         <title>{title}</title>
         <style>
             body {{ font-family: Arial, sans-serif; margin: 40px; }}

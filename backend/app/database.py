@@ -11,10 +11,10 @@ from .config import (
     USERS_FILE, LABOURS_FILE, ATTENDANCE_FILE, SALARY_FILE,
     OVERTIME_FILE, ADVANCES_FILE, LEAVES_FILE, LEAVE_BALANCE_FILE,
     SITES_FILE, SITE_ASSIGNMENTS_FILE, AUDIT_LOG_FILE, BACKUPS_FILE, BACKUP_DIR,
-    NOTIFICATIONS_FILE, PUSH_SUBSCRIPTIONS_FILE
+    NOTIFICATIONS_FILE, PUSH_SUBSCRIPTIONS_FILE, SALARY_PAYMENTS_FILE
 )
 from .models import (
-    User, Labour, Attendance, SalaryRecord, UserRole, AttendanceStatus,
+    User, Labour, Attendance, SalaryRecord, PaymentLog, UserRole, AttendanceStatus,
     Overtime, Advance, Leave, LeaveType, LeaveStatus, LeaveBalance,
     Site, LabourSiteAssignment, AuditLog, AuditAction, BackupRecord,
     Notification, NotificationType
@@ -95,6 +95,13 @@ def init_csv_files():
     if not PUSH_SUBSCRIPTIONS_FILE.exists():
         df = pd.DataFrame(columns=["id", "user", "endpoint", "p256dh", "auth", "created_at"])
         df.to_csv(PUSH_SUBSCRIPTIONS_FILE, index=False)
+
+    if not SALARY_PAYMENTS_FILE.exists():
+        df = pd.DataFrame(columns=[
+            "id", "salary_record_id", "labour_id",
+            "amount", "paid_date", "paid_by", "comment"
+        ])
+        df.to_csv(SALARY_PAYMENTS_FILE, index=False)
 
 
 # User operations
@@ -360,11 +367,25 @@ def get_salary_records(labour_id: str = None, is_paid: bool = None) -> List[Sala
             days_present=float(row["days_present"]),
             daily_wage=float(row["daily_wage"]),
             total_amount=float(row["total_amount"]),
+            paid_amount=float(row["paid_amount"]) if "paid_amount" in df.columns and pd.notna(row.get("paid_amount")) else 0.0,
             is_paid=bool(row["is_paid"]),
             paid_date=date.fromisoformat(row["paid_date"]) if pd.notna(row["paid_date"]) else None,
-            paid_by=row["paid_by"] if pd.notna(row["paid_by"]) else None
+            paid_by=row["paid_by"] if pd.notna(row["paid_by"]) else None,
+            payment_comment=row["payment_comment"] if "payment_comment" in df.columns and pd.notna(row.get("payment_comment")) else None,
         ))
     return records
+
+
+def delete_unpaid_salary_records(labour_id: str) -> int:
+    """Delete all unpaid salary records for a labour. Returns count deleted."""
+    if not SALARY_FILE.exists():
+        return 0
+    df = pd.read_csv(SALARY_FILE)
+    mask = (df["labour_id"] == labour_id) & (df["is_paid"] == False)
+    count = int(mask.sum())
+    df = df[~mask]
+    df.to_csv(SALARY_FILE, index=False)
+    return count
 
 
 def create_salary_record(labour_id: str, week_start: date, week_end: date, 
@@ -402,9 +423,11 @@ def create_salary_record(labour_id: str, week_start: date, week_end: date,
         "days_present": days_present,
         "daily_wage": daily_wage,
         "total_amount": total_amount,
+        "paid_amount": 0.0,
         "is_paid": False,
         "paid_date": None,
-        "paid_by": None
+        "paid_by": None,
+        "payment_comment": None,
     }])
     df = pd.concat([df, new_row], ignore_index=True)
     df.to_csv(SALARY_FILE, index=False)
@@ -421,37 +444,165 @@ def create_salary_record(labour_id: str, week_start: date, week_end: date,
     )
 
 
-def mark_salary_paid(labour_id: str, week_end: date, paid_by: str) -> Optional[SalaryRecord]:
+def mark_salary_paid(
+    labour_id: str,
+    week_end: date,
+    paid_by: str,
+    amount_paid: float = None,
+    payment_comment: str = None,
+) -> Optional[dict]:
+    """Pay salary for a labour up to week_end.
+
+    - amount_paid=None → pay all pending weeks in full.
+    - amount_paid=N    → distribute N across oldest weeks first (partial OK).
+    Records each payment as a PaymentLog entry.
+    Returns a dict with weeks_paid, amount_paid, remaining.
+    """
     if not SALARY_FILE.exists():
         return None
     df = pd.read_csv(SALARY_FILE)
-    
-    # Find all unpaid records up to and including this week_end
-    mask = (df["labour_id"] == labour_id) & (df["is_paid"] == False) & (df["week_end"] <= week_end.isoformat())
-    
-    if df[mask].empty:
-        return None
-    
+
+    # Ensure paid_amount column exists (backward compat)
+    if "paid_amount" not in df.columns:
+        df["paid_amount"] = 0.0
+    if "payment_comment" not in df.columns:
+        df["payment_comment"] = None
+
     today = date.today()
-    df.loc[mask, "is_paid"] = True
-    df.loc[mask, "paid_date"] = today.isoformat()
-    df.loc[mask, "paid_by"] = paid_by
-    df.to_csv(SALARY_FILE, index=False)
-    
-    # Return the latest record
-    latest = df[df["labour_id"] == labour_id].iloc[-1]
-    return SalaryRecord(
-        id=latest["id"],
-        labour_id=latest["labour_id"],
-        week_start=date.fromisoformat(latest["week_start"]),
-        week_end=date.fromisoformat(latest["week_end"]),
-        days_present=float(latest["days_present"]),
-        daily_wage=float(latest["daily_wage"]),
-        total_amount=float(latest["total_amount"]),
-        is_paid=True,
-        paid_date=today,
-        paid_by=paid_by
+
+    # Rows that still have money remaining, oldest week first
+    candidate_mask = (
+        (df["labour_id"] == labour_id)
+        & (df["is_paid"] == False)
+        & (df["week_end"] <= week_end.isoformat())
     )
+    if df[candidate_mask].empty:
+        return None
+
+    candidates = df[candidate_mask].sort_values("week_end")
+    total_remaining = sum(
+        float(row["total_amount"]) - float(row["paid_amount"])
+        for _, row in candidates.iterrows()
+    )
+
+    # Determine how much we're paying now
+    paying_now = total_remaining if amount_paid is None else float(amount_paid)
+    budget = paying_now
+    weeks_paid = 0
+    salary_record_ids = []  # for linking the payment log
+
+    for idx, row in candidates.iterrows():
+        if budget <= 0:
+            break
+        week_remaining = float(row["total_amount"]) - float(row["paid_amount"])
+        if week_remaining <= 0:
+            continue
+        pay_for_this_week = min(budget, week_remaining)
+        new_paid = float(row["paid_amount"]) + pay_for_this_week
+        df.loc[idx, "paid_amount"] = round(new_paid, 2)
+        df.loc[idx, "paid_by"] = paid_by
+        df.loc[idx, "payment_comment"] = payment_comment
+        if new_paid >= float(row["total_amount"]) - 0.01:  # fully paid (tolerance for float)
+            df.loc[idx, "is_paid"] = True
+            df.loc[idx, "paid_date"] = today.isoformat()
+            weeks_paid += 1
+        budget -= pay_for_this_week
+        salary_record_ids.append(str(row["id"]))
+
+    df.to_csv(SALARY_FILE, index=False)
+
+    # Recalculate remaining after saving
+    df2 = pd.read_csv(SALARY_FILE)
+    remaining_mask = (
+        (df2["labour_id"] == labour_id)
+        & (df2["is_paid"] == False)
+        & (df2["week_end"] <= week_end.isoformat())
+    )
+    remaining = float(
+        df2[remaining_mask].apply(
+            lambda r: float(r["total_amount"]) - float(r.get("paid_amount", 0)), axis=1
+        ).sum()
+    ) if not df2[remaining_mask].empty else 0.0
+
+    # Create ONE payment log entry for this transaction
+    primary_salary_record_id = salary_record_ids[0] if salary_record_ids else "unknown"
+    create_payment_log_entry(
+        salary_record_id=primary_salary_record_id,
+        labour_id=labour_id,
+        amount=round(paying_now, 2),
+        paid_by=paid_by,
+        comment=payment_comment,
+    )
+
+    return {
+        "weeks_paid": weeks_paid,
+        "amount_paid": round(paying_now, 2),
+        "remaining": round(remaining, 2),
+    }
+
+
+# ── Payment log operations ──────────────────────────────────────────────────
+
+def _ensure_payment_log_file():
+    if not SALARY_PAYMENTS_FILE.exists():
+        pd.DataFrame(columns=[
+            "id", "salary_record_id", "labour_id",
+            "amount", "paid_date", "paid_by", "comment"
+        ]).to_csv(SALARY_PAYMENTS_FILE, index=False)
+
+
+def create_payment_log_entry(
+    salary_record_id: str,
+    labour_id: str,
+    amount: float,
+    paid_by: str,
+    comment: str = None,
+) -> PaymentLog:
+    _ensure_payment_log_file()
+    entry_id = str(uuid.uuid4())[:8]
+    today = date.today()
+    df = pd.read_csv(SALARY_PAYMENTS_FILE)
+    new_row = pd.DataFrame([{
+        "id": entry_id,
+        "salary_record_id": salary_record_id,
+        "labour_id": labour_id,
+        "amount": round(amount, 2),
+        "paid_date": today.isoformat(),
+        "paid_by": paid_by,
+        "comment": comment,
+    }])
+    df = pd.concat([df, new_row], ignore_index=True)
+    df.to_csv(SALARY_PAYMENTS_FILE, index=False)
+    return PaymentLog(
+        id=entry_id,
+        salary_record_id=salary_record_id,
+        labour_id=labour_id,
+        amount=amount,
+        paid_date=today,
+        paid_by=paid_by,
+        comment=comment,
+    )
+
+
+def get_payment_logs(labour_id: str = None, salary_record_id: str = None) -> List[PaymentLog]:
+    _ensure_payment_log_file()
+    df = pd.read_csv(SALARY_PAYMENTS_FILE)
+    if labour_id:
+        df = df[df["labour_id"] == labour_id]
+    if salary_record_id:
+        df = df[df["salary_record_id"] == salary_record_id]
+    logs = []
+    for _, row in df.iterrows():
+        logs.append(PaymentLog(
+            id=str(row["id"]),
+            salary_record_id=str(row["salary_record_id"]),
+            labour_id=str(row["labour_id"]),
+            amount=float(row["amount"]),
+            paid_date=date.fromisoformat(row["paid_date"]),
+            paid_by=str(row["paid_by"]),
+            comment=row["comment"] if pd.notna(row["comment"]) else None,
+        ))
+    return logs
 
 
 # Export functions

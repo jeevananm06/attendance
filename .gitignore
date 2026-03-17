@@ -13,6 +13,9 @@ ENV/
 # Data files (for local CSV storage)
 backend/data/*.csv
 
+# Local SQLite dev database
+*.db
+
 # IDE
 .vscode/
 .idea/

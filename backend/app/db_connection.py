@@ -21,20 +21,27 @@ DATABASE_URL = os.getenv(
 if DATABASE_URL.startswith("postgres://"):
     DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
 
-# Create engine - add SSL for Supabase/production
-connect_args = {}
-if "supabase" in DATABASE_URL or "render.com" in DATABASE_URL:
-    connect_args["sslmode"] = "require"
+# SQLite vs PostgreSQL engine config
+if DATABASE_URL.startswith("sqlite"):
+    engine = create_engine(
+        DATABASE_URL,
+        connect_args={"check_same_thread": False},
+    )
+else:
+    # Add SSL for Supabase/production PostgreSQL
+    connect_args = {}
+    if "supabase" in DATABASE_URL or "render.com" in DATABASE_URL:
+        connect_args["sslmode"] = "require"
 
-engine = create_engine(
-    DATABASE_URL,
-    pool_pre_ping=True,
-    pool_size=5,
-    max_overflow=10,
-    pool_timeout=30,
-    pool_recycle=300,       # recycle connections every 5 min to avoid stale SSL
-    connect_args=connect_args,
-)
+    engine = create_engine(
+        DATABASE_URL,
+        pool_pre_ping=True,
+        pool_size=5,
+        max_overflow=10,
+        pool_timeout=30,
+        pool_recycle=300,       # recycle connections every 5 min to avoid stale SSL
+        connect_args=connect_args,
+    )
 
 # Create session factory
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
