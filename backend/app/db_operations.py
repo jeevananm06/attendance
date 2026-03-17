@@ -535,8 +535,7 @@ def mark_salary_paid(labour_id: str, week_end: date, paid_by: str, amount_paid: 
                 record.is_paid = True
                 record.paid_date = today
                 record.paid_by = paid_by
-                # Store comment on the last record if excess payment
-                if is_excess_payment and payment_comment:
+                if payment_comment:
                     record.payment_comment = payment_comment
             db.commit()
             
@@ -567,6 +566,8 @@ def mark_salary_paid(labour_id: str, week_end: date, paid_by: str, amount_paid: 
                 # Partial payment toward this week — don't mark as paid
                 record.paid_amount = (record.paid_amount or 0) + remaining_budget
                 record.paid_by = paid_by
+                if payment_comment:
+                    record.payment_comment = payment_comment
                 remaining_budget = 0
                 break
             else:

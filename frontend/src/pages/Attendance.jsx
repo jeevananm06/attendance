@@ -71,7 +71,7 @@ const MonthlyLabourCard = ({ labour, year, month }) => {
       const end   = toYMD(year, month, daysInMonth);
       const res   = await attendanceAPI.getByLabour(labour.id, start, end);
       const map   = {};
-      res.data.forEach((r) => { map[r.date] = r.status; });
+      res.data.forEach((r) => { map[r.date] = { status: r.status, comment: r.comment || '' }; });
       setMonthAttendance(map);
     } catch (e) {
       console.error(e);
@@ -84,7 +84,7 @@ const MonthlyLabourCard = ({ labour, year, month }) => {
     if (expanded) fetchMonthData();
   }, [expanded, fetchMonthData]);
 
-  const vals = Object.values(monthAttendance);
+  const vals = Object.values(monthAttendance).map((v) => v.status);
   const present     = vals.filter((s) => s === 'present').length;
   const halfDay     = vals.filter((s) => s === 'half_day').length;
   const absent      = vals.filter((s) => s === 'absent').length;
@@ -174,13 +174,16 @@ const MonthlyLabourCard = ({ labour, year, month }) => {
                   for (let i = 0; i < firstDow; i++) cells.push(<div key={`pad-${i}`} />);
                   for (let d = 1; d <= daysInMonth; d++) {
                     const ymd      = toYMD(year, month, d);
-                    const status   = monthAttendance[ymd];
+                    const entry    = monthAttendance[ymd];
+                    const status   = entry?.status;
+                    const comment  = entry?.comment;
                     const isFuture = ymd > today;
                     const meta     = STATUS_META[status];
                     cells.push(
                       <div
                         key={d}
-                        className={`rounded border text-center py-1 select-none ${
+                        title={comment || undefined}
+                        className={`rounded border text-center py-1 select-none relative ${
                           isFuture
                             ? 'bg-white border-gray-100 text-gray-200'
                             : meta
@@ -190,6 +193,7 @@ const MonthlyLabourCard = ({ labour, year, month }) => {
                       >
                         <div className="text-[9px] text-gray-400">{d}</div>
                         <div className="text-xs font-bold leading-tight">{meta ? meta.label : '–'}</div>
+                        {comment && <div className="absolute top-0 right-0 w-1.5 h-1.5 bg-blue-500 rounded-full" />}
                       </div>
                     );
                   }

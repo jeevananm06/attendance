@@ -188,7 +188,7 @@ const Salary = () => {
         labourId, 
         weekEnd, 
         entered >= total ? null : entered, 
-        isExcessPayment ? paymentComment.trim() : null,
+        paymentComment.trim() || null,
         advanceDeduction !== 'none' ? advanceDeduction : null,
         advanceDeduction === 'partial' ? partialDeductAmt : null
       );
@@ -462,15 +462,13 @@ const Salary = () => {
                                             ? '✓ Full payment — all weeks cleared'
                                             : `₹${remaining.toLocaleString()} will remain pending`}
                                       </p>
-                                      {excess > 0 && (
-                                        <input
-                                          type="text"
-                                          placeholder="Reason for excess payment (required)"
-                                          value={paymentComment}
-                                          onChange={(e) => setPaymentComment(e.target.value)}
-                                          className="mt-2 ml-5 w-64 border border-blue-300 dark:border-blue-600 rounded px-2 py-1.5 text-sm bg-white dark:bg-gray-700 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                        />
-                                      )}
+                                      <input
+                                        type="text"
+                                        placeholder={excess > 0 ? "Reason for excess payment (required)" : "Comment (optional)"}
+                                        value={paymentComment}
+                                        onChange={(e) => setPaymentComment(e.target.value)}
+                                        className={`mt-2 ml-5 w-64 border rounded px-2 py-1.5 text-sm bg-white dark:bg-gray-700 dark:text-gray-100 focus:outline-none focus:ring-2 ${excess > 0 ? 'border-blue-300 dark:border-blue-600 focus:ring-blue-500' : 'border-gray-300 dark:border-gray-600 focus:ring-primary-500'}`}
+                                      />
                                       
                                       {/* Advance Deduction Section */}
                                       {pendingAdvance > 0 && (
