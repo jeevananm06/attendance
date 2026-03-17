@@ -9,6 +9,7 @@ from .models import User, UserRole
 from .auth import get_password_hash
 from .routers import auth, labours, attendance, salary, stats, export
 from .routers import overtime, advances, leaves, sites, audit, backup, reports, notifications, push, documents
+from .routers import cafe_items, cafe_stock
 
 # Use PostgreSQL if enabled, otherwise CSV
 USE_POSTGRES = os.getenv("USE_POSTGRES", "false").lower() == "true"
@@ -65,6 +66,10 @@ app.include_router(notifications.router)
 app.include_router(push.router)
 app.include_router(documents.router)
 
+# Cafe inventory routers
+app.include_router(cafe_items.router)
+app.include_router(cafe_stock.router)
+
 
 async def keep_alive():
     """Ping self every 14 minutes to prevent Render free tier shutdown"""
@@ -106,6 +111,32 @@ async def startup_event():
             print("DB MIGRATION: repaid_amount column ensured in advances", flush=True)
         except Exception as e:
             print(f"DB MIGRATION WARNING: {e}", flush=True)
+
+    # Add cafe_price_access column to users table if it doesn't exist yet
+    if USE_POSTGRES:
+        try:
+            from .db_connection import engine
+            from sqlalchemy import text
+            with engine.connect() as conn:
+                conn.execute(text(
+                    "ALTER TABLE users ADD COLUMN IF NOT EXISTS cafe_price_access BOOLEAN DEFAULT FALSE"
+                ))
+                conn.commit()
+            print("DB MIGRATION: cafe_price_access column ensured in users", flush=True)
+        except Exception as e:
+            print(f"DB MIGRATION (cafe_price_access): {e}", flush=True)
+    else:
+        try:
+            from .db_connection import engine
+            from sqlalchemy import text
+            with engine.connect() as conn:
+                conn.execute(text(
+                    "ALTER TABLE users ADD COLUMN cafe_price_access BOOLEAN DEFAULT 0"
+                ))
+                conn.commit()
+            print("DB MIGRATION: cafe_price_access column added to users (sqlite)", flush=True)
+        except Exception as e:
+            print(f"DB MIGRATION (cafe_price_access sqlite): {e}", flush=True)
     
     try:
         existing = get_user("admin")

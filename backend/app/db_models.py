@@ -37,11 +37,12 @@ class LeaveStatusEnum(str, enum.Enum):
 
 class UserDB(Base):
     __tablename__ = "users"
-    
+
     username = Column(String(100), primary_key=True, index=True)
     role = Column(String(20), default="manager")
     hashed_password = Column(String(255), nullable=False)
     is_active = Column(Boolean, default=True)
+    cafe_price_access = Column(Boolean, default=False)
     created_at = Column(DateTime, default=datetime.utcnow)
 
 
@@ -227,15 +228,31 @@ class RefreshTokenDB(Base):
     is_revoked = Column(Boolean, default=False)
 
 
-class SalaryPaymentDB(Base):
-    """One row per payment installment — full audit trail of every payment made."""
-    __tablename__ = "salary_payments"
+class CafeItemDB(Base):
+    __tablename__ = "cafe_items"
 
     id = Column(String(36), primary_key=True, index=True)
-    salary_record_id = Column(String(36), ForeignKey("salary.id"), nullable=False, index=True)
-    labour_id = Column(String(36), ForeignKey("labours.id"), nullable=False, index=True)
-    amount = Column(Float, nullable=False)
-    paid_date = Column(Date, nullable=False)
-    paid_by = Column(String(100), nullable=False)
-    comment = Column(String(500), nullable=True)
+    name = Column(String(200), nullable=False)
+    category = Column(String(100), nullable=False)
+    unit = Column(String(50), nullable=False)
+    description = Column(Text, nullable=True)
+    active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow)
+
+
+class CafeStockEntryDB(Base):
+    __tablename__ = "cafe_stock_entries"
+
+    id = Column(String(36), primary_key=True, index=True)
+    site_id = Column(String(36), ForeignKey("sites.id"), nullable=False)
+    item_id = Column(String(36), ForeignKey("cafe_items.id"), nullable=False)
+    quantity = Column(Float, nullable=False)
+    unit_price = Column(Float, nullable=True)
+    total_cost = Column(Float, nullable=True)
+    supplier = Column(String(200), nullable=True)
+    entry_date = Column(Date, nullable=False)
+    comments = Column(Text, nullable=True)
+    created_by = Column(String(100), nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow)
