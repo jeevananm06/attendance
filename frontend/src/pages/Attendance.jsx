@@ -25,6 +25,66 @@ const STATUS_META = {
   double_duty:  { label: 'PP', color: 'bg-blue-600 text-white',   light: 'bg-blue-100 text-blue-800 border-blue-300',     days: 2.0, desc: 'Double Duty' },
 };
 
+/* ── Comment tooltip: shows on hover (desktop) and tap (mobile) ── */
+function CommentTooltip({ comment, children }) {
+  const [visible, setVisible] = useState(false);
+  const [pos, setPos]         = useState({ top: 0, left: 0 });
+  const wrapRef  = useRef(null);
+  const timerRef = useRef(null);
+
+  const show = () => {
+    if (!comment) return;
+    const rect = wrapRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const scrollY = window.scrollY || document.documentElement.scrollTop;
+    const scrollX = window.scrollX || document.documentElement.scrollLeft;
+    setPos({
+      top:  rect.top  + scrollY - 4,          // just above the cell
+      left: rect.left + scrollX + rect.width / 2,
+    });
+    setVisible(true);
+    clearTimeout(timerRef.current);
+  };
+
+  const hide = (delay = 0) => {
+    clearTimeout(timerRef.current);
+    if (delay) timerRef.current = setTimeout(() => setVisible(false), delay);
+    else setVisible(false);
+  };
+
+  // tap on mobile: show for 2.5 s then auto-hide
+  const handleTouch = (e) => {
+    if (!comment) return;
+    e.preventDefault();          // prevent ghost click
+    if (visible) { hide(); return; }
+    show();
+    timerRef.current = setTimeout(() => setVisible(false), 2500);
+  };
+
+  useEffect(() => () => clearTimeout(timerRef.current), []);
+
+  return (
+    <div
+      ref={wrapRef}
+      className="relative"
+      onMouseEnter={show}
+      onMouseLeave={() => hide()}
+      onTouchEnd={handleTouch}
+    >
+      {children}
+      {visible && comment && (
+        <div
+          style={{ position: 'fixed', top: pos.top, left: pos.left, transform: 'translate(-50%, -100%)', zIndex: 9999 }}
+          className="px-2 py-1 bg-gray-800 text-white text-[11px] rounded shadow-lg max-w-[160px] text-center pointer-events-none whitespace-pre-wrap"
+        >
+          {comment}
+          <div className="absolute left-1/2 -translate-x-1/2 top-full w-0 h-0 border-x-4 border-x-transparent border-t-4 border-t-gray-800" />
+        </div>
+      )}
+    </div>
+  );
+}
+
 function getDaysInMonth(year, month) {
   return new Date(year, month + 1, 0).getDate();
 }
@@ -180,23 +240,23 @@ const MonthlyLabourCard = ({ labour, year, month, isAdmin }) => {
                     const isFuture = ymd > today;
                     const meta     = STATUS_META[status];
                     cells.push(
-                      <div
-                        key={d}
-                        title={comment || undefined}
-                        className={`relative rounded border text-center py-1 select-none ${
-                          isFuture
-                            ? 'bg-white border-gray-100 text-gray-200'
-                            : meta
-                              ? `${meta.light} border`
-                              : 'bg-white border-gray-200 text-gray-400'
-                        } ${comment ? 'cursor-help' : ''}`}
-                      >
-                        <div className="text-[9px] text-gray-400">{d}</div>
-                        <div className="text-xs font-bold leading-tight">{meta ? meta.label : '–'}</div>
-                        {comment && (
-                          <div className="absolute bottom-0.5 right-0.5 w-1.5 h-1.5 rounded-full bg-orange-400" title={comment} />
-                        )}
-                      </div>
+                      <CommentTooltip key={d} comment={comment}>
+                        <div
+                          className={`relative rounded border text-center py-1 select-none ${
+                            isFuture
+                              ? 'bg-white border-gray-100 text-gray-200'
+                              : meta
+                                ? `${meta.light} border`
+                                : 'bg-white border-gray-200 text-gray-400'
+                          } ${comment ? 'cursor-help' : ''}`}
+                        >
+                          <div className="text-[9px] text-gray-400">{d}</div>
+                          <div className="text-xs font-bold leading-tight">{meta ? meta.label : '–'}</div>
+                          {comment && (
+                            <div className="absolute bottom-0.5 right-0.5 w-1.5 h-1.5 rounded-full bg-orange-400" />
+                          )}
+                        </div>
+                      </CommentTooltip>
                     );
                   }
                   return cells;
