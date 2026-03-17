@@ -6,7 +6,7 @@ from datetime import date
 
 from ..models import SalaryRecord, SalaryPayment, User
 from ..auth import get_current_manager_or_admin, get_current_admin
-from ..db_wrapper import get_salary_records, mark_salary_paid, get_all_labours, get_labour, create_notification, get_pending_advances, get_advances, repay_advance_partial, mark_advance_deducted
+from ..db_wrapper import get_salary_records, mark_salary_paid, get_all_labours, get_labour, create_notification, get_pending_advances, get_advances, repay_advance_partial, mark_advance_deducted, get_payment_logs
 from ..whatsapp_service import send_whatsapp_message
 from ..push_service import send_push_to_user
 
@@ -352,6 +352,34 @@ async def get_salary_slip(
     }
 
 
+@router.get("/payments/{labour_id}")
+async def get_salary_payments(
+    labour_id: str,
+    current_user: User = Depends(get_current_admin)
+):
+    """Get all payment log entries for a labour (Admin only)"""
+    labour = get_labour(labour_id)
+    if not labour:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Labour {labour_id} not found")
+    logs = get_payment_logs(labour_id=labour_id)
+    return {
+        "labour_id": labour_id,
+        "labour_name": labour.name,
+        "payments": [
+            {
+                "id": p.id,
+                "salary_record_id": p.salary_record_id,
+                "amount": p.amount,
+                "paid_date": p.paid_date.isoformat(),
+                "paid_by": p.paid_by,
+                "comment": p.comment,
+            }
+            for p in sorted(logs, key=lambda x: x.paid_date)
+        ],
+        "total_paid": sum(p.amount for p in logs),
+    }
+
+
 @router.get("/register")
 async def get_pay_register(
     year: int,
@@ -370,6 +398,11 @@ async def get_pay_register(
 
     labours = get_all_labours()
     all_records = get_salary_records()
+    # Build payment log map: salary_record_id → list of payment entries
+    all_logs = get_payment_logs()
+    log_map: dict = {}
+    for log in all_logs:
+        log_map.setdefault(log.salary_record_id, []).append(log)
 
     result = []
     for labour in labours:
@@ -397,6 +430,16 @@ async def get_pay_register(
                     "paid_date": r.paid_date.isoformat() if r.paid_date else None,
                     "paid_by": r.paid_by,
                     "payment_comment": r.payment_comment,
+                    "payments": [
+                        {
+                            "id": p.id,
+                            "amount": p.amount,
+                            "paid_date": p.paid_date.isoformat(),
+                            "paid_by": p.paid_by,
+                            "comment": p.comment,
+                        }
+                        for p in sorted(log_map.get(r.id, []), key=lambda x: x.paid_date)
+                    ],
                 }
                 for r in sorted(labour_records, key=lambda x: x.week_end)
             ],

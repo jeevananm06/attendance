@@ -25,6 +25,60 @@ const STATUS_META = {
   double_duty:  { label: 'PP', color: 'bg-blue-600 text-white',   light: 'bg-blue-100 text-blue-800 border-blue-300',     days: 2.0, desc: 'Double Duty' },
 };
 
+/* ── Comment tooltip: shows on hover (desktop) and tap (mobile) ── */
+function CommentTooltip({ comment, children }) {
+  const [visible, setVisible] = useState(false);
+  const [pos, setPos]         = useState({ top: 0, left: 0 });
+  const wrapRef  = useRef(null);
+  const timerRef = useRef(null);
+  const show = () => {
+    if (!comment) return;
+    const rect = wrapRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const scrollY = window.scrollY || document.documentElement.scrollTop;
+    const scrollX = window.scrollX || document.documentElement.scrollLeft;
+    setPos({
+      top:  rect.top  + scrollY - 4,
+      left: rect.left + scrollX + rect.width / 2,
+    });
+    setVisible(true);
+    clearTimeout(timerRef.current);
+  };
+  const hide = (delay = 0) => {
+    clearTimeout(timerRef.current);
+    if (delay) timerRef.current = setTimeout(() => setVisible(false), delay);
+    else setVisible(false);
+  };
+  const handleTouch = (e) => {
+    if (!comment) return;
+    e.preventDefault();
+    if (visible) { hide(); return; }
+    show();
+    timerRef.current = setTimeout(() => setVisible(false), 2500);
+  };
+  useEffect(() => () => clearTimeout(timerRef.current), []);
+  return (
+    <div
+      ref={wrapRef}
+      className="relative"
+      onMouseEnter={show}
+      onMouseLeave={() => hide()}
+      onTouchEnd={handleTouch}
+    >
+      {children}
+      {visible && comment && (
+        <div
+          style={{ position: 'fixed', top: pos.top, left: pos.left, transform: 'translate(-50%, -100%)', zIndex: 9999 }}
+          className="px-2 py-1 bg-gray-800 text-white text-[11px] rounded shadow-lg max-w-[160px] text-center pointer-events-none whitespace-pre-wrap"
+        >
+          {comment}
+          <div className="absolute left-1/2 -translate-x-1/2 top-full w-0 h-0 border-x-4 border-x-transparent border-t-4 border-t-gray-800" />
+        </div>
+      )}
+    </div>
+  );
+}
+
 function getDaysInMonth(year, month) {
   return new Date(year, month + 1, 0).getDate();
 }
@@ -36,7 +90,7 @@ function toYMD(year, month, day) {
 const MONTH_NAMES = ['January','February','March','April','May','June',
   'July','August','September','October','November','December'];
 
-const MonthlyLabourCard = ({ labour, year, month }) => {
+const MonthlyLabourCard = ({ labour, year, month, isAdmin }) => {
   const [monthAttendance, setMonthAttendance] = useState({});
   const [expanded, setExpanded] = useState(false);
   const [loadingMonth, setLoadingMonth] = useState(false);
@@ -84,12 +138,12 @@ const MonthlyLabourCard = ({ labour, year, month }) => {
     if (expanded) fetchMonthData();
   }, [expanded, fetchMonthData]);
 
-  const vals = Object.values(monthAttendance).map((v) => v.status);
-  const present     = vals.filter((s) => s === 'present').length;
-  const halfDay     = vals.filter((s) => s === 'half_day').length;
-  const absent      = vals.filter((s) => s === 'absent').length;
-  const presentHalf = vals.filter((s) => s === 'present_half').length;
-  const doubleDuty  = vals.filter((s) => s === 'double_duty').length;
+  const vals = Object.values(monthAttendance);
+  const present     = vals.filter((v) => v.status === 'present').length;
+  const halfDay     = vals.filter((v) => v.status === 'half_day').length;
+  const absent      = vals.filter((v) => v.status === 'absent').length;
+  const presentHalf = vals.filter((v) => v.status === 'present_half').length;
+  const doubleDuty  = vals.filter((v) => v.status === 'double_duty').length;
   const daysWorked  = present + halfDay * 0.5 + presentHalf * 1.5 + doubleDuty * 2.0;
   const earned      = daysWorked * labour.daily_wage;
 
@@ -180,21 +234,23 @@ const MonthlyLabourCard = ({ labour, year, month }) => {
                     const isFuture = ymd > today;
                     const meta     = STATUS_META[status];
                     cells.push(
-                      <div
-                        key={d}
-                        title={comment || undefined}
-                        className={`rounded border text-center py-1 select-none relative ${
-                          isFuture
-                            ? 'bg-white border-gray-100 text-gray-200'
-                            : meta
-                              ? `${meta.light} border`
-                              : 'bg-white border-gray-200 text-gray-400'
-                        }`}
-                      >
-                        <div className="text-[9px] text-gray-400">{d}</div>
-                        <div className="text-xs font-bold leading-tight">{meta ? meta.label : '–'}</div>
-                        {comment && <div className="absolute top-0 right-0 w-1.5 h-1.5 bg-blue-500 rounded-full" />}
-                      </div>
+                      <CommentTooltip key={d} comment={comment}>
+                        <div
+                          className={`relative rounded border text-center py-1 select-none ${
+                            isFuture
+                              ? 'bg-white border-gray-100 text-gray-200'
+                              : meta
+                                ? `${meta.light} border`
+                                : 'bg-white border-gray-200 text-gray-400'
+                          } ${comment ? 'cursor-help' : ''}`}
+                        >
+                          <div className="text-[9px] text-gray-400">{d}</div>
+                          <div className="text-xs font-bold leading-tight">{meta ? meta.label : '–'}</div>
+                          {comment && (
+                            <div className="absolute bottom-0.5 right-0.5 w-1.5 h-1.5 rounded-full bg-orange-400" />
+                          )}
+                        </div>
+                      </CommentTooltip>
                     );
                   }
                   return cells;

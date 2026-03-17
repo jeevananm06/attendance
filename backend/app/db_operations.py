@@ -12,10 +12,10 @@ from sqlalchemy import and_, or_
 from .db_models import (
     UserDB, LabourDB, AttendanceDB, SalaryDB, OvertimeDB,
     AdvanceDB, LeaveDB, SiteDB, SiteAssignmentDB, AuditLogDB, BackupDB,
-    NotificationDB, PushSubscriptionDB, RefreshTokenDB
+    NotificationDB, PushSubscriptionDB, RefreshTokenDB, SalaryPaymentDB
 )
 from .models import (
-    User, Labour, Attendance, SalaryRecord, UserRole, AttendanceStatus,
+    User, Labour, Attendance, SalaryRecord, PaymentLog, UserRole, AttendanceStatus,
     Overtime, Advance, Leave, LeaveType, LeaveStatus,
     Site, LabourSiteAssignment, AuditLog, AuditAction,
     Notification, NotificationType
@@ -538,10 +538,15 @@ def mark_salary_paid(labour_id: str, week_end: date, paid_by: str, amount_paid: 
                 if payment_comment:
                     record.payment_comment = payment_comment
             db.commit()
-            
+
+            paid_now = amount_paid if is_excess_payment else total_due
+            primary_record_id = records[0].id if records else "unknown"
+            _create_payment_log(db, primary_record_id, labour_id, paid_now, paid_by, payment_comment)
+            db.commit()
+
             result = {
                 "weeks_paid": len(records),
-                "amount_paid": amount_paid if is_excess_payment else total_due,
+                "amount_paid": paid_now,
                 "remaining": 0.0,
             }
             if is_excess_payment:
@@ -575,11 +580,80 @@ def mark_salary_paid(labour_id: str, week_end: date, paid_by: str, amount_paid: 
 
         db.commit()
         actual_paid = amount_paid - remaining_budget
-        return {
+        result = {
             "weeks_paid": weeks_paid,
             "amount_paid": actual_paid,
             "remaining": total_due - actual_paid,
         }
+
+        # Log this payment installment
+        primary_record_id = records[0].id if records else "unknown"
+        _create_payment_log(db, primary_record_id, labour_id, actual_paid, paid_by, payment_comment)
+        db.commit()
+        return result
+    finally:
+        db.close()
+
+
+# ============== PAYMENT LOG OPERATIONS ==============
+
+def _create_payment_log(db: Session, salary_record_id: str, labour_id: str,
+                        amount: float, paid_by: str, comment: str = None):
+    """Internal helper — creates a SalaryPaymentDB row inside an open session."""
+    entry = SalaryPaymentDB(
+        id=str(uuid.uuid4())[:8],
+        salary_record_id=salary_record_id,
+        labour_id=labour_id,
+        amount=round(amount, 2),
+        paid_date=date.today(),
+        paid_by=paid_by,
+        comment=comment,
+    )
+    db.add(entry)
+
+
+def create_payment_log_entry(salary_record_id: str, labour_id: str,
+                             amount: float, paid_by: str, comment: str = None) -> PaymentLog:
+    """Public function — creates a payment log entry in its own session."""
+    db = get_db_session()
+    try:
+        _create_payment_log(db, salary_record_id, labour_id, amount, paid_by, comment)
+        db.commit()
+        return PaymentLog(
+            id=str(uuid.uuid4())[:8],
+            salary_record_id=salary_record_id,
+            labour_id=labour_id,
+            amount=amount,
+            paid_date=date.today(),
+            paid_by=paid_by,
+            comment=comment,
+        )
+    finally:
+        db.close()
+
+
+def get_payment_logs(labour_id: str = None, salary_record_id: str = None) -> list:
+    """Return PaymentLog entries, optionally filtered by labour or salary record."""
+    db = get_db_session()
+    try:
+        q = db.query(SalaryPaymentDB)
+        if labour_id:
+            q = q.filter(SalaryPaymentDB.labour_id == labour_id)
+        if salary_record_id:
+            q = q.filter(SalaryPaymentDB.salary_record_id == salary_record_id)
+        rows = q.order_by(SalaryPaymentDB.paid_date).all()
+        return [
+            PaymentLog(
+                id=r.id,
+                salary_record_id=r.salary_record_id,
+                labour_id=r.labour_id,
+                amount=r.amount,
+                paid_date=r.paid_date,
+                paid_by=r.paid_by,
+                comment=r.comment,
+            )
+            for r in rows
+        ]
     finally:
         db.close()
 

@@ -131,6 +131,17 @@ class SalaryPayment(BaseModel):
     advance_deduction_amount: Optional[float] = None  # Amount to deduct if partial
 
 
+class PaymentLog(BaseModel):
+    """Individual payment installment record — one row per payment made."""
+    id: str
+    salary_record_id: str
+    labour_id: str
+    amount: float
+    paid_date: date
+    paid_by: str
+    comment: Optional[str] = None
+
+
 class LabourStats(BaseModel):
     labour_id: str
     name: str
