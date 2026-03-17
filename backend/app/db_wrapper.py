@@ -19,7 +19,7 @@ if USE_POSTGRES:
         # Attendance operations
         get_attendance_by_date, get_attendance_by_labour, get_attendance_bulk, mark_attendance, delete_attendance, purge_absent_attendance_records,
         # Salary operations
-        get_salary_records, get_salary_records_bulk, create_salary_record, mark_salary_paid, delete_unpaid_salary_records,
+        get_salary_records, get_salary_records_bulk, create_salary_record, mark_salary_paid, get_payment_logs, create_payment_log_entry,
         # Overtime operations
         create_overtime, get_overtime_records,
         # Advance operations
@@ -213,6 +213,12 @@ else:
         # Init
         init_csv_files
     )
+
+    def get_payment_logs(labour_id=None, salary_record_id=None):
+        return []
+
+    def create_payment_log_entry(salary_record_id, labour_id, amount, paid_by, comment=None):
+        return None
 
     def get_salary_records_bulk(labour_ids: list) -> dict:
         from .database import get_salary_records

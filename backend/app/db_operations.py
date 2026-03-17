@@ -618,6 +618,8 @@ def mark_salary_paid(labour_id: str, week_end: date, paid_by: str, amount_paid: 
         db.close()
 
 
+# ============== PAYMENT LOG OPERATIONS ==============
+
 def _create_payment_log(db: Session, salary_record_id: str, labour_id: str,
                         amount: float, paid_by: str, comment: str = None):
     """Internal helper — creates a SalaryPaymentDB row inside an open session."""

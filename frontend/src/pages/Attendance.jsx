@@ -31,7 +31,6 @@ function CommentTooltip({ comment, children }) {
   const [pos, setPos]         = useState({ top: 0, left: 0 });
   const wrapRef  = useRef(null);
   const timerRef = useRef(null);
-
   const show = () => {
     if (!comment) return;
     const rect = wrapRef.current?.getBoundingClientRect();
@@ -39,13 +38,12 @@ function CommentTooltip({ comment, children }) {
     const scrollY = window.scrollY || document.documentElement.scrollTop;
     const scrollX = window.scrollX || document.documentElement.scrollLeft;
     setPos({
-      top:  rect.top  + scrollY - 4,          // just above the cell
+      top:  rect.top  + scrollY - 4,
       left: rect.left + scrollX + rect.width / 2,
     });
     setVisible(true);
     clearTimeout(timerRef.current);
   };
-
   const hide = (delay = 0) => {
     clearTimeout(timerRef.current);
     if (delay) timerRef.current = setTimeout(() => setVisible(false), delay);
@@ -60,9 +58,7 @@ function CommentTooltip({ comment, children }) {
     show();
     timerRef.current = setTimeout(() => setVisible(false), 2500);
   };
-
   useEffect(() => () => clearTimeout(timerRef.current), []);
-
   return (
     <div
       ref={wrapRef}
