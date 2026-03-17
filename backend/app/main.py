@@ -107,8 +107,11 @@ async def startup_event():
                 conn.execute(text(
                     "ALTER TABLE advances ADD COLUMN IF NOT EXISTS repaid_amount FLOAT DEFAULT 0.0"
                 ))
+                conn.execute(text(
+                    "ALTER TABLE salary ADD COLUMN IF NOT EXISTS payment_comment VARCHAR(500)"
+                ))
                 conn.commit()
-            print("DB MIGRATION: repaid_amount column ensured in advances", flush=True)
+            print("DB MIGRATION: repaid_amount and payment_comment columns ensured", flush=True)
         except Exception as e:
             print(f"DB MIGRATION WARNING: {e}", flush=True)
 
