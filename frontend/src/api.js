@@ -243,6 +243,8 @@ export const salaryAPI = {
   },
   getRegister: (year, month) =>
     api.get(`/salary/register?year=${year}&month=${month}`),
+  getPayments: (labourId) =>
+    api.get(`/salary/payments/${labourId}`),
 };
 
 export const statsAPI = {

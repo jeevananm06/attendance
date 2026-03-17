@@ -167,6 +167,7 @@ else:
     from .database import (
         # Salary operations
         get_salary_records, create_salary_record, mark_salary_paid,
+        create_payment_log_entry, get_payment_logs,
         # Overtime operations
         create_overtime, get_overtime_records,
         # Advance operations

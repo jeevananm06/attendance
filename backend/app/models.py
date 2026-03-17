@@ -126,9 +126,20 @@ class SalaryPayment(BaseModel):
     labour_id: str
     week_end: date  # Friday of the week
     amount_paid: Optional[float] = None  # None = pay full amount; otherwise partial
-    payment_comment: Optional[str] = None  # Comment required when paying more than due
+    payment_comment: Optional[str] = None  # Optional note for any payment
     advance_deduction: Optional[str] = None  # "full", "partial", or "none" (default: none)
     advance_deduction_amount: Optional[float] = None  # Amount to deduct if partial
+
+
+class PaymentLog(BaseModel):
+    """Individual payment installment record — one row per payment made."""
+    id: str
+    salary_record_id: str   # links to salary.csv row
+    labour_id: str
+    amount: float
+    paid_date: date
+    paid_by: str
+    comment: Optional[str] = None
 
 
 class LabourStats(BaseModel):

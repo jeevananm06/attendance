@@ -160,12 +160,7 @@ const Salary = () => {
     const entered = parseFloat(payAmount);
     if (isNaN(entered) || entered <= 0) { setError('Enter a valid amount'); return; }
     
-    // Require comment for excess payments
     const isExcessPayment = entered > total;
-    if (isExcessPayment && !paymentComment.trim()) {
-      setError('Please provide a reason for the excess payment');
-      return;
-    }
     
     // Validate partial advance deduction amount
     const pendingAdvance = advances[labourId] || 0;
@@ -185,10 +180,10 @@ const Salary = () => {
       setPayingLabour(labourId);
       setError('');
       const res = await salaryAPI.pay(
-        labourId, 
-        weekEnd, 
-        entered >= total ? null : entered, 
-        isExcessPayment ? paymentComment.trim() : null,
+        labourId,
+        weekEnd,
+        entered >= total ? null : entered,
+        paymentComment.trim() || null,
         advanceDeduction !== 'none' ? advanceDeduction : null,
         advanceDeduction === 'partial' ? partialDeductAmt : null
       );
@@ -457,20 +452,18 @@ const Salary = () => {
                                     <>
                                       <p className={`text-xs mt-1 ml-5 font-medium ${color}`}>
                                         {excess > 0
-                                          ? `⚠ Excess payment of ₹${excess.toLocaleString()} — comment required`
+                                          ? `⚠ Excess payment of ₹${excess.toLocaleString()}`
                                           : remaining === 0
                                             ? '✓ Full payment — all weeks cleared'
                                             : `₹${remaining.toLocaleString()} will remain pending`}
                                       </p>
-                                      {excess > 0 && (
-                                        <input
-                                          type="text"
-                                          placeholder="Reason for excess payment (required)"
-                                          value={paymentComment}
-                                          onChange={(e) => setPaymentComment(e.target.value)}
-                                          className="mt-2 ml-5 w-64 border border-blue-300 dark:border-blue-600 rounded px-2 py-1.5 text-sm bg-white dark:bg-gray-700 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                        />
-                                      )}
+                                      <input
+                                        type="text"
+                                        placeholder="Payment note / mode (optional)"
+                                        value={paymentComment}
+                                        onChange={(e) => setPaymentComment(e.target.value)}
+                                        className="mt-2 ml-5 w-64 border border-gray-300 dark:border-gray-600 rounded px-2 py-1.5 text-sm bg-white dark:bg-gray-700 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500 placeholder-gray-400"
+                                      />
                                       
                                       {/* Advance Deduction Section */}
                                       {pendingAdvance > 0 && (
@@ -672,21 +665,19 @@ const Salary = () => {
                                           <th className="text-right px-2 py-1.5 text-gray-600 dark:text-gray-400">Paid</th>
                                           <th className="text-right px-2 py-1.5 text-gray-600 dark:text-gray-400">Balance</th>
                                           <th className="text-center px-2 py-1.5 text-gray-600 dark:text-gray-400">Status</th>
-                                          <th className="text-left px-2 py-1.5 text-gray-600 dark:text-gray-400">Paid Date</th>
-                                          <th className="text-left px-2 py-1.5 text-gray-600 dark:text-gray-400">Paid By</th>
-                                          <th className="text-left px-2 py-1.5 text-gray-600 dark:text-gray-400">Comment</th>
+                                          <th className="text-left px-2 py-1.5 text-gray-600 dark:text-gray-400">Payment History</th>
                                         </tr>
                                       </thead>
                                       <tbody>
                                         {l.weeks.map((w, idx) => (
-                                          <tr key={idx} className="border-t border-gray-200 dark:border-gray-600">
-                                            <td className="px-2 py-1.5 text-gray-700 dark:text-gray-300">
-                                              {new Date(w.week_start).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })} - {new Date(w.week_end).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}
+                                          <tr key={idx} className="border-t border-gray-200 dark:border-gray-600 align-top">
+                                            <td className="px-2 py-1.5 text-gray-700 dark:text-gray-300 whitespace-nowrap">
+                                              {new Date(w.week_start).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })} – {new Date(w.week_end).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}
                                             </td>
                                             <td className="px-2 py-1.5 text-center text-gray-600 dark:text-gray-400">{w.days_present}</td>
                                             <td className="px-2 py-1.5 text-right text-gray-700 dark:text-gray-300">₹{w.total_amount.toLocaleString()}</td>
                                             <td className="px-2 py-1.5 text-right text-green-600">₹{w.paid_amount.toLocaleString()}</td>
-                                            <td className={`px-2 py-1.5 text-right ${(w.total_amount - w.paid_amount) > 0 ? 'text-orange-500' : 'text-green-500'}`}>
+                                            <td className={`px-2 py-1.5 text-right font-medium ${(w.total_amount - w.paid_amount) > 0 ? 'text-orange-500' : 'text-green-500'}`}>
                                               ₹{(w.total_amount - w.paid_amount).toLocaleString()}
                                             </td>
                                             <td className="px-2 py-1.5 text-center">
@@ -704,12 +695,28 @@ const Salary = () => {
                                                 </span>
                                               )}
                                             </td>
-                                            <td className="px-2 py-1.5 text-gray-600 dark:text-gray-400">
-                                              {w.paid_date ? new Date(w.paid_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '-'}
-                                            </td>
-                                            <td className="px-2 py-1.5 text-gray-600 dark:text-gray-400">{w.paid_by || '-'}</td>
-                                            <td className="px-2 py-1.5 text-gray-600 dark:text-gray-400 max-w-[150px] truncate" title={w.payment_comment || ''}>
-                                              {w.payment_comment || '-'}
+                                            {/* Payment log entries for this week */}
+                                            <td className="px-2 py-1.5">
+                                              {(!w.payments || w.payments.length === 0) ? (
+                                                <span className="text-gray-400 dark:text-gray-500">—</span>
+                                              ) : (
+                                                <div className="space-y-1">
+                                                  {w.payments.map((p) => (
+                                                    <div key={p.id} className="flex items-start gap-2 text-[11px]">
+                                                      <span className="font-semibold text-green-600 whitespace-nowrap">₹{p.amount.toLocaleString()}</span>
+                                                      <span className="text-gray-500 dark:text-gray-400 whitespace-nowrap">
+                                                        {new Date(p.paid_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: '2-digit' })}
+                                                      </span>
+                                                      <span className="text-gray-500 dark:text-gray-400">by {p.paid_by}</span>
+                                                      {p.comment && (
+                                                        <span className="text-gray-400 dark:text-gray-500 italic truncate max-w-[120px]" title={p.comment}>
+                                                          "{p.comment}"
+                                                        </span>
+                                                      )}
+                                                    </div>
+                                                  ))}
+                                                </div>
+                                              )}
                                             </td>
                                           </tr>
                                         ))}
