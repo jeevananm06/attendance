@@ -49,9 +49,11 @@ function CommentTooltip({ comment, children }) {
     if (delay) timerRef.current = setTimeout(() => setVisible(false), delay);
     else setVisible(false);
   };
+
+  // tap on mobile: show for 2.5 s then auto-hide
   const handleTouch = (e) => {
     if (!comment) return;
-    e.preventDefault();
+    e.preventDefault();          // prevent ghost click
     if (visible) { hide(); return; }
     show();
     timerRef.current = setTimeout(() => setVisible(false), 2500);
@@ -159,7 +161,7 @@ const MonthlyLabourCard = ({ labour, year, month, isAdmin }) => {
           </div>
           <div>
             <p className="font-semibold text-gray-800 dark:text-gray-100">{labour.name}</p>
-            <p className="text-xs text-gray-500 dark:text-gray-400">₹{labour.daily_wage}/day</p>
+            {isAdmin && <p className="text-xs text-gray-500 dark:text-gray-400">₹{labour.daily_wage}/day</p>}
           </div>
         </div>
         <div className="flex items-center gap-3">
@@ -193,7 +195,7 @@ const MonthlyLabourCard = ({ labour, year, month, isAdmin }) => {
             </button>
           </div>
           <div className="text-right">
-            <p className="font-bold text-gray-800 dark:text-gray-100">₹{earned.toLocaleString()}</p>
+            {isAdmin && <p className="font-bold text-gray-800 dark:text-gray-100">₹{earned.toLocaleString()}</p>}
             <p className="text-xs text-gray-400 dark:text-gray-500">{daysWorked} days</p>
           </div>
           {expanded
@@ -277,7 +279,7 @@ const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Frid
 const Attendance = () => {
   const { isAdmin, isManager } = useAuth();
   const canEditAttendance = isAdmin || isManager;
-  const canViewMonthly = isAdmin;
+  const canViewMonthly = isAdmin || isManager;
 
   const [view, setView] = useState('daily');
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
@@ -811,6 +813,7 @@ const Attendance = () => {
                         labour={labour}
                         year={selectedYear}
                         month={selectedMonth}
+                        isAdmin={isAdmin}
                       />
                     ))}
                   </div>

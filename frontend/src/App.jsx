@@ -10,6 +10,11 @@ import Stats from './pages/Stats';
 import Export from './pages/Export';
 import More from './pages/More';
 import Users from './pages/Users';
+import CafeDashboard from './pages/CafeDashboard';
+import CafeEntry from './pages/CafeEntry';
+import CafeHistory from './pages/CafeHistory';
+import CafeAnalytics from './pages/CafeAnalytics';
+import CafeItems from './pages/CafeItems';
 import InstallPrompt from './components/InstallPrompt';
 
 const ProtectedRoute = ({ children, allowedRoles }) => {
@@ -103,6 +108,46 @@ const App = () => {
             element={
               <ProtectedRoute allowedRoles={['admin']}>
                 <Users />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/cafe"
+            element={
+              <ProtectedRoute allowedRoles={['admin']}>
+                <CafeDashboard />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/cafe/entry"
+            element={
+              <ProtectedRoute allowedRoles={['admin']}>
+                <CafeEntry />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/cafe/history"
+            element={
+              <ProtectedRoute allowedRoles={['admin']}>
+                <CafeHistory />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/cafe/analytics"
+            element={
+              <ProtectedRoute allowedRoles={['admin']}>
+                <CafeAnalytics />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/cafe/items"
+            element={
+              <ProtectedRoute allowedRoles={['admin']}>
+                <CafeItems />
               </ProtectedRoute>
             }
           />

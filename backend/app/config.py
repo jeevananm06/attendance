@@ -30,6 +30,9 @@ NOTIFICATIONS_FILE = DATA_DIR / "notifications.csv"
 # Push subscription CSV
 PUSH_SUBSCRIPTIONS_FILE = DATA_DIR / "push_subscriptions.csv"
 
+# Payment log CSV (each salary payment installment)
+SALARY_PAYMENTS_FILE = DATA_DIR / "salary_payments.csv"
+
 # Document uploads directory
 DOCUMENTS_DIR = DATA_DIR / "documents"
 DOCUMENTS_DIR.mkdir(exist_ok=True)

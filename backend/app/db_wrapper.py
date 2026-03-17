@@ -4,6 +4,9 @@ This allows gradual migration and fallback to CSV for local development
 """
 
 import os
+from dotenv import load_dotenv
+
+load_dotenv()  # Ensure .env is loaded before reading USE_POSTGRES
 
 USE_POSTGRES = os.getenv("USE_POSTGRES", "false").lower() == "true"
 
@@ -35,6 +38,14 @@ if USE_POSTGRES:
         save_push_subscription, delete_push_subscription, get_push_subscriptions,
         # Init
         init_db_tables as init_csv_files
+    )
+
+    # Cafe inventory operations
+    from .db_operations import (
+        create_cafe_item, get_cafe_items, get_cafe_item, update_cafe_item,
+        create_cafe_stock_entry, get_cafe_stock_entries, get_cafe_stock_entry,
+        update_cafe_stock_entry, delete_cafe_stock_entry,
+        get_cafe_analytics, export_cafe_stock_csv,
     )
 
     # Bulk functions (PostgreSQL only, already imported above)
@@ -149,6 +160,19 @@ if USE_POSTGRES:
         return None
 
 else:
+    # CSV mode stubs for cafe inventory (data doesn't persist on Render — use PostgreSQL)
+    def create_cafe_item(name, category, unit, description=None): return None
+    def get_cafe_items(include_inactive=False): return []
+    def get_cafe_item(item_id): return None
+    def update_cafe_item(item_id, **kwargs): return None
+    def create_cafe_stock_entry(site_id, item_id, quantity, unit_price, supplier, entry_date, comments, created_by): return None
+    def get_cafe_stock_entries(site_id=None, item_id=None, start_date=None, end_date=None, limit=100, offset=0): return []
+    def get_cafe_stock_entry(entry_id): return None
+    def update_cafe_stock_entry(entry_id, **kwargs): return None
+    def delete_cafe_stock_entry(entry_id): return False
+    def get_cafe_analytics(site_id=None, start_date=None, end_date=None): return {"by_item": [], "by_site": [], "trend": [], "summary": {}}
+    def export_cafe_stock_csv(site_id=None, start_date=None, end_date=None): return ""
+
     from .database import (
         # User operations
         get_user, create_user, get_all_users, update_user,
@@ -166,7 +190,7 @@ else:
 
     from .database import (
         # Salary operations
-        get_salary_records, create_salary_record, mark_salary_paid,
+        get_salary_records, create_salary_record, mark_salary_paid, delete_unpaid_salary_records,
         # Overtime operations
         create_overtime, get_overtime_records,
         # Advance operations

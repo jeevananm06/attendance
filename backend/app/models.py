@@ -15,6 +15,7 @@ class User(BaseModel):
     role: UserRole
     hashed_password: str
     is_active: bool = True
+    cafe_price_access: bool = False
 
 
 class UserCreate(BaseModel):
@@ -27,6 +28,7 @@ class UserUpdate(BaseModel):
     password: Optional[str] = None
     role: Optional[UserRole] = None
     is_active: Optional[bool] = None
+    cafe_price_access: Optional[bool] = None
 
 
 class UserLogin(BaseModel):
@@ -126,7 +128,7 @@ class SalaryPayment(BaseModel):
     labour_id: str
     week_end: date  # Friday of the week
     amount_paid: Optional[float] = None  # None = pay full amount; otherwise partial
-    payment_comment: Optional[str] = None  # Comment required when paying more than due
+    payment_comment: Optional[str] = None  # Optional note for any payment
     advance_deduction: Optional[str] = None  # "full", "partial", or "none" (default: none)
     advance_deduction_amount: Optional[float] = None  # Amount to deduct if partial
 
@@ -134,7 +136,7 @@ class SalaryPayment(BaseModel):
 class PaymentLog(BaseModel):
     """Individual payment installment record — one row per payment made."""
     id: str
-    salary_record_id: str
+    salary_record_id: str   # links to salary.csv row
     labour_id: str
     amount: float
     paid_date: date
@@ -337,3 +339,68 @@ class PushSubscription(BaseModel):
     endpoint: str
     keys: dict   # {"p256dh": "...", "auth": "..."}
     user: str
+
+
+# ============== CAFE INVENTORY ==============
+
+class CafeItem(BaseModel):
+    id: str
+    name: str
+    category: str
+    unit: str
+    description: Optional[str] = None
+    active: bool = True
+    created_at: datetime
+    updated_at: datetime
+
+
+class CafeItemCreate(BaseModel):
+    name: str
+    category: str
+    unit: str
+    description: Optional[str] = None
+
+
+class CafeItemUpdate(BaseModel):
+    name: Optional[str] = None
+    category: Optional[str] = None
+    unit: Optional[str] = None
+    description: Optional[str] = None
+    active: Optional[bool] = None
+
+
+class CafeStockEntry(BaseModel):
+    id: str
+    site_id: str
+    item_id: str
+    site_name: Optional[str] = None
+    item_name: Optional[str] = None
+    item_unit: Optional[str] = None
+    item_category: Optional[str] = None
+    quantity: float
+    unit_price: Optional[float] = None
+    total_cost: Optional[float] = None
+    supplier: Optional[str] = None
+    entry_date: date
+    comments: Optional[str] = None
+    created_by: str
+    created_at: datetime
+    updated_at: datetime
+
+
+class CafeStockEntryCreate(BaseModel):
+    site_id: str
+    item_id: str
+    quantity: float
+    unit_price: Optional[float] = None
+    supplier: Optional[str] = None
+    entry_date: date
+    comments: Optional[str] = None
+
+
+class CafeStockEntryUpdate(BaseModel):
+    quantity: Optional[float] = None
+    unit_price: Optional[float] = None
+    supplier: Optional[str] = None
+    entry_date: Optional[date] = None
+    comments: Optional[str] = None
