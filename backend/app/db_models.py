@@ -225,3 +225,17 @@ class RefreshTokenDB(Base):
     expires_at = Column(DateTime, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
     is_revoked = Column(Boolean, default=False)
+
+
+class SalaryPaymentDB(Base):
+    """One row per payment installment — full audit trail of every payment made."""
+    __tablename__ = "salary_payments"
+
+    id = Column(String(36), primary_key=True, index=True)
+    salary_record_id = Column(String(36), ForeignKey("salary.id"), nullable=False, index=True)
+    labour_id = Column(String(36), ForeignKey("labours.id"), nullable=False, index=True)
+    amount = Column(Float, nullable=False)
+    paid_date = Column(Date, nullable=False)
+    paid_by = Column(String(100), nullable=False)
+    comment = Column(String(500), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
