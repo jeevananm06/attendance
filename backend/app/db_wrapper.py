@@ -48,6 +48,11 @@ if USE_POSTGRES:
         get_cafe_analytics, export_cafe_stock_csv,
     )
 
+    # Designation operations
+    from .db_operations import (
+        get_designations, create_designation, update_designation, delete_designation,
+    )
+
     # Bulk functions (PostgreSQL only, already imported above)
     # get_attendance_bulk, get_salary_records_bulk, create_salary_records_bulk
     # are imported directly from db_operations in salary_calculator.py

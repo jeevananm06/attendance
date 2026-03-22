@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { laboursAPI } from '../api';
+import { laboursAPI, designationsAPI } from '../api';
 import { useAuth } from '../context/AuthContext';
 import {
   Plus,
@@ -29,12 +29,24 @@ const Labours = () => {
     phone: '',
     daily_wage: '',
     joined_date: new Date().toISOString().split('T')[0],
-    pay_cycle: 'weekly'
+    pay_cycle: 'weekly',
+    designation: ''
   });
+  const [designations, setDesignations] = useState([]);
 
   useEffect(() => {
     fetchLabours();
+    fetchDesignations();
   }, [showInactive]);
+
+  const fetchDesignations = async () => {
+    try {
+      const res = await designationsAPI.getAll();
+      setDesignations(res.data);
+    } catch (err) {
+      console.error('Failed to load designations', err);
+    }
+  };
 
   const fetchLabours = async (silent = false) => {
     try {
@@ -57,7 +69,8 @@ const Labours = () => {
           name: formData.name,
           phone: formData.phone || null,
           daily_wage: parseFloat(formData.daily_wage),
-          pay_cycle: formData.pay_cycle
+          pay_cycle: formData.pay_cycle,
+          designation: formData.designation || null
         };
         // Only admin can update joined_date
         if (isAdmin && formData.joined_date) {
@@ -70,7 +83,8 @@ const Labours = () => {
           phone: formData.phone || null,
           daily_wage: parseFloat(formData.daily_wage),
           joined_date: formData.joined_date,
-          pay_cycle: formData.pay_cycle
+          pay_cycle: formData.pay_cycle,
+          designation: formData.designation || null
         });
       }
       setShowModal(false);
@@ -110,7 +124,8 @@ const Labours = () => {
       phone: labour.phone || '',
       daily_wage: labour.daily_wage.toString(),
       joined_date: labour.joined_date,
-      pay_cycle: labour.pay_cycle || 'weekly'
+      pay_cycle: labour.pay_cycle || 'weekly',
+      designation: labour.designation || ''
     });
     setShowModal(true);
   };
@@ -122,7 +137,8 @@ const Labours = () => {
       phone: '',
       daily_wage: '',
       joined_date: new Date().toISOString().split('T')[0],
-      pay_cycle: 'weekly'
+      pay_cycle: 'weekly',
+      designation: ''
     });
   };
 
@@ -200,6 +216,9 @@ const Labours = () => {
                 </div>
                 <div>
                   <h3 className="font-semibold text-gray-800 dark:text-gray-100">{labour.name}</h3>
+                  {labour.designation && (
+                    <p className="text-xs text-gray-500 dark:text-gray-400">{labour.designation}</p>
+                  )}
                   <span className={`text-xs px-2 py-0.5 rounded-full ${
                     labour.is_active
                       ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
@@ -336,6 +355,20 @@ const Labours = () => {
                   />
                 </div>
               )}
+
+              <div>
+                <label className="label">Designation</label>
+                <select
+                  value={formData.designation}
+                  onChange={(e) => setFormData({ ...formData, designation: e.target.value })}
+                  className="input"
+                >
+                  <option value="">-- None --</option>
+                  {designations.map((d) => (
+                    <option key={d.id} value={d.name}>{d.name}</option>
+                  ))}
+                </select>
+              </div>
 
               <div>
                 <label className="label">Pay Cycle *</label>

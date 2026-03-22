@@ -12,7 +12,8 @@ from sqlalchemy import and_, or_
 from .db_models import (
     UserDB, LabourDB, AttendanceDB, SalaryDB, OvertimeDB,
     AdvanceDB, LeaveDB, SiteDB, SiteAssignmentDB, AuditLogDB, BackupDB,
-    NotificationDB, PushSubscriptionDB, RefreshTokenDB, SalaryPaymentDB
+    NotificationDB, PushSubscriptionDB, RefreshTokenDB, SalaryPaymentDB,
+    DesignationDB
 )
 from .models import (
     User, Labour, Attendance, SalaryRecord, PaymentLog, UserRole, AttendanceStatus,
@@ -115,7 +116,8 @@ def get_all_labours(include_inactive: bool = False) -> List[Labour]:
             daily_wage=l.daily_wage,
             joined_date=l.joined_date,
             is_active=l.is_active,
-            pay_cycle=l.pay_cycle or "weekly"
+            pay_cycle=l.pay_cycle or "weekly",
+            designation=l.designation
         ) for l in labours]
     finally:
         db.close()
@@ -134,13 +136,14 @@ def get_labour(labour_id: str) -> Optional[Labour]:
             daily_wage=labour.daily_wage,
             joined_date=labour.joined_date,
             is_active=labour.is_active,
-            pay_cycle=labour.pay_cycle or "weekly"
+            pay_cycle=labour.pay_cycle or "weekly",
+            designation=labour.designation
         )
     finally:
         db.close()
 
 
-def create_labour(name: str, daily_wage: float, phone: str = None, joined_date: date = None, pay_cycle: str = "weekly") -> Labour:
+def create_labour(name: str, daily_wage: float, phone: str = None, joined_date: date = None, pay_cycle: str = "weekly", designation: str = None) -> Labour:
     db = get_db_session()
     try:
         labour_id = str(uuid.uuid4())[:8]
@@ -154,7 +157,8 @@ def create_labour(name: str, daily_wage: float, phone: str = None, joined_date: 
             daily_wage=daily_wage,
             joined_date=joined_date,
             is_active=True,
-            pay_cycle=pay_cycle
+            pay_cycle=pay_cycle,
+            designation=designation
         )
         db.add(db_labour)
         db.commit()
@@ -166,7 +170,8 @@ def create_labour(name: str, daily_wage: float, phone: str = None, joined_date: 
             daily_wage=daily_wage,
             joined_date=joined_date,
             is_active=True,
-            pay_cycle=pay_cycle
+            pay_cycle=pay_cycle,
+            designation=designation
         )
     finally:
         db.close()
@@ -1708,6 +1713,60 @@ def export_cafe_stock_csv(site_id: str = None, start_date=None, end_date=None) -
             f"{e.unit_price or ''},{e.total_cost or ''},{supplier},{comments},{e.created_by}"
         )
     return "\n".join(lines)
+
+
+# ============== DESIGNATION OPERATIONS ==============
+
+def get_designations() -> list:
+    db = get_db_session()
+    try:
+        records = db.query(DesignationDB).order_by(DesignationDB.name).all()
+        return [{"id": r.id, "name": r.name} for r in records]
+    finally:
+        db.close()
+
+
+def create_designation(name: str) -> dict:
+    db = get_db_session()
+    try:
+        existing = db.query(DesignationDB).filter(DesignationDB.name == name).first()
+        if existing:
+            return {"id": existing.id, "name": existing.name}
+        designation = DesignationDB(
+            id=str(uuid.uuid4())[:8],
+            name=name,
+        )
+        db.add(designation)
+        db.commit()
+        return {"id": designation.id, "name": designation.name}
+    finally:
+        db.close()
+
+
+def update_designation(designation_id: str, name: str) -> Optional[dict]:
+    db = get_db_session()
+    try:
+        record = db.query(DesignationDB).filter(DesignationDB.id == designation_id).first()
+        if not record:
+            return None
+        record.name = name
+        db.commit()
+        return {"id": record.id, "name": record.name}
+    finally:
+        db.close()
+
+
+def delete_designation(designation_id: str) -> bool:
+    db = get_db_session()
+    try:
+        record = db.query(DesignationDB).filter(DesignationDB.id == designation_id).first()
+        if not record:
+            return False
+        db.delete(record)
+        db.commit()
+        return True
+    finally:
+        db.close()
 
 
 # ============== INITIALIZATION ==============

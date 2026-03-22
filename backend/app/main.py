@@ -9,7 +9,7 @@ from .models import User, UserRole
 from .auth import get_password_hash
 from .routers import auth, labours, attendance, salary, stats, export
 from .routers import overtime, advances, leaves, sites, audit, backup, reports, notifications, push, documents
-from .routers import cafe_items, cafe_stock
+from .routers import cafe_items, cafe_stock, designations
 
 # Use PostgreSQL if enabled, otherwise CSV
 USE_POSTGRES = os.getenv("USE_POSTGRES", "false").lower() == "true"
@@ -69,6 +69,9 @@ app.include_router(documents.router)
 # Cafe inventory routers
 app.include_router(cafe_items.router)
 app.include_router(cafe_stock.router)
+
+# Designation router
+app.include_router(designations.router)
 
 
 async def keep_alive():

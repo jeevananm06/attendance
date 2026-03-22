@@ -56,6 +56,7 @@ class LabourDB(Base):
     joined_date = Column(Date, nullable=False)
     is_active = Column(Boolean, default=True)
     pay_cycle = Column(String(10), default="weekly")  # "weekly" or "monthly"
+    designation = Column(String(200), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     
     # Relationships
@@ -256,6 +257,14 @@ class CafeStockEntryDB(Base):
     created_by = Column(String(100), nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow)
+
+
+class DesignationDB(Base):
+    __tablename__ = "designations"
+
+    id = Column(String(36), primary_key=True, index=True)
+    name = Column(String(200), nullable=False, unique=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
 
 
 class SalaryPaymentDB(Base):

@@ -127,15 +127,15 @@ const Dashboard = () => {
           <>
             <StatCard
               icon={Wallet}
-              label="Total Paid"
-              value={`₹${(stats?.salary?.total_paid || 0).toLocaleString()}`}
+              label="Paid (This Month)"
+              value={`₹${(stats?.salary?.month_paid || 0).toLocaleString()}`}
               color="bg-purple-500"
               link="/salary"
             />
             <StatCard
               icon={TrendingUp}
-              label="Pending Salary"
-              value={`₹${(stats?.salary?.total_pending || 0).toLocaleString()}`}
+              label="Pending (This Month)"
+              value={`₹${(stats?.salary?.month_pending || 0).toLocaleString()}`}
               color="bg-orange-500"
               link="/salary"
             />
@@ -220,11 +220,13 @@ const Dashboard = () => {
           <div className="card">
             <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4">Salary Overview</h3>
             <div className="space-y-4">
+              {/* Current Month */}
               <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">This Month</p>
                 <div className="flex justify-between items-center mb-2">
-                  <span className="text-gray-600 dark:text-gray-400">Total Earned</span>
+                  <span className="text-gray-600 dark:text-gray-400">Earned</span>
                   <span className="font-semibold text-gray-800 dark:text-gray-100">
-                    ₹{(stats?.salary?.total_earned || 0).toLocaleString()}
+                    ₹{(stats?.salary?.month_earned || 0).toLocaleString()}
                   </span>
                 </div>
                 <div className="w-full bg-gray-200 dark:bg-gray-600 rounded-full h-2">
@@ -232,26 +234,44 @@ const Dashboard = () => {
                     className="bg-green-500 h-2 rounded-full"
                     style={{
                       width: `${
-                        stats?.salary?.total_earned
-                          ? (stats.salary.total_paid / stats.salary.total_earned) * 100
+                        stats?.salary?.month_earned
+                          ? (stats.salary.month_paid / stats.salary.month_earned) * 100
                           : 0
                       }%`
                     }}
                   />
                 </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="p-4 bg-green-50 dark:bg-green-900/30 rounded-lg text-center">
-                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Paid</p>
-                  <p className="text-xl font-bold text-green-600">
-                    ₹{(stats?.salary?.total_paid || 0).toLocaleString()}
-                  </p>
+                <div className="grid grid-cols-2 gap-4 mt-3">
+                  <div className="p-3 bg-green-50 dark:bg-green-900/30 rounded-lg text-center">
+                    <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">Paid</p>
+                    <p className="text-lg font-bold text-green-600">
+                      ₹{(stats?.salary?.month_paid || 0).toLocaleString()}
+                    </p>
+                  </div>
+                  <div className="p-3 bg-orange-50 dark:bg-orange-900/30 rounded-lg text-center">
+                    <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">Pending</p>
+                    <p className="text-lg font-bold text-orange-600">
+                      ₹{(stats?.salary?.month_pending || 0).toLocaleString()}
+                    </p>
+                  </div>
                 </div>
-                <div className="p-4 bg-orange-50 dark:bg-orange-900/30 rounded-lg text-center">
-                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Pending</p>
-                  <p className="text-xl font-bold text-orange-600">
-                    ₹{(stats?.salary?.total_pending || 0).toLocaleString()}
-                  </p>
+              </div>
+              {/* All-time */}
+              <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">All Time</p>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="text-center">
+                    <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">Total Paid</p>
+                    <p className="text-lg font-bold text-green-600">
+                      ₹{(stats?.salary?.total_paid || 0).toLocaleString()}
+                    </p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">Total Pending</p>
+                    <p className="text-lg font-bold text-orange-600">
+                      ₹{(stats?.salary?.total_pending || 0).toLocaleString()}
+                    </p>
+                  </div>
                 </div>
               </div>
             </div>
