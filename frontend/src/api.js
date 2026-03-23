@@ -276,6 +276,8 @@ export const statsAPI = {
     api.get(`/stats/trends?labour_id=${labourId}&weeks=${weeks}`),
   getWeeklyPendingDetail: (weekEnd) =>
     api.get(`/stats/weekly/pending-detail?week_end=${weekEnd}`),
+  getWeeklyByDesignation: (weeks = 8) =>
+    cached(`stats:weekly-by-designation:${weeks}`, () => api.get(`/stats/weekly/by-designation?weeks=${weeks}`), 60_000),
 };
 
 export const exportAPI = {

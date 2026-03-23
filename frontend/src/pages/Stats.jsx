@@ -15,6 +15,8 @@ import {
   Line,
   BarChart,
   Bar,
+  AreaChart,
+  Area,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -46,6 +48,7 @@ const Stats = () => {
   const [labourTrend, setLabourTrend] = useState(null);
   const [weekDetail, setWeekDetail] = useState(null);
   const [weekDetailLoading, setWeekDetailLoading] = useState(false);
+  const [designationWeekly, setDesignationWeekly] = useState(null);
 
   useEffect(() => {
     fetchData();
@@ -62,6 +65,7 @@ const Stats = () => {
       setOverview(overviewRes.data);
       setWeeklyStats(weeklyRes.data);
       setLabourStats(labourRes.data);
+      statsAPI.getWeeklyByDesignation(8).then(r => setDesignationWeekly(r.data)).catch(() => {});
       if (isAdmin) {
         statsAPI.getSiteCosts().then(r => setSiteCosts(r.data)).catch(() => {});
         statsAPI.getWeeklyBySite(8).then(r => setSiteWeekly(r.data)).catch(() => {});
@@ -246,6 +250,39 @@ const Stats = () => {
           )}
         </div>
       </div>
+
+      {/* Wages by Designation — Stacked Area Chart */}
+      {designationWeekly && designationWeekly.designations.length > 0 && (
+        <div className="card">
+          <div className="flex items-center gap-2 mb-4">
+            <Users className="text-primary-600" size={20} />
+            <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100">
+              Weekly Wages by Designation (Last 8 Weeks)
+            </h3>
+          </div>
+          <ResponsiveContainer width="100%" height={320}>
+            <AreaChart data={designationWeekly.weeks} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="label" tick={{ fontSize: 12 }} />
+              <YAxis tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`} />
+              <Tooltip formatter={(value) => `₹${Number(value).toLocaleString()}`} />
+              <Legend />
+              {designationWeekly.designations.map((desg, idx) => (
+                <Area
+                  key={desg}
+                  type="monotone"
+                  dataKey={desg}
+                  name={desg}
+                  stackId="1"
+                  stroke={SITE_COLORS[idx % SITE_COLORS.length]}
+                  fill={SITE_COLORS[idx % SITE_COLORS.length]}
+                  fillOpacity={0.6}
+                />
+              ))}
+            </AreaChart>
+          </ResponsiveContainer>
+        </div>
+      )}
 
       {/* Site-wise Cost Stats (Admin only) */}
       {isAdmin && siteCosts && siteCosts.sites.length > 0 && (

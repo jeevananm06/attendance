@@ -172,6 +172,48 @@ async def get_weekly_stats(
     return {"weeks": weekly_data}
 
 
+@router.get("/weekly/by-designation")
+async def get_weekly_by_designation(
+    weeks: int = 8,
+    current_user: User = Depends(get_current_manager_or_admin)
+):
+    """Get weekly wages broken down by labour designation for the last N weeks."""
+    from ..salary_calculator import get_week_boundaries
+
+    today = date.today()
+    all_records = get_salary_records()
+    labours_map = {l.id: l for l in get_all_labours(include_inactive=True)}
+
+    all_designations = set()
+    weekly_data = []
+
+    for i in range(weeks):
+        target_date = today - timedelta(weeks=i)
+        week_start, week_end = get_week_boundaries(target_date)
+
+        week_records = [r for r in all_records if r.week_end == week_end]
+
+        desg_totals = {}
+        for r in week_records:
+            labour = labours_map.get(r.labour_id)
+            desg = (labour.designation if labour and labour.designation else "Unassigned")
+            desg_totals[desg] = desg_totals.get(desg, 0) + r.total_amount
+            all_designations.add(desg)
+
+        weekly_data.append({
+            "week_end": week_end.isoformat(),
+            "label": week_end.strftime("%b %d"),
+            **desg_totals,
+        })
+
+    weekly_data.reverse()
+
+    return {
+        "weeks": weekly_data,
+        "designations": sorted(all_designations),
+    }
+
+
 @router.get("/weekly/pending-detail")
 async def get_weekly_pending_detail(
     week_end: date,
