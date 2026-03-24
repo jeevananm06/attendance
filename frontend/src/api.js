@@ -248,6 +248,9 @@ export const salaryAPI = {
     if (weekEnd) url += `?week_end=${weekEnd}`;
     return api.get(url);
   },
+  getSlipAllPending: (labourId) => {
+    return api.get(`/salary/slip/${labourId}/all-pending`);
+  },
   getRegister: (year, month) =>
     api.get(`/salary/register?year=${year}&month=${month}`),
   getPayments: (labourId) =>

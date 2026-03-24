@@ -149,10 +149,15 @@ const Salary = () => {
     setAdvanceDeductionAmount('');
   };
 
-  const handleOpenSlip = async (labour) => {
+  const handleOpenSlip = async (labour, mode = 'last') => {
     try {
-      const weekEnd = getLatestWeekEnd(labour.records);
-      const res = await salaryAPI.getSlip(labour.labour_id, weekEnd);
+      let res;
+      if (mode === 'all_pending') {
+        res = await salaryAPI.getSlipAllPending(labour.labour_id);
+      } else {
+        const weekEnd = getLatestWeekEnd(labour.records);
+        res = await salaryAPI.getSlip(labour.labour_id, weekEnd);
+      }
       setSlip(res.data);
     } catch (err) {
       setError(err.response?.data?.detail || 'Failed to load salary slip');
@@ -768,13 +773,23 @@ const LabourSalaryCard = ({
             </table>
 
             <div className="flex gap-3 flex-wrap">
-              <button
-                onClick={() => handleOpenSlip(labour)}
-                className="btn-secondary flex items-center gap-2"
-              >
-                <FileText size={18} />
-                Slip
-              </button>
+              <div className="relative group">
+                <button
+                  onClick={() => handleOpenSlip(labour, 'last')}
+                  className="btn-secondary flex items-center gap-2"
+                >
+                  <FileText size={18} />
+                  Slip
+                </button>
+                {labour.total_pending > 0 && (
+                  <button
+                    onClick={() => handleOpenSlip(labour, 'all_pending')}
+                    className="btn-secondary flex items-center gap-1 text-xs mt-1 w-full justify-center"
+                  >
+                    All Pending
+                  </button>
+                )}
+              </div>
               <button
                 onClick={() => handleCalculateOne(labour.labour_id)}
                 disabled={calculatingLabour === labour.labour_id}
