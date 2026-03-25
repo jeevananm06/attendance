@@ -53,6 +53,9 @@ if USE_POSTGRES:
         get_designations, create_designation, update_designation, delete_designation,
     )
 
+    # Refresh token cleanup
+    from .db_operations import cleanup_old_refresh_tokens
+
     # Bulk functions (PostgreSQL only, already imported above)
     # get_attendance_bulk, get_salary_records_bulk, create_salary_records_bulk
     # are imported directly from db_operations in salary_calculator.py

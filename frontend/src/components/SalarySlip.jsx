@@ -1,5 +1,6 @@
-import { useRef } from 'react';
-import { X, Printer } from 'lucide-react';
+import { useRef, useState } from 'react';
+import { X, Printer, Share2, Download } from 'lucide-react';
+import html2canvas from 'html2canvas';
 
 const fmt = (n) => `₹${Number(n).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const fmtDate = (s) =>
@@ -8,6 +9,7 @@ const fmtDate = (s) =>
 const SalarySlip = ({ slip, onClose }) => {
   const printRef = useRef(null);
   const isMulti = slip.mode === 'all_pending';
+  const [sharing, setSharing] = useState(false);
 
   const handlePrint = () => {
     const content = printRef.current?.innerHTML;
@@ -39,6 +41,42 @@ const SalarySlip = ({ slip, onClose }) => {
     win.close();
   };
 
+  const handleShare = async () => {
+    if (!printRef.current) return;
+    setSharing(true);
+    try {
+      const canvas = await html2canvas(printRef.current, {
+        backgroundColor: '#ffffff',
+        scale: 2,
+        useCORS: true,
+      });
+      const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
+      const fileName = `salary-slip-${slip.labour_name.replace(/\s+/g, '-')}.png`;
+      const file = new File([blob], fileName, { type: 'image/png' });
+
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({
+          title: `Salary Slip - ${slip.labour_name}`,
+          files: [file],
+        });
+      } else {
+        // Fallback: download the image
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = fileName;
+        a.click();
+        URL.revokeObjectURL(url);
+      }
+    } catch (err) {
+      if (err.name !== 'AbortError') {
+        console.error('Share failed:', err);
+      }
+    } finally {
+      setSharing(false);
+    }
+  };
+
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col">
@@ -48,6 +86,19 @@ const SalarySlip = ({ slip, onClose }) => {
             {isMulti ? 'All Pending Salary Slip' : 'Salary Slip'}
           </h3>
           <div className="flex items-center gap-2">
+            <button
+              onClick={handleShare}
+              disabled={sharing}
+              className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm disabled:opacity-50"
+              title="Share as image"
+            >
+              {sharing ? (
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              ) : (
+                <Share2 size={16} />
+              )}
+              Share
+            </button>
             <button
               onClick={handlePrint}
               className="flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-sm"

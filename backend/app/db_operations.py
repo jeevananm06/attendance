@@ -4,7 +4,7 @@ This module replaces the CSV-based database.py with SQLAlchemy operations
 """
 
 from typing import List, Optional
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 import uuid
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, or_
@@ -1409,6 +1409,23 @@ def revoke_all_refresh_tokens(username: str) -> bool:
     except Exception:
         db.rollback()
         return False
+    finally:
+        db.close()
+
+
+def cleanup_old_refresh_tokens(days: int = 30) -> int:
+    """Delete refresh tokens older than the given number of days"""
+    db = get_db_session()
+    try:
+        cutoff = datetime.utcnow() - timedelta(days=days)
+        count = db.query(RefreshTokenDB).filter(
+            RefreshTokenDB.expires_at < cutoff
+        ).delete()
+        db.commit()
+        return count
+    except Exception:
+        db.rollback()
+        return 0
     finally:
         db.close()
 

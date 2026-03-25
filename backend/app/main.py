@@ -144,6 +144,16 @@ async def startup_event():
         except Exception as e:
             print(f"DB MIGRATION (cafe_price_access sqlite): {e}", flush=True)
     
+    # Clean up refresh tokens older than 30 days
+    if USE_POSTGRES:
+        try:
+            from .db_wrapper import cleanup_old_refresh_tokens
+            deleted = cleanup_old_refresh_tokens(days=30)
+            if deleted:
+                print(f"CLEANUP: Deleted {deleted} old refresh tokens", flush=True)
+        except Exception as e:
+            print(f"CLEANUP WARNING: {e}", flush=True)
+
     try:
         existing = get_user("admin")
         print(f"DB ADMIN CHECK: existing={existing}", flush=True)
