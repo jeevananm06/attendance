@@ -466,7 +466,8 @@ async def get_site_profitability(
 ):
     """Site Profitability / Cost-per-Day — per-site cost efficiency for a given month (Admin only).
     Cost/Day and Utilization are scoped to the selected month (defaults to current month).
-    Utilization = actual attendance days / (labours × working weeks × 6), capped at 100%.
+    Cost/Day = total earned / days in month.
+    Utilization = actual attendance days / (labours × working weeks × 7), capped at 100%.
     """
     from ..salary_calculator import get_week_boundaries
 
@@ -510,13 +511,14 @@ async def get_site_profitability(
         total_earned = sum(r.total_amount for r in site_records)
         total_days = sum(r.days_present for r in site_records)
 
-        # Cost per day = total earned / total attendance days (this month)
-        cost_per_day = round(total_earned / total_days, 2) if total_days > 0 else 0
+        # Cost per day = total earned / number of days in the month
+        days_in_month = cal_module.monthrange(year, month)[1]
+        cost_per_day = round(total_earned / days_in_month, 2) if total_earned > 0 else 0
 
         # Utilization = actual days / possible days
-        # Possible days = number of labours who have records × number of weeks × 6
+        # Possible days = number of labours who have records × number of weeks × 7
         active_lids_in_month = set(r.labour_id for r in site_records)
-        possible_days = len(active_lids_in_month) * num_weeks * 6
+        possible_days = len(active_lids_in_month) * num_weeks * 7
         utilization_pct = round(min(total_days / possible_days, 1.0) * 100, 1) if possible_days > 0 else 0
 
         site_summaries.append({
