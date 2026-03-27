@@ -159,6 +159,13 @@ export const laboursAPI = {
   delete: (id) => { invalidateCache('labours:all', `labours:${id}`); return api.delete(`/labours/${id}`); },
 };
 
+export const designationsAPI = {
+  getAll: () => cached('designations:all', () => api.get('/designations'), 60_000),
+  create: (data) => { invalidateCache('designations:all'); return api.post('/designations', data); },
+  update: (id, data) => { invalidateCache('designations:all'); return api.put(`/designations/${id}`, data); },
+  delete: (id) => { invalidateCache('designations:all'); return api.delete(`/designations/${id}`); },
+};
+
 export const attendanceAPI = {
   getByDate: (date) =>
     cached(`attendance:date:${date}`, () => api.get(`/attendance/date/${date}`), 30_000),
