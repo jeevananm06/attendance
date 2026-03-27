@@ -277,6 +277,16 @@ export const statsAPI = {
     cached(`stats:weekly-by-site:${weeks}`, () => api.get(`/stats/weekly-by-site?weeks=${weeks}`), 60_000),
   getTrends: (labourId, weeks = 12) =>
     api.get(`/stats/trends?labour_id=${labourId}&weeks=${weeks}`),
+  getPaymentDelays: () =>
+    cached('stats:payment-delays', () => api.get('/stats/payment-delays'), 60_000),
+  getPaymentFunnel: (year, month) =>
+    api.get(`/stats/payment-funnel?year=${year}&month=${month}`),
+  getSiteProfitability: (weeks = 8) =>
+    cached(`stats:site-profit:${weeks}`, () => api.get(`/stats/site-profitability?weeks=${weeks}`), 60_000),
+  getPayrollComparison: () =>
+    cached('stats:payroll-comparison', () => api.get('/stats/payroll-comparison'), 60_000),
+  getWageDistribution: () =>
+    cached('stats:wage-distribution', () => api.get('/stats/wage-distribution'), 60_000),
   getWeeklyPendingDetail: (weekEnd) =>
     api.get(`/stats/weekly/pending-detail?week_end=${weekEnd}`),
   getWeeklyByDesignation: (weeks = 8) =>
