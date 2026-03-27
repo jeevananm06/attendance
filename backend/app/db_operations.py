@@ -3069,7 +3069,6 @@ def get_cafe_stock_entries(site_id: str = None, item_id: str = None,
             q = q.filter(CafeStockEntryDB.entry_date <= end_date)
 
         rows = q.order_by(CafeStockEntryDB.entry_date.desc(), CafeStockEntryDB.created_at.desc()) \
-
                 .offset(offset).limit(limit).all()
 
 
@@ -3292,9 +3291,7 @@ def get_cafe_analytics(site_id: str = None, start_date=None, end_date=None) -> d
 
             ).join(CafeItemDB, CafeStockEntryDB.item_id == CafeItemDB.id)
 
-        ).group_by(CafeItemDB.id, CafeItemDB.name, CafeItemDB.category, CafeItemDB.unit) \
-
-         .order_by(desc('total_quantity'))
+        ).group_by(CafeItemDB.id, CafeItemDB.name, CafeItemDB.category, CafeItemDB.unit).order_by(desc('total_quantity'))
 
         by_item = [{"item_name": r.item_name, "category": r.category, "unit": r.unit,
 
