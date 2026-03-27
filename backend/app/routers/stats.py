@@ -128,16 +128,16 @@ async def get_weekly_stats(
     
     today = date.today()
     weekly_data = []
-    
+
+    labours = get_all_labours()
+    all_records = get_salary_records()
+
     for i in range(weeks):
         target_date = today - timedelta(weeks=i)
         week_start, week_end = get_week_boundaries(target_date)
-        
-        labours = get_all_labours()
-        week_records = get_salary_records()
-        
+
         # Filter records for this week
-        week_salary = [r for r in week_records if r.week_end == week_end]
+        week_salary = [r for r in all_records if r.week_end == week_end]
         
         total_days = sum(r.days_present for r in week_salary)
         total_wages = sum(r.total_amount for r in week_salary)

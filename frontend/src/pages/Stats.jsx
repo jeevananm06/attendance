@@ -62,15 +62,14 @@ const Stats = () => {
   const fetchData = async (silent = false) => {
     try {
       if (!silent) setLoading(true);
-      const [overviewRes, weeklyRes, labourRes] = await Promise.all([
+      const [overviewRes, weeklyRes] = await Promise.all([
         statsAPI.getOverview(),
         statsAPI.getWeekly(8),
-        statsAPI.getAllLabourStats()
       ]);
       setOverview(overviewRes.data);
       setWeeklyStats(weeklyRes.data);
-      setLabourStats(labourRes.data);
-      // statsAPI.getWeeklyByDesignation removed — endpoint does not exist
+      // Load remaining data non-blocking so page renders faster
+      statsAPI.getAllLabourStats().then(r => setLabourStats(r.data)).catch(() => {});
       if (isAdmin) {
         statsAPI.getAttendanceReport(12).then(r => setAttendanceReport(r.data)).catch(() => {});
         statsAPI.getSiteCosts().then(r => setSiteCosts(r.data)).catch(() => {});
