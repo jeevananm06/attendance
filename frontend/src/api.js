@@ -288,6 +288,8 @@ export const statsAPI = {
     cached('stats:payroll-comparison', () => api.get('/stats/payroll-comparison'), 60_000),
   getWageDistribution: () =>
     cached('stats:wage-distribution', () => api.get('/stats/wage-distribution'), 60_000),
+  getAttendanceReport: (months = 12) =>
+    cached(`stats:attendance-report:${months}`, () => api.get(`/stats/attendance-report?months=${months}`), 60_000),
 };
 
 export const exportAPI = {

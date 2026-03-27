@@ -683,3 +683,104 @@ async def get_wage_distribution(
         },
         "labours": labour_wages,
     }
+
+
+@router.get("/attendance-report")
+async def get_attendance_report(
+    months: int = 12,
+    current_user: User = Depends(get_current_admin)
+):
+    """Attendance report for last N months — days present vs working days per labour.
+    Working days = 7 per week. Sorted by attendance percentage descending.
+    """
+    from ..salary_calculator import get_week_boundaries
+
+    today = date.today()
+    # Go back N months
+    start_year = today.year
+    start_month = today.month - months
+    while start_month <= 0:
+        start_month += 12
+        start_year -= 1
+    from_date = date(start_year, start_month + 1, 1) if start_month < 12 else date(start_year + 1, 1, 1)
+    # Simpler: just go back N*30 days worth of weeks
+    from_date = today - timedelta(days=months * 30)
+
+    all_salary = get_salary_records()
+    all_labours = get_all_labours(include_inactive=False)
+    labour_map = {l.id: l for l in all_labours}
+
+    # Filter salary records to the period
+    period_salary = [r for r in all_salary if r.week_end >= from_date]
+
+    # Count distinct weeks in the period (for working days denominator)
+    all_week_ends = sorted(set(r.week_end for r in period_salary))
+    total_weeks = len(all_week_ends) or 1
+    total_working_days = total_weeks * 7
+
+    # Per-month breakdown for chart
+    month_buckets = defaultdict(lambda: defaultdict(float))
+    month_working_days = defaultdict(set)
+    for r in period_salary:
+        key = r.week_end.strftime("%Y-%m")
+        month_buckets[r.labour_id][key] += r.days_present
+        month_working_days[key].add(r.week_end)
+
+    # Sorted month labels
+    all_months = sorted(month_working_days.keys())
+    month_labels = []
+    month_total_days = {}
+    for m in all_months:
+        num_weeks = len(month_working_days[m])
+        working = num_weeks * 7
+        month_total_days[m] = working
+        y, mo = m.split("-")
+        label = date(int(y), int(mo), 1).strftime("%b %Y")
+        month_labels.append({"key": m, "label": label, "working_days": working})
+
+    # Per-labour summary
+    labour_rows = []
+    for labour in all_labours:
+        lid = labour.id
+        records = [r for r in period_salary if r.labour_id == lid]
+        if not records:
+            continue
+        days_present = sum(r.days_present for r in records)
+        # Working days = weeks where this labour has records × 7
+        labour_week_ends = set(r.week_end for r in records)
+        labour_working_days = len(labour_week_ends) * 7
+        pct = round(min(days_present / labour_working_days, 1.0) * 100, 1) if labour_working_days > 0 else 0
+
+        # Monthly breakdown
+        monthly = []
+        for m_info in month_labels:
+            m_key = m_info["key"]
+            present = month_buckets[lid].get(m_key, 0)
+            monthly.append({
+                "month": m_info["label"],
+                "days_present": present,
+                "working_days": m_info["working_days"],
+            })
+
+        labour_rows.append({
+            "labour_id": lid,
+            "labour_name": labour.name,
+            "designation": getattr(labour, "designation", None),
+            "days_present": days_present,
+            "working_days": labour_working_days,
+            "attendance_pct": pct,
+            "monthly": monthly,
+        })
+
+    # Sort by attendance percentage descending
+    labour_rows.sort(key=lambda x: x["attendance_pct"], reverse=True)
+
+    return {
+        "months": months,
+        "from_date": from_date.isoformat(),
+        "to_date": today.isoformat(),
+        "total_weeks": total_weeks,
+        "total_working_days": total_working_days,
+        "month_labels": month_labels,
+        "labours": labour_rows,
+    }
