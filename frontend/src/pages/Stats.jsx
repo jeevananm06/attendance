@@ -70,9 +70,9 @@ const Stats = () => {
       setOverview(overviewRes.data);
       setWeeklyStats(weeklyRes.data);
       setLabourStats(labourRes.data);
-      statsAPI.getWeeklyByDesignation(8).then(r => setDesignationWeekly(r.data)).catch(() => {});
-      statsAPI.getAttendanceReport(12).then(r => setAttendanceReport(r.data)).catch(() => {});
+      // statsAPI.getWeeklyByDesignation removed — endpoint does not exist
       if (isAdmin) {
+        statsAPI.getAttendanceReport(12).then(r => setAttendanceReport(r.data)).catch(() => {});
         statsAPI.getSiteCosts().then(r => setSiteCosts(r.data)).catch(() => {});
         statsAPI.getWeeklyBySite(8).then(r => setSiteWeekly(r.data)).catch(() => {});
       }
