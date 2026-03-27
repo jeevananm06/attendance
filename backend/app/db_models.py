@@ -5,8 +5,13 @@ SQLAlchemy Database Models for Labour Attendance Management System
 from sqlalchemy import Column, String, Float, Boolean, Date, DateTime, Enum, ForeignKey, Text
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
-from datetime import datetime, date
+from datetime import datetime, date, timezone, timedelta
 import enum
+
+IST = timezone(timedelta(hours=5, minutes=30))
+
+def ist_now():
+    return datetime.now(IST).replace(tzinfo=None)
 
 Base = declarative_base()
 
@@ -43,7 +48,7 @@ class UserDB(Base):
     hashed_password = Column(String(255), nullable=False)
     is_active = Column(Boolean, default=True)
     cafe_price_access = Column(Boolean, default=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=ist_now)
 
 
 class LabourDB(Base):
@@ -57,7 +62,7 @@ class LabourDB(Base):
     is_active = Column(Boolean, default=True)
     pay_cycle = Column(String(10), default="weekly")  # "weekly" or "monthly"
     designation = Column(String(200), nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=ist_now)
     
     # Relationships
     attendances = relationship("AttendanceDB", back_populates="labour")
@@ -76,7 +81,7 @@ class AttendanceDB(Base):
     status = Column(String(20), default="present")
     comment = Column(String(500), nullable=True)
     marked_by = Column(String(100), nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=ist_now)
     
     # Relationships
     labour = relationship("LabourDB", back_populates="attendances")
@@ -97,7 +102,7 @@ class SalaryDB(Base):
     paid_date = Column(Date, nullable=True)
     paid_by = Column(String(100), nullable=True)
     payment_comment = Column(String(500), nullable=True)  # Comment for excess payments
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=ist_now)
     
     # Relationships
     labour = relationship("LabourDB", back_populates="salaries")
@@ -112,7 +117,7 @@ class OvertimeDB(Base):
     hours = Column(Float, nullable=False)
     rate_multiplier = Column(Float, default=1.5)
     created_by = Column(String(100), nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=ist_now)
     
     # Relationships
     labour = relationship("LabourDB", back_populates="overtimes")
@@ -129,7 +134,7 @@ class AdvanceDB(Base):
     is_deducted = Column(Boolean, default=False)
     repaid_amount = Column(Float, default=0.0)
     created_by = Column(String(100), nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=ist_now)
     
     # Relationships
     labour = relationship("LabourDB", back_populates="advances")
@@ -146,7 +151,7 @@ class LeaveDB(Base):
     reason = Column(Text, nullable=True)
     status = Column(String(20), default="pending")
     approved_by = Column(String(100), nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=ist_now)
     
     # Relationships
     labour = relationship("LabourDB", back_populates="leaves")
@@ -159,7 +164,7 @@ class SiteDB(Base):
     name = Column(String(200), nullable=False)
     address = Column(Text, nullable=True)
     is_active = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=ist_now)
 
 
 class SiteAssignmentDB(Base):
@@ -170,7 +175,7 @@ class SiteAssignmentDB(Base):
     site_id = Column(String(36), ForeignKey("sites.id"), nullable=False)
     assigned_date = Column(Date, nullable=False)
     is_active = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=ist_now)
 
 
 class AuditLogDB(Base):
@@ -182,7 +187,7 @@ class AuditLogDB(Base):
     entity_id = Column(String(36), nullable=True)
     user = Column(String(100), nullable=True)
     details = Column(Text, nullable=True)
-    timestamp = Column(DateTime, default=datetime.utcnow)
+    timestamp = Column(DateTime, default=ist_now)
 
 
 class BackupDB(Base):
@@ -191,7 +196,7 @@ class BackupDB(Base):
     id = Column(String(36), primary_key=True, index=True)
     filename = Column(String(255), nullable=False)
     created_by = Column(String(100), nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=ist_now)
 
 
 class NotificationDB(Base):
@@ -204,7 +209,7 @@ class NotificationDB(Base):
     title = Column(String(200), nullable=False)
     message = Column(Text, nullable=False)
     is_read = Column(Boolean, default=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=ist_now)
 
 
 class PushSubscriptionDB(Base):
@@ -215,7 +220,7 @@ class PushSubscriptionDB(Base):
     endpoint = Column(Text, nullable=False, unique=True)
     p256dh = Column(Text, nullable=False)
     auth = Column(Text, nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=ist_now)
 
 
 class RefreshTokenDB(Base):
@@ -225,7 +230,7 @@ class RefreshTokenDB(Base):
     user_id = Column(String(100), nullable=False, index=True)
     token = Column(String(255), nullable=False, unique=True)
     expires_at = Column(DateTime, nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=ist_now)
     is_revoked = Column(Boolean, default=False)
 
 
@@ -238,8 +243,8 @@ class CafeItemDB(Base):
     unit = Column(String(50), nullable=False)
     description = Column(Text, nullable=True)
     active = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=ist_now)
+    updated_at = Column(DateTime, default=ist_now)
 
 
 class CafeStockEntryDB(Base):
@@ -255,8 +260,8 @@ class CafeStockEntryDB(Base):
     entry_date = Column(Date, nullable=False)
     comments = Column(Text, nullable=True)
     created_by = Column(String(100), nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=ist_now)
+    updated_at = Column(DateTime, default=ist_now)
 
 
 class DesignationDB(Base):
@@ -264,7 +269,7 @@ class DesignationDB(Base):
 
     id = Column(String(36), primary_key=True, index=True)
     name = Column(String(200), nullable=False, unique=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=ist_now)
 
 
 class SalaryPaymentDB(Base):
@@ -278,4 +283,4 @@ class SalaryPaymentDB(Base):
     paid_date = Column(Date, nullable=False)
     paid_by = Column(String(100), nullable=False)
     comment = Column(String(500), nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=ist_now)
