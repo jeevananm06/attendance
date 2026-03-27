@@ -358,30 +358,7 @@ const Stats = () => {
             </h3>
           </div>
 
-          {/* Horizontal Bar Chart */}
-          <ResponsiveContainer width="100%" height={Math.max(300, attendanceReport.labours.length * 36)}>
-            <BarChart data={attendanceReport.labours.map(l => ({ name: l.labour_name, attendance_pct: l.attendance_pct }))} layout="vertical" margin={{ left: 10, right: 30 }}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis type="number" domain={[0, 100]} tickFormatter={(v) => `${v}%`} />
-              <YAxis type="category" dataKey="name" width={120} tick={{ fontSize: 12 }} />
-              <Tooltip formatter={(v) => `${v}%`} />
-              <Bar dataKey="attendance_pct" name="Attendance %" radius={[0, 4, 4, 0]}>
-                {attendanceReport.labours.map((entry, idx) => (
-                  <Cell
-                    key={idx}
-                    fill={
-                      entry.attendance_pct >= 80 ? '#22c55e' :
-                      entry.attendance_pct >= 60 ? '#3b82f6' :
-                      entry.attendance_pct >= 40 ? '#f97316' : '#ef4444'
-                    }
-                  />
-                ))}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-
-          {/* Detailed Table */}
-          <div className="mt-4 overflow-x-auto">
+          <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="sticky top-0 bg-white dark:bg-gray-800">
                 <tr className="border-b bg-gray-50 dark:bg-gray-700">
