@@ -160,8 +160,8 @@ export const laboursAPI = {
 };
 
 export const designationsAPI = {
-  getAll: () => cached('designations:all', () => api.get('/designations/'), 120_000),
-  create: (data) => { invalidateCache('designations:all'); return api.post('/designations/', data); },
+  getAll: () => cached('designations:all', () => api.get('/designations'), 60_000),
+  create: (data) => { invalidateCache('designations:all'); return api.post('/designations', data); },
   update: (id, data) => { invalidateCache('designations:all'); return api.put(`/designations/${id}`, data); },
   delete: (id) => { invalidateCache('designations:all'); return api.delete(`/designations/${id}`); },
 };
@@ -248,9 +248,6 @@ export const salaryAPI = {
     if (weekEnd) url += `?week_end=${weekEnd}`;
     return api.get(url);
   },
-  getSlipAllPending: (labourId) => {
-    return api.get(`/salary/slip/${labourId}/all-pending`);
-  },
   getRegister: (year, month) =>
     api.get(`/salary/register?year=${year}&month=${month}`),
   getPayments: (labourId) =>
@@ -281,16 +278,16 @@ export const statsAPI = {
     cached('stats:payment-delays', () => api.get('/stats/payment-delays'), 60_000),
   getPaymentFunnel: (year, month) =>
     api.get(`/stats/payment-funnel?year=${year}&month=${month}`),
-  getSiteProfitability: (weeks = 8) =>
-    cached(`stats:site-profit:${weeks}`, () => api.get(`/stats/site-profitability?weeks=${weeks}`), 60_000),
+  getSiteProfitability: (weeks = 8, year, month) => {
+    let url = `/stats/site-profitability?weeks=${weeks}`;
+    if (year) url += `&year=${year}`;
+    if (month) url += `&month=${month}`;
+    return api.get(url);
+  },
   getPayrollComparison: () =>
     cached('stats:payroll-comparison', () => api.get('/stats/payroll-comparison'), 60_000),
   getWageDistribution: () =>
     cached('stats:wage-distribution', () => api.get('/stats/wage-distribution'), 60_000),
-  getWeeklyPendingDetail: (weekEnd) =>
-    api.get(`/stats/weekly/pending-detail?week_end=${weekEnd}`),
-  getWeeklyByDesignation: (weeks = 8) =>
-    cached(`stats:weekly-by-designation:${weeks}`, () => api.get(`/stats/weekly/by-designation?weeks=${weeks}`), 60_000),
 };
 
 export const exportAPI = {

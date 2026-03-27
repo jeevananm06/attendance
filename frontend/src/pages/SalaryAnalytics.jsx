@@ -52,6 +52,8 @@ const SalaryAnalytics = () => {
   const [funnelYear, setFunnelYear] = useState(new Date().getFullYear());
   const [funnelMonth, setFunnelMonth] = useState(new Date().getMonth() + 1);
   const [siteProfitability, setSiteProfitability] = useState(null);
+  const [siteYear, setSiteYear] = useState(new Date().getFullYear());
+  const [siteMonth, setSiteMonth] = useState(new Date().getMonth() + 1);
   const [payrollComparison, setPayrollComparison] = useState(null);
   const [wageDistribution, setWageDistribution] = useState(null);
   const [expandedDelays, setExpandedDelays] = useState(false);
@@ -75,10 +77,7 @@ const SalaryAnalytics = () => {
           await loadFunnel(funnelYear, funnelMonth);
           break;
         case 'sites':
-          if (!siteProfitability) {
-            const res = await statsAPI.getSiteProfitability(8);
-            setSiteProfitability(res.data);
-          }
+          await loadSiteProfitability(siteYear, siteMonth);
           break;
         case 'payroll':
           if (!payrollComparison) {
@@ -108,6 +107,23 @@ const SalaryAnalytics = () => {
     } catch (err) {
       setError('Failed to load funnel data');
     }
+  };
+
+  const loadSiteProfitability = async (year, month) => {
+    try {
+      const res = await statsAPI.getSiteProfitability(8, year, month);
+      setSiteProfitability(res.data);
+    } catch (err) {
+      setError('Failed to load site profitability data');
+    }
+  };
+
+  const handleSiteMonthChange = async (y, m) => {
+    setSiteYear(y);
+    setSiteMonth(m);
+    setLoading(true);
+    await loadSiteProfitability(y, m);
+    setLoading(false);
   };
 
   const handleFunnelMonthChange = async (y, m) => {
@@ -165,7 +181,9 @@ const SalaryAnalytics = () => {
           {activeTab === 'funnel' && funnel && (
             <PaymentFunnelTab data={funnel} year={funnelYear} month={funnelMonth} onMonthChange={handleFunnelMonthChange} fmt={fmt} />
           )}
-          {activeTab === 'sites' && siteProfitability && <SiteProfitabilityTab data={siteProfitability} fmt={fmt} />}
+          {activeTab === 'sites' && siteProfitability && (
+            <SiteProfitabilityTab data={siteProfitability} year={siteYear} month={siteMonth} onMonthChange={handleSiteMonthChange} fmt={fmt} />
+          )}
           {activeTab === 'payroll' && payrollComparison && <PayrollComparisonTab data={payrollComparison} fmt={fmt} />}
           {activeTab === 'wages' && wageDistribution && <WageDistributionTab data={wageDistribution} fmt={fmt} />}
         </>
@@ -379,9 +397,40 @@ const PaymentFunnelTab = ({ data, year, month, onMonthChange, fmt }) => {
 
 // ===================== Site Profitability Tab =====================
 
-const SiteProfitabilityTab = ({ data, fmt }) => {
+const SiteProfitabilityTab = ({ data, year, month, onMonthChange, fmt }) => {
+  const monthOptions = Array.from({ length: 12 }, (_, i) => ({
+    value: i + 1,
+    label: new Date(2000, i).toLocaleString('default', { month: 'short' }),
+  }));
+
   return (
     <div className="space-y-6">
+      {/* Month Picker */}
+      <div className="card">
+        <div className="flex items-center gap-4 flex-wrap">
+          <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Period:</label>
+          <select
+            value={month}
+            onChange={(e) => onMonthChange(year, parseInt(e.target.value))}
+            className="border rounded-lg px-3 py-1.5 text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200"
+          >
+            {monthOptions.map((m) => (
+              <option key={m.value} value={m.value}>{m.label}</option>
+            ))}
+          </select>
+          <select
+            value={year}
+            onChange={(e) => onMonthChange(parseInt(e.target.value), month)}
+            className="border rounded-lg px-3 py-1.5 text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200"
+          >
+            {[year - 1, year, year + 1].map((y) => (
+              <option key={y} value={y}>{y}</option>
+            ))}
+          </select>
+          <span className="text-xs text-gray-400 dark:text-gray-500">Cost/Day &amp; Utilization are scoped to this month</span>
+        </div>
+      </div>
+
       {/* Site Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {data.sites.map((site) => (
@@ -392,8 +441,8 @@ const SiteProfitabilityTab = ({ data, fmt }) => {
             </div>
             <div className="space-y-2 text-sm">
               <div className="flex justify-between">
-                <span className="text-gray-500 dark:text-gray-400">Labours</span>
-                <span className="font-medium text-gray-800 dark:text-gray-100">{site.labour_count}</span>
+                <span className="text-gray-500 dark:text-gray-400">Labours (assigned / active)</span>
+                <span className="font-medium text-gray-800 dark:text-gray-100">{site.labour_count} / {site.active_this_month || 0}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-500 dark:text-gray-400">Total Cost</span>
