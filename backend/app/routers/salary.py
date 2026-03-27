@@ -6,7 +6,7 @@ from datetime import date
 
 from ..models import SalaryRecord, SalaryPayment, User
 from ..auth import get_current_manager_or_admin, get_current_admin
-from ..db_wrapper import get_salary_records, mark_salary_paid, get_all_labours, get_labour, create_notification, get_pending_advances, get_advances, repay_advance_partial, mark_advance_deducted, delete_unpaid_salary_records
+from ..db_wrapper import get_salary_records, mark_salary_paid, get_all_labours, get_labour, create_notification, get_pending_advances, get_advances, repay_advance_partial, mark_advance_deducted, delete_unpaid_salary_records, get_payment_logs
 from ..whatsapp_service import send_whatsapp_message
 from ..push_service import send_push_to_user
 
@@ -352,6 +352,72 @@ async def get_salary_slip(
         "paid_amount": record.paid_amount,
         "paid_date": record.paid_date.isoformat() if record.paid_date else None,
         "paid_by": record.paid_by,
+        "generated_at": date.today().isoformat(),
+    }
+
+
+@router.get("/slip/{labour_id}/all-pending")
+async def get_salary_slip_all_pending(
+    labour_id: str,
+    current_user: User = Depends(get_current_admin)
+):
+    """Get salary slip data for all unpaid weeks (Admin only)"""
+    labour = get_labour(labour_id)
+    if not labour:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Labour with id {labour_id} not found"
+        )
+
+    records = get_salary_records(labour_id=labour_id)
+    if not records:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No salary records found for this labour"
+        )
+
+    pending_records = sorted(
+        [r for r in records if not r.is_paid],
+        key=lambda r: r.week_end
+    )
+
+    if not pending_records:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No pending salary records found"
+        )
+
+    advance_pending = get_pending_advances(labour_id)
+    total_gross = sum(r.total_amount for r in pending_records)
+    total_paid_partial = sum(r.paid_amount for r in pending_records)
+    total_days = sum(r.days_present for r in pending_records)
+    net_salary = max(0.0, total_gross - total_paid_partial - advance_pending)
+
+    weeks = []
+    for r in pending_records:
+        weeks.append({
+            "week_start": r.week_start.isoformat(),
+            "week_end": r.week_end.isoformat(),
+            "days_present": r.days_present,
+            "earned": r.total_amount,
+            "paid": r.paid_amount,
+            "balance": round(r.total_amount - r.paid_amount, 2),
+        })
+
+    return {
+        "labour_id": labour.id,
+        "labour_name": labour.name,
+        "designation": getattr(labour, "designation", None),
+        "daily_wage": labour.daily_wage,
+        "pay_cycle": getattr(labour, "pay_cycle", "weekly") or "weekly",
+        "mode": "all_pending",
+        "weeks": weeks,
+        "total_weeks": len(pending_records),
+        "total_days": total_days,
+        "total_gross": total_gross,
+        "total_paid_partial": total_paid_partial,
+        "advance_pending": advance_pending,
+        "net_payable": net_salary,
         "generated_at": date.today().isoformat(),
     }
 

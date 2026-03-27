@@ -2,6 +2,7 @@ import uuid
 import mimetypes
 from pathlib import Path
 from datetime import datetime
+from ..db_models import ist_now
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 from fastapi.responses import FileResponse
@@ -106,7 +107,7 @@ async def upload_document(
         "original_name": file.filename,
         "doc_type": doc_type,
         "uploaded_by": current_user.username,
-        "uploaded_at": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S"),
+        "uploaded_at": ist_now().strftime("%Y-%m-%dT%H:%M:%S"),
     })
     _save_meta(labour_id, docs)
 

@@ -159,6 +159,13 @@ export const laboursAPI = {
   delete: (id) => { invalidateCache('labours:all', `labours:${id}`); return api.delete(`/labours/${id}`); },
 };
 
+export const designationsAPI = {
+  getAll: () => cached('designations:all', () => api.get('/designations/'), 120_000),
+  create: (data) => { invalidateCache('designations:all'); return api.post('/designations/', data); },
+  update: (id, data) => { invalidateCache('designations:all'); return api.put(`/designations/${id}`, data); },
+  delete: (id) => { invalidateCache('designations:all'); return api.delete(`/designations/${id}`); },
+};
+
 export const attendanceAPI = {
   getByDate: (date) =>
     cached(`attendance:date:${date}`, () => api.get(`/attendance/date/${date}`), 30_000),
@@ -241,6 +248,9 @@ export const salaryAPI = {
     if (weekEnd) url += `?week_end=${weekEnd}`;
     return api.get(url);
   },
+  getSlipAllPending: (labourId) => {
+    return api.get(`/salary/slip/${labourId}/all-pending`);
+  },
   getRegister: (year, month) =>
     api.get(`/salary/register?year=${year}&month=${month}`),
   getPayments: (labourId) =>
@@ -277,6 +287,10 @@ export const statsAPI = {
     cached('stats:payroll-comparison', () => api.get('/stats/payroll-comparison'), 60_000),
   getWageDistribution: () =>
     cached('stats:wage-distribution', () => api.get('/stats/wage-distribution'), 60_000),
+  getWeeklyPendingDetail: (weekEnd) =>
+    api.get(`/stats/weekly/pending-detail?week_end=${weekEnd}`),
+  getWeeklyByDesignation: (weeks = 8) =>
+    cached(`stats:weekly-by-designation:${weeks}`, () => api.get(`/stats/weekly/by-designation?weeks=${weeks}`), 60_000),
 };
 
 export const exportAPI = {

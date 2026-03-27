@@ -60,6 +60,7 @@ class Labour(BaseModel):
     joined_date: date
     is_active: bool = True
     pay_cycle: PayCycle = PayCycle.WEEKLY
+    designation: Optional[str] = None
 
 
 class LabourCreate(BaseModel):
@@ -68,6 +69,7 @@ class LabourCreate(BaseModel):
     daily_wage: float
     joined_date: Optional[date] = None
     pay_cycle: PayCycle = PayCycle.WEEKLY
+    designation: Optional[str] = None
 
 
 class LabourUpdate(BaseModel):
@@ -77,6 +79,7 @@ class LabourUpdate(BaseModel):
     is_active: Optional[bool] = None
     joined_date: Optional[date] = None  # Admin only
     pay_cycle: Optional[PayCycle] = None
+    designation: Optional[str] = None
 
 
 class AttendanceStatus(str, Enum):

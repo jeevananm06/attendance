@@ -105,14 +105,33 @@ async def get_overview_stats(
     # Only include salary info for admin
     if current_user.role == UserRole.ADMIN:
         all_salary_records = get_salary_records()
+
+        # All-time totals
         total_earned = sum(r.total_amount for r in all_salary_records)
-        # Use paid_amount to account for partial payments
         total_paid = sum(r.paid_amount for r in all_salary_records)
         total_pending = total_earned - total_paid
+
+        # Current month totals (filter by week_end within current month)
+        first_of_month = today.replace(day=1)
+        import calendar as cal
+        _, last_day = cal.monthrange(today.year, today.month)
+        end_of_month = today.replace(day=last_day)
+
+        month_records = [
+            r for r in all_salary_records
+            if r.week_end and first_of_month <= r.week_end <= end_of_month
+        ]
+        month_earned = sum(r.total_amount for r in month_records)
+        month_paid = sum(r.paid_amount for r in month_records)
+        month_pending = month_earned - month_paid
+
         result["salary"] = {
             "total_earned": total_earned,
             "total_paid": total_paid,
-            "total_pending": total_pending
+            "total_pending": total_pending,
+            "month_earned": month_earned,
+            "month_paid": month_paid,
+            "month_pending": month_pending,
         }
     
     return result
@@ -154,6 +173,89 @@ async def get_weekly_stats(
         })
     
     return {"weeks": weekly_data}
+
+
+@router.get("/weekly/by-designation")
+async def get_weekly_by_designation(
+    weeks: int = 8,
+    current_user: User = Depends(get_current_manager_or_admin)
+):
+    """Get weekly wages broken down by labour designation for the last N weeks."""
+    from ..salary_calculator import get_week_boundaries
+
+    today = date.today()
+    all_records = get_salary_records()
+    labours_map = {l.id: l for l in get_all_labours(include_inactive=True)}
+
+    all_designations = set()
+    weekly_data = []
+
+    for i in range(weeks):
+        target_date = today - timedelta(weeks=i)
+        week_start, week_end = get_week_boundaries(target_date)
+
+        week_records = [r for r in all_records if r.week_end == week_end]
+
+        desg_totals = {}
+        for r in week_records:
+            labour = labours_map.get(r.labour_id)
+            desg = (labour.designation if labour and labour.designation else "Unassigned")
+            desg_totals[desg] = desg_totals.get(desg, 0) + r.total_amount
+            all_designations.add(desg)
+
+        weekly_data.append({
+            "week_end": week_end.isoformat(),
+            "label": week_end.strftime("%b %d"),
+            **desg_totals,
+        })
+
+    weekly_data.reverse()
+
+    return {
+        "weeks": weekly_data,
+        "designations": sorted(all_designations),
+    }
+
+
+@router.get("/weekly/pending-detail")
+async def get_weekly_pending_detail(
+    week_end: date,
+    current_user: User = Depends(get_current_admin)
+):
+    """Get per-labour pending breakdown for a specific week."""
+    all_records = get_salary_records()
+    labours_map = {l.id: l for l in get_all_labours(include_inactive=True)}
+
+    week_records = [r for r in all_records if r.week_end == week_end]
+
+    details = []
+    for r in week_records:
+        pending = r.total_amount - r.paid_amount
+        labour = labours_map.get(r.labour_id)
+        details.append({
+            "labour_id": r.labour_id,
+            "name": labour.name if labour else "Unknown",
+            "daily_wage": labour.daily_wage if labour else 0,
+            "days_present": r.days_present,
+            "total_amount": r.total_amount,
+            "paid_amount": r.paid_amount,
+            "pending": round(pending, 2),
+            "is_paid": r.is_paid,
+        })
+
+    # Sort: unpaid first (highest pending), then paid
+    details.sort(key=lambda d: (-d["pending"], d["name"]))
+
+    total_wages = sum(d["total_amount"] for d in details)
+    total_paid = sum(d["paid_amount"] for d in details)
+
+    return {
+        "week_end": week_end.isoformat(),
+        "total_wages": total_wages,
+        "total_paid": total_paid,
+        "total_pending": round(total_wages - total_paid, 2),
+        "labours": details,
+    }
 
 
 @router.get("/all-labours")

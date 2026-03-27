@@ -2,7 +2,7 @@
 import { useAuth } from '../context/AuthContext';
 import {
   overtimeAPI, advancesAPI, leavesAPI, sitesAPI,
-  auditAPI, backupAPI, reportsAPI, laboursAPI, documentsAPI
+  auditAPI, backupAPI, reportsAPI, laboursAPI, documentsAPI, designationsAPI
 } from '../api';
 import {
   Clock, Wallet, Calendar, MapPin, Shield, Database, FileText,
@@ -50,6 +50,7 @@ const More = () => {
     { id: 'advances', label: 'Advances', icon: Wallet },
     { id: 'leaves', label: 'Leaves', icon: Calendar },
     { id: 'sites', label: 'Sites', icon: MapPin },
+    { id: 'designations', label: 'Designations', icon: Users },
     { id: 'documents', label: 'Documents', icon: FileArchive },
     { id: 'reports', label: 'Reports', icon: FileText },
     ...(isAdmin ? [
@@ -99,6 +100,9 @@ const More = () => {
           )}
           {activeTab === 'sites' && (
             <SitesTab labours={labours} setError={setError} setSuccess={setSuccess} isAdmin={isAdmin} />
+          )}
+          {activeTab === 'designations' && (
+            <DesignationsTab isAdmin={isAdmin} setError={setError} setSuccess={setSuccess} />
           )}
           {activeTab === 'documents' && (
             <DocumentsTab labours={labours} isAdmin={isAdmin} setError={setError} setSuccess={setSuccess} />
@@ -553,6 +557,151 @@ const LeavesTab = ({ labours, setError, setSuccess }) => {
         </table>
         {records.length === 0 && <p className="text-center py-8 text-gray-500 dark:text-gray-400">No leave records</p>}
       </div>
+    </div>
+  );
+};
+
+// Designations Tab
+const DesignationsTab = ({ isAdmin, setError, setSuccess }) => {
+  const [designations, setDesignations] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [newName, setNewName] = useState('');
+  const [editingId, setEditingId] = useState(null);
+  const [editName, setEditName] = useState('');
+
+  useEffect(() => { fetchDesignations(); }, []);
+
+  const fetchDesignations = async () => {
+    try {
+      setLoading(true);
+      const res = await designationsAPI.getAll();
+      setDesignations(res.data);
+    } catch (err) {
+      setError('Failed to load designations');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAdd = async (e) => {
+    e.preventDefault();
+    if (!newName.trim()) return;
+    try {
+      await designationsAPI.create({ name: newName.trim() });
+      setNewName('');
+      setSuccess('Designation added');
+      setTimeout(() => setSuccess(''), 3000);
+      fetchDesignations();
+    } catch (err) {
+      setError(err.response?.data?.detail || 'Failed to add designation');
+    }
+  };
+
+  const handleUpdate = async (id) => {
+    if (!editName.trim()) return;
+    try {
+      await designationsAPI.update(id, { name: editName.trim() });
+      setEditingId(null);
+      setEditName('');
+      setSuccess('Designation updated');
+      setTimeout(() => setSuccess(''), 3000);
+      fetchDesignations();
+    } catch (err) {
+      setError(err.response?.data?.detail || 'Failed to update designation');
+    }
+  };
+
+  const handleDelete = async (id, name) => {
+    if (!window.confirm(`Delete designation "${name}"?`)) return;
+    try {
+      await designationsAPI.delete(id);
+      setSuccess('Designation deleted');
+      setTimeout(() => setSuccess(''), 3000);
+      fetchDesignations();
+    } catch (err) {
+      setError(err.response?.data?.detail || 'Failed to delete designation');
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex justify-center py-8">
+        <div className="w-6 h-6 border-2 border-primary-600 border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      {isAdmin && (
+        <form onSubmit={handleAdd} className="flex gap-2">
+          <input
+            type="text"
+            value={newName}
+            onChange={(e) => setNewName(e.target.value)}
+            placeholder="New designation name..."
+            className="input flex-1"
+            required
+          />
+          <button type="submit" className="btn-primary flex items-center gap-1">
+            <Plus size={18} /> Add
+          </button>
+        </form>
+      )}
+
+      {designations.length === 0 ? (
+        <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+          <Users size={40} className="mx-auto mb-3 opacity-50" />
+          <p>No designations yet. Add one above.</p>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {designations.map((d) => (
+            <div key={d.id} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+              {editingId === d.id ? (
+                <div className="flex items-center gap-2 flex-1 mr-2">
+                  <input
+                    type="text"
+                    value={editName}
+                    onChange={(e) => setEditName(e.target.value)}
+                    className="input flex-1"
+                    autoFocus
+                    onKeyDown={(e) => { if (e.key === 'Enter') handleUpdate(d.id); if (e.key === 'Escape') setEditingId(null); }}
+                  />
+                  <button onClick={() => handleUpdate(d.id)} className="p-1.5 text-green-600 hover:bg-green-50 dark:hover:bg-green-900/30 rounded">
+                    <Check size={18} />
+                  </button>
+                  <button onClick={() => setEditingId(null)} className="p-1.5 text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-600 rounded">
+                    <X size={18} />
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <span className="font-medium text-gray-800 dark:text-gray-100">{d.name}</span>
+                  {isAdmin && (
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => { setEditingId(d.id); setEditName(d.name); }}
+                        className="p-1.5 text-gray-400 hover:text-primary-600 hover:bg-primary-50 dark:hover:bg-primary-900/20 rounded"
+                        title="Edit"
+                      >
+                        <Eye size={16} />
+                      </button>
+                      <button
+                        onClick={() => handleDelete(d.id, d.name)}
+                        className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded"
+                        title="Delete"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 };

@@ -50,7 +50,8 @@ async def add_labour(
         daily_wage=labour_data.daily_wage,
         phone=labour_data.phone,
         joined_date=labour_data.joined_date,
-        pay_cycle=labour_data.pay_cycle.value if labour_data.pay_cycle else "weekly"
+        pay_cycle=labour_data.pay_cycle.value if labour_data.pay_cycle else "weekly",
+        designation=labour_data.designation
     )
 
 
@@ -85,7 +86,8 @@ async def update_labour_info(
         daily_wage=labour_data.daily_wage,
         is_active=labour_data.is_active,
         joined_date=joined_date,
-        pay_cycle=labour_data.pay_cycle.value if labour_data.pay_cycle else None
+        pay_cycle=labour_data.pay_cycle.value if labour_data.pay_cycle else None,
+        designation=labour_data.designation
     )
     if not updated:
         raise HTTPException(

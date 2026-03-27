@@ -15,6 +15,8 @@ import {
   Line,
   BarChart,
   Bar,
+  AreaChart,
+  Area,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -44,6 +46,9 @@ const Stats = () => {
   const [selectedLabour, setSelectedLabour] = useState(null);
   const [labourDetail, setLabourDetail] = useState(null);
   const [labourTrend, setLabourTrend] = useState(null);
+  const [weekDetail, setWeekDetail] = useState(null);
+  const [weekDetailLoading, setWeekDetailLoading] = useState(false);
+  const [designationWeekly, setDesignationWeekly] = useState(null);
 
   useEffect(() => {
     fetchData();
@@ -60,6 +65,7 @@ const Stats = () => {
       setOverview(overviewRes.data);
       setWeeklyStats(weeklyRes.data);
       setLabourStats(labourRes.data);
+      statsAPI.getWeeklyByDesignation(8).then(r => setDesignationWeekly(r.data)).catch(() => {});
       if (isAdmin) {
         statsAPI.getSiteCosts().then(r => setSiteCosts(r.data)).catch(() => {});
         statsAPI.getWeeklyBySite(8).then(r => setSiteWeekly(r.data)).catch(() => {});
@@ -70,6 +76,29 @@ const Stats = () => {
     } finally {
       if (!silent) setLoading(false);
     }
+  };
+
+  const fetchWeekDetail = async (weekEnd) => {
+    try {
+      setWeekDetailLoading(true);
+      const res = await statsAPI.getWeeklyPendingDetail(weekEnd);
+      setWeekDetail(res.data);
+    } catch (err) {
+      setError('Failed to load week details');
+    } finally {
+      setWeekDetailLoading(false);
+    }
+  };
+
+  const handleChartClick = (data) => {
+    if (!data || !data.activePayload || !data.activePayload.length) return;
+    // Find the original week data to get the week_end date
+    const clickedLabel = data.activeLabel;
+    const weekData = weeklyStats?.weeks?.slice().reverse().find((w) => {
+      const label = new Date(w.week_end).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      return label === clickedLabel;
+    });
+    if (weekData) fetchWeekDetail(weekData.week_end);
   };
 
   const fetchLabourDetail = async (labourId) => {
@@ -198,19 +227,22 @@ const Stats = () => {
         <div className="card">
           <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4">Weekly Wages (Last 8 Weeks)</h3>
           {weeklyChartData && weeklyChartData.length > 0 ? (
-            <ResponsiveContainer width="100%" height={300}>
-              <LineChart data={weeklyChartData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="week" />
-                <YAxis />
-                <Tooltip
-                  formatter={(value) => `₹${value.toLocaleString()}`}
-                />
-                <Legend />
-                <Line type="monotone" dataKey="paid" name="Paid" stroke="#22c55e" strokeWidth={2} dot={{ r: 4 }} />
-                <Line type="monotone" dataKey="pending" name="Pending" stroke="#f97316" strokeWidth={2} dot={{ r: 4 }} />
-              </LineChart>
-            </ResponsiveContainer>
+            <>
+              <ResponsiveContainer width="100%" height={300}>
+                <LineChart data={weeklyChartData} onClick={handleChartClick} style={{ cursor: 'pointer' }}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="week" />
+                  <YAxis />
+                  <Tooltip
+                    formatter={(value) => `₹${value.toLocaleString()}`}
+                  />
+                  <Legend />
+                  <Line type="monotone" dataKey="paid" name="Paid" stroke="#22c55e" strokeWidth={2} dot={{ r: 4 }} />
+                  <Line type="monotone" dataKey="pending" name="Pending" stroke="#f97316" strokeWidth={2} dot={{ r: 4 }} />
+                </LineChart>
+              </ResponsiveContainer>
+              <p className="text-xs text-gray-400 dark:text-gray-500 text-center mt-2">Click on a week to see per-labour breakdown</p>
+            </>
           ) : (
             <div className="h-64 flex items-center justify-center text-gray-500 dark:text-gray-400">
               No weekly data available
@@ -218,6 +250,39 @@ const Stats = () => {
           )}
         </div>
       </div>
+
+      {/* Wages by Designation — Stacked Area Chart */}
+      {designationWeekly && designationWeekly.designations.length > 0 && (
+        <div className="card">
+          <div className="flex items-center gap-2 mb-4">
+            <Users className="text-primary-600" size={20} />
+            <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100">
+              Weekly Wages by Designation (Last 8 Weeks)
+            </h3>
+          </div>
+          <ResponsiveContainer width="100%" height={320}>
+            <AreaChart data={designationWeekly.weeks} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="label" tick={{ fontSize: 12 }} />
+              <YAxis tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`} />
+              <Tooltip formatter={(value) => `₹${Number(value).toLocaleString()}`} />
+              <Legend />
+              {designationWeekly.designations.map((desg, idx) => (
+                <Area
+                  key={desg}
+                  type="monotone"
+                  dataKey={desg}
+                  name={desg}
+                  stackId="1"
+                  stroke={SITE_COLORS[idx % SITE_COLORS.length]}
+                  fill={SITE_COLORS[idx % SITE_COLORS.length]}
+                  fillOpacity={0.6}
+                />
+              ))}
+            </AreaChart>
+          </ResponsiveContainer>
+        </div>
+      )}
 
       {/* Site-wise Cost Stats (Admin only) */}
       {isAdmin && siteCosts && siteCosts.sites.length > 0 && (
@@ -347,6 +412,73 @@ const Stats = () => {
           </div>
         )}
       </div>
+
+      {/* Week Pending Detail Modal */}
+      {(weekDetail || weekDetailLoading) && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl w-full max-w-lg max-h-[80vh] flex flex-col">
+            <div className="flex items-center justify-between p-5 border-b dark:border-gray-700 flex-shrink-0">
+              <div>
+                <h2 className="text-lg font-semibold dark:text-gray-100">Week Ending {weekDetail?.week_end ? new Date(weekDetail.week_end + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '...'}</h2>
+                {weekDetail && (
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
+                    Pending: <span className="font-semibold text-orange-600">₹{weekDetail.total_pending.toLocaleString()}</span>
+                    {' · '}Paid: <span className="font-semibold text-green-600">₹{weekDetail.total_paid.toLocaleString()}</span>
+                  </p>
+                )}
+              </div>
+              <button
+                onClick={() => setWeekDetail(null)}
+                className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            <div className="overflow-y-auto flex-1 p-4">
+              {weekDetailLoading ? (
+                <div className="flex justify-center py-8">
+                  <div className="w-6 h-6 border-2 border-primary-600 border-t-transparent rounded-full animate-spin" />
+                </div>
+              ) : weekDetail?.labours?.length === 0 ? (
+                <p className="text-center text-gray-500 dark:text-gray-400 py-8">No salary records for this week</p>
+              ) : (
+                <div className="space-y-2">
+                  {weekDetail.labours.map((l) => (
+                    <div
+                      key={l.labour_id}
+                      className={`flex items-center justify-between p-3 rounded-lg border ${
+                        l.pending > 0
+                          ? 'bg-orange-50 dark:bg-orange-900/20 border-orange-200 dark:border-orange-800'
+                          : 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800'
+                      }`}
+                    >
+                      <div>
+                        <p className="font-medium text-gray-800 dark:text-gray-100">{l.name}</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">
+                          {l.days_present} days · ₹{l.daily_wage}/day · Total: ₹{l.total_amount.toLocaleString()}
+                        </p>
+                      </div>
+                      <div className="text-right flex-shrink-0 ml-3">
+                        {l.pending > 0 ? (
+                          <>
+                            <p className="font-bold text-orange-600">₹{l.pending.toLocaleString()}</p>
+                            <p className="text-[10px] text-gray-500">pending</p>
+                          </>
+                        ) : (
+                          <>
+                            <p className="font-bold text-green-600">Paid</p>
+                            <p className="text-[10px] text-gray-500">₹{l.paid_amount.toLocaleString()}</p>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Labour Detail Modal */}
       {selectedLabour && labourDetail && (

@@ -35,11 +35,10 @@ function CommentTooltip({ comment, children }) {
     if (!comment) return;
     const rect = wrapRef.current?.getBoundingClientRect();
     if (!rect) return;
-    const scrollY = window.scrollY || document.documentElement.scrollTop;
-    const scrollX = window.scrollX || document.documentElement.scrollLeft;
+    // For fixed positioning, use viewport-relative coordinates directly
     setPos({
-      top:  rect.top  + scrollY - 4,
-      left: rect.left + scrollX + rect.width / 2,
+      top:  rect.top - 4,
+      left: rect.left + rect.width / 2,
     });
     setVisible(true);
     clearTimeout(timerRef.current);
@@ -53,7 +52,7 @@ function CommentTooltip({ comment, children }) {
   // tap on mobile: show for 2.5 s then auto-hide
   const handleTouch = (e) => {
     if (!comment) return;
-    e.preventDefault();          // prevent ghost click
+    e.stopPropagation();         // prevent event bubbling
     if (visible) { hide(); return; }
     show();
     timerRef.current = setTimeout(() => setVisible(false), 2500);
@@ -65,7 +64,7 @@ function CommentTooltip({ comment, children }) {
       className="relative"
       onMouseEnter={show}
       onMouseLeave={() => hide()}
-      onTouchEnd={handleTouch}
+      onTouchStart={handleTouch}
     >
       {children}
       {visible && comment && (
