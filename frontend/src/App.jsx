@@ -15,6 +15,7 @@ import CafeEntry from './pages/CafeEntry';
 import CafeHistory from './pages/CafeHistory';
 import CafeAnalytics from './pages/CafeAnalytics';
 import CafeItems from './pages/CafeItems';
+import SalaryAnalytics from './pages/SalaryAnalytics';
 import InstallPrompt from './components/InstallPrompt';
 
 const ProtectedRoute = ({ children, allowedRoles }) => {
@@ -108,6 +109,14 @@ const App = () => {
             element={
               <ProtectedRoute allowedRoles={['admin']}>
                 <Users />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/salary-analytics"
+            element={
+              <ProtectedRoute allowedRoles={['admin']}>
+                <SalaryAnalytics />
               </ProtectedRoute>
             }
           />

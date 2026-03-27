@@ -21,6 +21,7 @@ import {
   ClipboardList,
   TrendingUp,
   Package,
+  Activity,
 } from 'lucide-react';
 import OfflineIndicator from './OfflineIndicator';
 import { useDarkMode } from '../hooks/useDarkMode';
@@ -32,6 +33,7 @@ const navItems = [
   { path: '/attendance', icon: CalendarCheck, label: 'Attendance' },
   { path: '/salary', icon: Wallet, label: 'Salary', roles: ['admin'] },
   { path: '/stats', icon: BarChart3, label: 'Statistics', roles: ['admin'] },
+  { path: '/salary-analytics', icon: Activity, label: 'Salary Analytics', roles: ['admin'] },
   { path: '/export', icon: Download, label: 'Export', roles: ['admin'] },
   { path: '/more', icon: MoreHorizontal, label: 'More', roles: ['admin'] },
   { path: '/users', icon: UserCog, label: 'Users', roles: ['admin'] },
