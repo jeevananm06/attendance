@@ -109,10 +109,21 @@ async def get_overview_stats(
         # Use paid_amount to account for partial payments
         total_paid = sum(r.paid_amount for r in all_salary_records)
         total_pending = total_earned - total_paid
+
+        # Current month stats
+        month_start = today.replace(day=1)
+        month_records = [r for r in all_salary_records if r.week_end >= month_start]
+        month_earned = sum(r.total_amount for r in month_records)
+        month_paid = sum(r.paid_amount for r in month_records)
+        month_pending = month_earned - month_paid
+
         result["salary"] = {
             "total_earned": total_earned,
             "total_paid": total_paid,
-            "total_pending": total_pending
+            "total_pending": total_pending,
+            "month_earned": month_earned,
+            "month_paid": month_paid,
+            "month_pending": month_pending,
         }
     
     return result
