@@ -262,6 +262,12 @@ def get_attendance_by_date(target_date: date) -> List[Attendance]:
     if not ATTENDANCE_FILE.exists():
         return []
     df = pd.read_csv(ATTENDANCE_FILE)
+    
+    # Add marked_at column if missing (migration)
+    if "marked_at" not in df.columns:
+        df["marked_at"] = datetime.now().isoformat()
+        df.to_csv(ATTENDANCE_FILE, index=False)
+    
     df_filtered = df[df["date"] == target_date.isoformat()]
     records = []
     for _, row in df_filtered.iterrows():
@@ -271,7 +277,7 @@ def get_attendance_by_date(target_date: date) -> List[Attendance]:
             date=date.fromisoformat(row["date"]),
             status=AttendanceStatus(row["status"]),
             marked_by=row["marked_by"],
-            marked_at=datetime.fromisoformat(row["marked_at"])
+            marked_at=datetime.fromisoformat(row["marked_at"]) if pd.notna(row["marked_at"]) else datetime.now()
         ))
     return records
 
@@ -280,6 +286,12 @@ def get_attendance_by_labour(labour_id: str, start_date: date = None, end_date: 
     if not ATTENDANCE_FILE.exists():
         return []
     df = pd.read_csv(ATTENDANCE_FILE)
+    
+    # Add marked_at column if missing (migration)
+    if "marked_at" not in df.columns:
+        df["marked_at"] = datetime.now().isoformat()
+        df.to_csv(ATTENDANCE_FILE, index=False)
+    
     df_filtered = df[df["labour_id"] == labour_id]
     
     if start_date:
@@ -295,7 +307,7 @@ def get_attendance_by_labour(labour_id: str, start_date: date = None, end_date: 
             date=date.fromisoformat(row["date"]),
             status=AttendanceStatus(row["status"]),
             marked_by=row["marked_by"],
-            marked_at=datetime.fromisoformat(row["marked_at"])
+            marked_at=datetime.fromisoformat(row["marked_at"]) if pd.notna(row["marked_at"]) else datetime.now()
         ))
     return records
 

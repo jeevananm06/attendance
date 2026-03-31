@@ -6,7 +6,7 @@ from datetime import date
 
 from ..models import SalaryRecord, SalaryPayment, User
 from ..auth import get_current_manager_or_admin, get_current_admin
-from ..db_wrapper import get_salary_records, mark_salary_paid, get_all_labours, get_labour, create_notification, get_pending_advances, get_advances, repay_advance_partial, mark_advance_deducted, delete_unpaid_salary_records, get_payment_logs
+from ..db_wrapper import get_salary_records, mark_salary_paid, get_all_labours, get_labour, create_notification, get_pending_advances, get_advances, repay_advance_partial, mark_advance_deducted, delete_unpaid_salary_records, get_payment_logs, create_advance
 from ..whatsapp_service import send_whatsapp_message
 from ..push_service import send_push_to_user
 
@@ -242,6 +242,18 @@ async def pay_salary(
             detail="No unpaid salary records found for this period"
         )
 
+    # If excess payment with advance_payment flag, create an advance record
+    advance_created = None
+    excess_amount = result.get("excess_amount", 0)
+    if excess_amount > 0 and payment.advance_payment:
+        reason = payment.payment_comment or "Advance from excess salary payment"
+        advance_created = create_advance(
+            labour_id=payment.labour_id,
+            amount=excess_amount,
+            reason=reason,
+            given_by=current_user.username
+        )
+
     # Calculate net payment (salary paid minus advance deducted)
     net_payment = result['amount_paid'] - advance_deducted
 
@@ -250,6 +262,8 @@ async def pay_salary(
         msg_text = f"Paid ₹{result['amount_paid']:.0f} to {labour.name}"
         if advance_deducted > 0:
             msg_text += f" (₹{advance_deducted:.0f} advance deducted, net: ₹{net_payment:.0f})"
+        if advance_created:
+            msg_text += f" · Advance of ₹{excess_amount:.0f} recorded"
         create_notification(
             user=current_user.username,
             notif_type="salary_paid",
@@ -292,12 +306,17 @@ async def pay_salary(
         "weeks_paid": result["weeks_paid"],
         "amount_paid": result["amount_paid"],
         "remaining": result["remaining"],
+        "excess_amount": excess_amount,
     }
     
     if advance_deducted > 0:
         response["advance_deducted"] = advance_deducted
         response["net_payment"] = net_payment
         response["advances_updated"] = len(advances_updated)
+
+    if advance_created:
+        response["advance_created"] = True
+        response["advance_amount"] = excess_amount
     
     return response
 

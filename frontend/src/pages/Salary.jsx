@@ -40,6 +40,7 @@ const Salary = () => {
   const [paymentComment, setPaymentComment] = useState('');
   const [advanceDeduction, setAdvanceDeduction] = useState('none'); // 'none', 'full', 'partial'
   const [advanceDeductionAmount, setAdvanceDeductionAmount] = useState('');
+  const [advancePayment, setAdvancePayment] = useState(false);
   const [slip, setSlip] = useState(null);
 
   // Site grouping state
@@ -147,6 +148,7 @@ const Salary = () => {
     setPaymentComment('');
     setAdvanceDeduction('none');
     setAdvanceDeductionAmount('');
+    setAdvancePayment(false);
   };
 
   const handleOpenSlip = async (labour, mode = 'last') => {
@@ -183,7 +185,7 @@ const Salary = () => {
     if (isNaN(entered) || entered <= 0) { setError('Enter a valid amount'); return; }
 
     const isExcessPayment = entered > total;
-    if (isExcessPayment && !paymentComment.trim()) {
+    if (isExcessPayment && !advancePayment && !paymentComment.trim()) {
       setError('Please provide a reason for the excess payment');
       return;
     }
@@ -207,17 +209,20 @@ const Salary = () => {
       const res = await salaryAPI.pay(
         labourId, 
         weekEnd, 
-        entered >= total ? null : entered, 
+        entered, 
         paymentComment.trim() || null,
         advanceDeduction !== 'none' ? advanceDeduction : null,
-        advanceDeduction === 'partial' ? partialDeductAmt : null
+        advanceDeduction === 'partial' ? partialDeductAmt : null,
+        advancePayment
       );
-      const { amount_paid, remaining, weeks_paid, excess_amount, advance_deducted, net_payment } = res.data;
+      const { amount_paid, remaining, weeks_paid, excess_amount, advance_deducted, net_payment, advance_created } = res.data;
       let msg = `Paid ₹${amount_paid.toLocaleString()} (${weeks_paid} week${weeks_paid !== 1 ? 's' : ''})`;
       if (advance_deducted > 0) {
         msg += ` · Advance deducted: ₹${advance_deducted.toLocaleString()} · Net: ₹${net_payment.toLocaleString()}`;
       }
-      if (excess_amount > 0) {
+      if (advance_created) {
+        msg += ` · Advance of ₹${excess_amount.toLocaleString()} recorded`;
+      } else if (excess_amount > 0) {
         msg += ` · Excess: ₹${excess_amount.toLocaleString()}`;
       } else if (remaining > 0) {
         msg += ` · ₹${remaining.toLocaleString()} still pending`;
@@ -455,6 +460,8 @@ const Salary = () => {
                   setAdvanceDeduction={setAdvanceDeduction}
                   advanceDeductionAmount={advanceDeductionAmount}
                   setAdvanceDeductionAmount={setAdvanceDeductionAmount}
+                  advancePayment={advancePayment}
+                  setAdvancePayment={setAdvancePayment}
                   payingLabour={payingLabour}
                   calculatingLabour={calculatingLabour}
                   openPayPanel={openPayPanel}
@@ -676,6 +683,7 @@ const LabourSalaryCard = ({
   labour, advances, expandedLabour, setExpandedLabour,
   payPanel, payAmount, setPayAmount, paymentComment, setPaymentComment,
   advanceDeduction, setAdvanceDeduction, advanceDeductionAmount, setAdvanceDeductionAmount,
+  advancePayment, setAdvancePayment,
   payingLabour, calculatingLabour, openPayPanel, closePayPanel,
   handlePay, handleCalculateOne, handleOpenSlip, siteName,
 }) => (
@@ -844,17 +852,35 @@ const LabourSalaryCard = ({
                           <>
                             <p className={`text-xs mt-1 ml-5 font-medium ${color}`}>
                               {excess > 0
-                                ? `⚠ Excess payment of ₹${excess.toLocaleString()} — comment required`
+                                ? (advancePayment
+                                    ? `₹${excess.toLocaleString()} will be recorded as advance`
+                                    : `⚠ Excess payment of ₹${excess.toLocaleString()} — comment required`)
                                 : remaining === 0
                                   ? '✓ Full payment — all weeks cleared'
                                   : `₹${remaining.toLocaleString()} will remain pending`}
                             </p>
+
+                            {/* Advance Payment checkbox — visible only on overpay */}
+                            {excess > 0 && (
+                              <label className="flex items-center gap-2 mt-2 ml-5 cursor-pointer">
+                                <input
+                                  type="checkbox"
+                                  checked={advancePayment}
+                                  onChange={(e) => setAdvancePayment(e.target.checked)}
+                                  className="w-4 h-4 rounded border-blue-400 text-blue-600 focus:ring-blue-500"
+                                />
+                                <span className="text-xs font-medium text-blue-700 dark:text-blue-400">
+                                  Record ₹{excess.toLocaleString()} as advance payment
+                                </span>
+                              </label>
+                            )}
+
                             <input
                               type="text"
-                              placeholder={excess > 0 ? "Reason for excess payment (required)" : "Comment (optional)"}
+                              placeholder={excess > 0 && !advancePayment ? "Reason for excess payment (required)" : "Comment (optional)"}
                               value={paymentComment}
                               onChange={(e) => setPaymentComment(e.target.value)}
-                              className={`mt-2 ml-5 w-64 border rounded px-2 py-1.5 text-sm bg-white dark:bg-gray-700 dark:text-gray-100 focus:outline-none focus:ring-2 ${excess > 0 ? 'border-blue-300 dark:border-blue-600 focus:ring-blue-500' : 'border-gray-300 dark:border-gray-600 focus:ring-primary-500'}`}
+                              className={`mt-2 ml-5 w-64 border rounded px-2 py-1.5 text-sm bg-white dark:bg-gray-700 dark:text-gray-100 focus:outline-none focus:ring-2 ${excess > 0 && !advancePayment ? 'border-blue-300 dark:border-blue-600 focus:ring-blue-500' : 'border-gray-300 dark:border-gray-600 focus:ring-primary-500'}`}
                             />
 
 

@@ -134,6 +134,7 @@ class SalaryPayment(BaseModel):
     payment_comment: Optional[str] = None  # Optional note for any payment
     advance_deduction: Optional[str] = None  # "full", "partial", or "none" (default: none)
     advance_deduction_amount: Optional[float] = None  # Amount to deduct if partial
+    advance_payment: Optional[bool] = False  # If True, excess amount creates an advance record
 
 
 class PaymentLog(BaseModel):

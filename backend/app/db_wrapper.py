@@ -356,6 +356,12 @@ else:
 
     def export_cafe_stock_csv(site_id=None, start_date=None, end_date=None): return ""
 
+    # Designation stubs for CSV mode
+    def get_designations(): return []
+    def create_designation(name): return None
+    def update_designation(designation_id, name): return None
+    def delete_designation(designation_id): return False
+
 
 
     from .database import (
