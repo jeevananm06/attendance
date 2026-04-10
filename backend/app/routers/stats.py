@@ -696,6 +696,21 @@ async def get_wage_distribution(
     }
 
 
+def _count_attendance_days(attendance_records: list) -> float:
+    """Count present days from attendance records (handles half-day, double duty, etc.)."""
+    days = 0.0
+    for record in attendance_records:
+        if record.status == AttendanceStatus.PRESENT:
+            days += 1.0
+        elif record.status == AttendanceStatus.HALF_DAY:
+            days += 0.5
+        elif record.status == AttendanceStatus.PRESENT_HALF:
+            days += 1.5
+        elif record.status == AttendanceStatus.DOUBLE_DUTY:
+            days += 2.0
+    return days
+
+
 @router.get("/attendance-report")
 async def get_attendance_report(
     months: int = 12,
@@ -718,18 +733,9 @@ async def get_attendance_report(
     month_list.reverse()
 
     from_date = date(month_list[0][0], month_list[0][1], 1)
+    to_date = today
 
-    all_salary = get_salary_records()
     all_labours = get_all_labours(include_inactive=False)
-
-    # Filter salary records to the period
-    period_salary = [r for r in all_salary if r.week_end >= from_date]
-
-    # Per-month: days_present per labour, and calendar days in month
-    month_buckets = defaultdict(lambda: defaultdict(float))
-    for r in period_salary:
-        key = r.week_end.strftime("%Y-%m")
-        month_buckets[r.labour_id][key] += r.days_present
 
     # Build month labels with actual calendar days
     month_labels = []
@@ -745,21 +751,42 @@ async def get_attendance_report(
     labour_rows = []
     for labour in all_labours:
         lid = labour.id
-        records = [r for r in period_salary if r.labour_id == lid]
-        if not records:
-            continue
-        days_present = sum(r.days_present for r in records)
+        # Get actual attendance records for this labour in the period
+        attendance_records = get_attendance_by_labour(lid, from_date, to_date)
 
-        # Working days = sum of calendar days for months where labour has records
-        active_months = set(r.week_end.strftime("%Y-%m") for r in records)
+        # Filter out 'absent' records - only count actual presence
+        present_records = [r for r in attendance_records if r.status != AttendanceStatus.ABSENT]
+
+        if not present_records:
+            continue
+
+        # Group attendance by month and count days
+        month_buckets = defaultdict(float)
+        for record in present_records:
+            m_key = record.date.strftime("%Y-%m")
+            if record.status == AttendanceStatus.PRESENT:
+                month_buckets[m_key] += 1.0
+            elif record.status == AttendanceStatus.HALF_DAY:
+                month_buckets[m_key] += 0.5
+            elif record.status == AttendanceStatus.PRESENT_HALF:
+                month_buckets[m_key] += 1.5
+            elif record.status == AttendanceStatus.DOUBLE_DUTY:
+                month_buckets[m_key] += 2.0
+
+        # Calculate total days present
+        days_present = sum(month_buckets.values())
+
+        # Working days = sum of calendar days for months where labour has attendance
+        active_months = set(month_buckets.keys())
         labour_working_days = sum(month_calendar_days.get(m, 30) for m in active_months)
         pct = round(days_present / labour_working_days * 100, 1) if labour_working_days > 0 else 0
 
-        # Monthly breakdown
+        # Monthly breakdown - include ALL months in range, even with 0 days
         monthly = []
         for m_info in month_labels:
             m_key = m_info["key"]
-            present = month_buckets[lid].get(m_key, 0)
+            present = month_buckets.get(m_key, 0)
+            # Include month if there's any attendance OR if it's in the active months set
             if present > 0 or m_key in active_months:
                 monthly.append({
                     "month": m_info["label"],
@@ -783,7 +810,7 @@ async def get_attendance_report(
     return {
         "months": months,
         "from_date": from_date.isoformat(),
-        "to_date": today.isoformat(),
+        "to_date": to_date.isoformat(),
         "month_labels": month_labels,
         "labours": labour_rows,
     }
