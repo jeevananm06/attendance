@@ -292,6 +292,8 @@ export const statsAPI = {
     cached('stats:wage-distribution', () => api.get('/stats/wage-distribution'), 60_000),
   getAttendanceReport: (months = 12) =>
     cached(`stats:attendance-report:${months}`, () => api.get(`/stats/attendance-report?months=${months}`), 60_000),
+  getWeeklyPendingDetail: (weekEnd) =>
+    api.get(`/stats/weekly-pending-detail?week_end=${weekEnd}`),
 };
 
 export const exportAPI = {

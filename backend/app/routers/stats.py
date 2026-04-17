@@ -167,6 +167,50 @@ async def get_weekly_stats(
     return {"weeks": weekly_data}
 
 
+@router.get("/weekly-pending-detail")
+async def get_weekly_pending_detail(
+    week_end: date,
+    current_user: User = Depends(get_current_admin)
+):
+    """Get per-labour salary breakdown for a specific week."""
+    labours = get_all_labours()
+    labour_map = {l.id: l for l in labours}
+    all_records = get_salary_records()
+
+    week_records = [r for r in all_records if r.week_end == week_end]
+
+    total_paid = 0.0
+    total_pending = 0.0
+    labour_list = []
+
+    for r in week_records:
+        labour = labour_map.get(r.labour_id)
+        paid = r.paid_amount or 0.0
+        pending = r.total_amount - paid
+        total_paid += paid
+        total_pending += pending
+        labour_list.append({
+            "labour_id": r.labour_id,
+            "name": labour.name if labour else "Unknown",
+            "days_present": r.days_present,
+            "daily_wage": labour.daily_wage if labour else 0,
+            "total_amount": r.total_amount,
+            "paid_amount": paid,
+            "pending": pending,
+            "is_paid": r.is_paid,
+        })
+
+    # Sort: pending first (descending), then paid
+    labour_list.sort(key=lambda x: (-x["pending"], x["name"]))
+
+    return {
+        "week_end": week_end.isoformat(),
+        "total_paid": total_paid,
+        "total_pending": total_pending,
+        "labours": labour_list,
+    }
+
+
 @router.get("/all-labours")
 async def get_all_labour_stats(
     current_user: User = Depends(get_current_manager_or_admin)
