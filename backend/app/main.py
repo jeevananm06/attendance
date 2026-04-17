@@ -180,8 +180,8 @@ async def keep_alive():
 
 async def saturday_salary_scheduler():
     """Automatically calculate salaries every Saturday."""
-    logger = logging.getLogger("salary_scheduler")
     await asyncio.sleep(30)  # wait for app to fully start
+    print("SCHEDULER: Saturday salary scheduler started", flush=True)
 
     last_run_date = None  # track to avoid duplicate runs on the same day
 
@@ -192,21 +192,22 @@ async def saturday_salary_scheduler():
 
             # Saturday = weekday 5
             if today.weekday() == 5 and last_run_date != today:
-                logger.info(f"Saturday salary auto-calculation triggered for {today}")
+                print(f"SCHEDULER: Saturday salary auto-calculation triggered for {today}", flush=True)
                 try:
                     from .salary_calculator import recalculate_all_salaries, get_last_friday
                     last_friday = get_last_friday(today)
                     results = recalculate_all_salaries(last_friday)
                     total = sum(r.get("records_created", 0) for r in results.values() if isinstance(r, dict))
-                    logger.info(f"Saturday salary calculation complete: {len(results)} labours processed, {total} records created")
+                    print(f"SCHEDULER: Saturday salary calculation complete: {len(results)} labours processed, {total} records created", flush=True)
                     last_run_date = today
                 except Exception as calc_err:
-                    logger.error(f"Saturday salary calculation failed: {calc_err}")
+                    print(f"SCHEDULER ERROR: Saturday salary calculation failed: {calc_err}", flush=True)
 
         except Exception as e:
-            logger.error(f"Salary scheduler error: {e}")
+            print(f"SCHEDULER ERROR: {e}", flush=True)
 
         # Check every hour
+        print(f"SCHEDULER HEARTBEAT: {today} (weekday: {today.weekday()})", flush=True)
         await asyncio.sleep(3600)
 
 
@@ -224,6 +225,8 @@ async def startup_event():
     asyncio.create_task(keep_alive())
 
     asyncio.create_task(saturday_salary_scheduler())
+
+    print("BACKGROUND TASKS: keep_alive and saturday_salary_scheduler started", flush=True)
 
 
 
