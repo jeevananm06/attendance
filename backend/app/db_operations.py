@@ -1128,9 +1128,11 @@ def mark_salary_paid(labour_id: str, week_end: date, paid_by: str, amount_paid: 
 
                 record.paid_by = paid_by
 
-                if payment_comment:
+            # Attach comment to the last (most recent) week
 
-                    record.payment_comment = payment_comment
+            if payment_comment and records:
+
+                records[-1].payment_comment = payment_comment
 
             db.commit()
 
@@ -1138,7 +1140,7 @@ def mark_salary_paid(labour_id: str, week_end: date, paid_by: str, amount_paid: 
 
             paid_now = amount_paid if is_excess_payment else total_due
 
-            primary_record_id = records[0].id if records else "unknown"
+            primary_record_id = records[-1].id if records else "unknown"
 
             _create_payment_log(db, primary_record_id, labour_id, paid_now, paid_by, payment_comment)
 
@@ -1172,6 +1174,8 @@ def mark_salary_paid(labour_id: str, week_end: date, paid_by: str, amount_paid: 
 
         weeks_paid = 0
 
+        last_touched_record = records[-1]  # default to last record
+
         for record in records:
 
             week_remaining = record.total_amount - (record.paid_amount or 0)
@@ -1192,6 +1196,8 @@ def mark_salary_paid(labour_id: str, week_end: date, paid_by: str, amount_paid: 
 
                 weeks_paid += 1
 
+                last_touched_record = record
+
             elif remaining_budget > 0:
 
                 # Partial payment toward this week — don't mark as paid
@@ -1200,17 +1206,21 @@ def mark_salary_paid(labour_id: str, week_end: date, paid_by: str, amount_paid: 
 
                 record.paid_by = paid_by
 
-                if payment_comment:
-
-                    record.payment_comment = payment_comment
-
                 remaining_budget = 0
+
+                last_touched_record = record
 
                 break
 
             else:
 
                 break
+
+        # Attach comment to the last record that received payment
+
+        if payment_comment:
+
+            last_touched_record.payment_comment = payment_comment
 
 
 
@@ -1230,9 +1240,9 @@ def mark_salary_paid(labour_id: str, week_end: date, paid_by: str, amount_paid: 
 
 
 
-        # Log this payment installment
+        # Log this payment installment — tag to last touched week
 
-        primary_record_id = records[0].id if records else "unknown"
+        primary_record_id = last_touched_record.id
 
         _create_payment_log(db, primary_record_id, labour_id, actual_paid, paid_by, payment_comment)
 

@@ -10,6 +10,8 @@ import logging
 
 import httpx
 
+from datetime import date, datetime, timedelta
+
 
 
 from .models import User, UserRole
@@ -176,6 +178,37 @@ async def keep_alive():
 
 
 
+async def saturday_salary_scheduler():
+    """Automatically calculate salaries every Saturday."""
+    logger = logging.getLogger("salary_scheduler")
+    await asyncio.sleep(30)  # wait for app to fully start
+
+    last_run_date = None  # track to avoid duplicate runs on the same day
+
+    while True:
+        try:
+            now = datetime.now()
+            today = now.date()
+
+            # Saturday = weekday 5
+            if today.weekday() == 5 and last_run_date != today:
+                logger.info(f"Saturday salary auto-calculation triggered for {today}")
+                try:
+                    from .salary_calculator import recalculate_all_salaries, get_last_friday
+                    last_friday = get_last_friday(today)
+                    results = recalculate_all_salaries(last_friday)
+                    total = sum(r.get("records_created", 0) for r in results.values() if isinstance(r, dict))
+                    logger.info(f"Saturday salary calculation complete: {len(results)} labours processed, {total} records created")
+                    last_run_date = today
+                except Exception as calc_err:
+                    logger.error(f"Saturday salary calculation failed: {calc_err}")
+
+        except Exception as e:
+            logger.error(f"Salary scheduler error: {e}")
+
+        # Check every hour
+        await asyncio.sleep(3600)
+
 
 
 @app.on_event("startup")
@@ -189,6 +222,8 @@ async def startup_event():
     
 
     asyncio.create_task(keep_alive())
+
+    asyncio.create_task(saturday_salary_scheduler())
 
 
 
