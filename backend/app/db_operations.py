@@ -1390,10 +1390,13 @@ def get_payment_logs(labour_id: str = None, salary_record_id: str = None) -> lis
 def revert_payment(payment_log_id: str, reverted_by: str) -> Optional[dict]:
     """
     Revert a payment by its payment log ID.
-    - Subtracts the payment amount from the salary record's paid_amount
-    - Resets is_paid / paid_date / paid_by if paid_amount drops to 0
-    - Deletes the payment log entry
-    - Returns info about what was reverted
+    Since mark_salary_paid distributes a single payment across multiple salary
+    records (oldest-first), the revert must undo that across ALL affected records
+    for the labour — subtracting from newest records first (reverse order).
+
+    Strategy: get all salary records for this labour that have any paid_amount,
+    ordered by week_end DESC (newest first), and subtract the payment amount
+    starting from the newest. This reverses the oldest-first allocation.
     """
     db = get_db_session()
     try:
@@ -1403,49 +1406,73 @@ def revert_payment(payment_log_id: str, reverted_by: str) -> Optional[dict]:
             return None
 
         payment_amount = payment.amount
-        salary_record_id = payment.salary_record_id
         labour_id = payment.labour_id
 
-        # Find the salary record
-        salary_record = db.query(SalaryDB).filter(SalaryDB.id == salary_record_id).first()
-        if not salary_record:
-            # Payment log exists but salary record doesn't — just delete the log
+        # Get ALL salary records for this labour that have any paid amount,
+        # ordered by week_end DESC (newest first).
+        records = (
+            db.query(SalaryDB)
+            .filter(
+                SalaryDB.labour_id == labour_id,
+                SalaryDB.paid_amount > 0,
+            )
+            .order_by(SalaryDB.week_end.desc())
+            .all()
+        )
+
+        if not records:
             db.delete(payment)
             db.commit()
             return {
                 "reverted_amount": payment_amount,
-                "salary_record_id": salary_record_id,
                 "labour_id": labour_id,
-                "warning": "Salary record not found, only payment log removed",
+                "warning": "No salary records found, only payment log removed",
             }
 
-        # Subtract the payment amount from paid_amount
-        old_paid = salary_record.paid_amount or 0
-        new_paid = max(old_paid - payment_amount, 0)
-        salary_record.paid_amount = new_paid
+        # Subtract the payment amount from records, newest first
+        remaining_to_revert = payment_amount
+        affected_records = []
 
-        # If paid_amount is now 0 or less than total, mark as unpaid
-        if new_paid < salary_record.total_amount:
-            salary_record.is_paid = False
+        for record in records:
+            if remaining_to_revert <= 0:
+                break
 
-        # If paid_amount is 0, clear paid info
-        if new_paid == 0:
-            salary_record.paid_date = None
-            salary_record.paid_by = None
-            salary_record.payment_comment = None
+            current_paid = record.paid_amount or 0
+            if current_paid <= 0:
+                continue
+
+            # How much can we subtract from this record?
+            subtract = min(current_paid, remaining_to_revert)
+            new_paid = current_paid - subtract
+            record.paid_amount = new_paid
+            remaining_to_revert -= subtract
+
+            # If paid_amount drops below total, mark as unpaid
+            if new_paid < record.total_amount:
+                record.is_paid = False
+
+            # If paid_amount is 0, clear all paid info
+            if new_paid == 0:
+                record.paid_date = None
+                record.paid_by = None
+                record.payment_comment = None
+
+            affected_records.append({
+                "week_end": record.week_end.isoformat(),
+                "old_paid": current_paid,
+                "new_paid": new_paid,
+                "subtracted": subtract,
+            })
 
         # Delete the payment log entry
         db.delete(payment)
-
         db.commit()
 
         return {
             "reverted_amount": payment_amount,
-            "salary_record_id": salary_record_id,
             "labour_id": labour_id,
-            "week_end": salary_record.week_end.isoformat(),
-            "new_paid_amount": new_paid,
-            "new_is_paid": salary_record.is_paid,
+            "records_affected": len(affected_records),
+            "details": affected_records,
         }
 
     finally:
