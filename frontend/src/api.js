@@ -254,6 +254,14 @@ export const salaryAPI = {
     api.get(`/salary/register?year=${year}&month=${month}`),
   getPayments: (labourId) =>
     api.get(`/salary/payments/${labourId}`),
+  getAllPayments: (limit = 50) =>
+    api.get(`/salary/payments?limit=${limit}`),
+  revertPayment: (paymentId) => {
+    invalidateCache('salary:pending:all', 'salary:summary');
+    invalidateCache(...Object.keys(_cache).filter((k) => k.startsWith('salary:records:')));
+    invalidateCache(...Object.keys(_cache).filter((k) => k.startsWith('salary:pending:')));
+    return api.post(`/salary/revert-payment/${paymentId}`);
+  },
 };
 
 export const statsAPI = {

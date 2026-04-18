@@ -24,7 +24,7 @@ const MONTHS = [
 
 const Salary = () => {
   const { isAdmin } = useAuth();
-  const [tab, setTab] = useState('pending'); // 'pending' | 'register'
+  const [tab, setTab] = useState('pending'); // 'pending' | 'register' | 'history'
   const [pendingSalaries, setPendingSalaries] = useState(null);
   const [labours, setLabours] = useState([]);
   const [advances, setAdvances] = useState({}); // { labourId: { pending_amount, advances: [] } }
@@ -54,6 +54,11 @@ const Salary = () => {
   const [register, setRegister] = useState(null);
   const [regLoading, setRegLoading] = useState(false);
   const [expandedRegLabour, setExpandedRegLabour] = useState(null);
+
+  // Payment history / revert state
+  const [paymentHistory, setPaymentHistory] = useState(null);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [revertingId, setRevertingId] = useState(null);
 
   useEffect(() => {
     fetchData();
@@ -176,6 +181,39 @@ const Salary = () => {
       setError(err.response?.data?.detail || 'Failed to load register');
     } finally {
       setRegLoading(false);
+    }
+  };
+
+  const fetchPaymentHistory = async () => {
+    try {
+      setHistoryLoading(true);
+      setError('');
+      const res = await salaryAPI.getAllPayments(50);
+      setPaymentHistory(res.data.payments);
+    } catch (err) {
+      setError(err.response?.data?.detail || 'Failed to load payment history');
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
+
+  const handleRevertPayment = async (paymentId, labourName, amount) => {
+    if (!window.confirm(`Are you sure you want to revert the ₹${amount.toLocaleString()} payment for ${labourName}? This will mark the salary as unpaid.`)) {
+      return;
+    }
+    try {
+      setRevertingId(paymentId);
+      setError('');
+      const res = await salaryAPI.revertPayment(paymentId);
+      setSuccess(res.data.message);
+      // Refresh both payment history and pending data
+      fetchPaymentHistory();
+      fetchData(true);
+      setTimeout(() => setSuccess(''), 5000);
+    } catch (err) {
+      setError(err.response?.data?.detail || 'Failed to revert payment');
+    } finally {
+      setRevertingId(null);
     }
   };
 
@@ -321,6 +359,16 @@ const Salary = () => {
         >
           Pay Register
         </button>
+        {isAdmin && (
+          <button
+            onClick={() => { setTab('history'); if (!paymentHistory) fetchPaymentHistory(); }}
+            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+              tab === 'history' ? 'bg-white dark:bg-gray-600 text-primary-600 dark:text-primary-400 shadow-sm' : 'text-gray-600 dark:text-gray-400 hover:text-gray-800'
+            }`}
+          >
+            Payment History
+          </button>
+        )}
       </div>
 
       {error && (
@@ -671,6 +719,77 @@ const Salary = () => {
                 </div>
               )}
             </>
+          )}
+        </div>
+      )}
+
+      {tab === 'history' && isAdmin && (
+        <div className="card space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100">Recent Payments</h3>
+            <button
+              onClick={fetchPaymentHistory}
+              disabled={historyLoading}
+              className="btn-secondary flex items-center gap-2 text-sm"
+            >
+              {historyLoading ? (
+                <div className="w-4 h-4 border-2 border-gray-500 border-t-transparent rounded-full animate-spin" />
+              ) : (
+                <RefreshCw size={14} />
+              )}
+              Refresh
+            </button>
+          </div>
+
+          {historyLoading && !paymentHistory ? (
+            <div className="flex justify-center py-8">
+              <div className="w-6 h-6 border-2 border-primary-600 border-t-transparent rounded-full animate-spin" />
+            </div>
+          ) : !paymentHistory || paymentHistory.length === 0 ? (
+            <p className="text-center py-8 text-gray-400 dark:text-gray-500">No payment records found</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50 dark:bg-gray-700">
+                  <tr>
+                    <th className="text-left px-3 py-2 text-gray-600 dark:text-gray-300">Labour</th>
+                    <th className="text-right px-3 py-2 text-gray-600 dark:text-gray-300">Amount</th>
+                    <th className="text-center px-3 py-2 text-gray-600 dark:text-gray-300">Date</th>
+                    <th className="text-left px-3 py-2 text-gray-600 dark:text-gray-300">Paid By</th>
+                    <th className="text-left px-3 py-2 text-gray-600 dark:text-gray-300">Comment</th>
+                    <th className="text-center px-3 py-2 text-gray-600 dark:text-gray-300">Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {paymentHistory.map((p) => (
+                    <tr key={p.id} className="border-t border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                      <td className="px-3 py-2 font-medium text-gray-900 dark:text-gray-100">{p.labour_name}</td>
+                      <td className="px-3 py-2 text-right font-semibold text-green-600">₹{p.amount.toLocaleString()}</td>
+                      <td className="px-3 py-2 text-center text-gray-600 dark:text-gray-400">
+                        {new Date(p.paid_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: '2-digit' })}
+                      </td>
+                      <td className="px-3 py-2 text-gray-600 dark:text-gray-400">{p.paid_by}</td>
+                      <td className="px-3 py-2 text-gray-500 dark:text-gray-400 text-xs max-w-[200px] truncate" title={p.comment || ''}>
+                        {p.comment || '—'}
+                      </td>
+                      <td className="px-3 py-2 text-center">
+                        <button
+                          onClick={() => handleRevertPayment(p.id, p.labour_name, p.amount)}
+                          disabled={revertingId === p.id}
+                          className="px-2 py-1 text-xs font-medium text-red-600 hover:text-white hover:bg-red-600 border border-red-300 dark:border-red-700 rounded transition-colors disabled:opacity-50"
+                        >
+                          {revertingId === p.id ? (
+                            <div className="w-3 h-3 border-2 border-red-500 border-t-transparent rounded-full animate-spin inline-block" />
+                          ) : (
+                            'Revert'
+                          )}
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
         </div>
       )}

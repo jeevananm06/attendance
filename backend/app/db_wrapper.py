@@ -40,7 +40,7 @@ if USE_POSTGRES:
 
         # Salary operations
 
-        get_salary_records, get_salary_records_bulk, create_salary_record, mark_salary_paid, delete_unpaid_salary_records, get_payment_logs, create_payment_log_entry,
+        get_salary_records, get_salary_records_bulk, create_salary_record, mark_salary_paid, delete_unpaid_salary_records, get_payment_logs, create_payment_log_entry, revert_payment, get_all_payment_logs,
 
         # Overtime operations
 
@@ -455,6 +455,10 @@ else:
     def create_payment_log_entry(salary_record_id, labour_id, amount, paid_by, comment=None):
 
         return None
+
+    def revert_payment(payment_log_id, reverted_by): return None
+
+    def get_all_payment_logs(limit=50): return []
 
 
 

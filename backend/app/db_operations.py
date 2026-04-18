@@ -1384,6 +1384,96 @@ def get_payment_logs(labour_id: str = None, salary_record_id: str = None) -> lis
 
 
 
+# ============== PAYMENT REVERT OPERATIONS ==============
+
+
+def revert_payment(payment_log_id: str, reverted_by: str) -> Optional[dict]:
+    """
+    Revert a payment by its payment log ID.
+    - Subtracts the payment amount from the salary record's paid_amount
+    - Resets is_paid / paid_date / paid_by if paid_amount drops to 0
+    - Deletes the payment log entry
+    - Returns info about what was reverted
+    """
+    db = get_db_session()
+    try:
+        # Find the payment log entry
+        payment = db.query(SalaryPaymentDB).filter(SalaryPaymentDB.id == payment_log_id).first()
+        if not payment:
+            return None
+
+        payment_amount = payment.amount
+        salary_record_id = payment.salary_record_id
+        labour_id = payment.labour_id
+
+        # Find the salary record
+        salary_record = db.query(SalaryDB).filter(SalaryDB.id == salary_record_id).first()
+        if not salary_record:
+            # Payment log exists but salary record doesn't — just delete the log
+            db.delete(payment)
+            db.commit()
+            return {
+                "reverted_amount": payment_amount,
+                "salary_record_id": salary_record_id,
+                "labour_id": labour_id,
+                "warning": "Salary record not found, only payment log removed",
+            }
+
+        # Subtract the payment amount from paid_amount
+        old_paid = salary_record.paid_amount or 0
+        new_paid = max(old_paid - payment_amount, 0)
+        salary_record.paid_amount = new_paid
+
+        # If paid_amount is now 0 or less than total, mark as unpaid
+        if new_paid < salary_record.total_amount:
+            salary_record.is_paid = False
+
+        # If paid_amount is 0, clear paid info
+        if new_paid == 0:
+            salary_record.paid_date = None
+            salary_record.paid_by = None
+            salary_record.payment_comment = None
+
+        # Delete the payment log entry
+        db.delete(payment)
+
+        db.commit()
+
+        return {
+            "reverted_amount": payment_amount,
+            "salary_record_id": salary_record_id,
+            "labour_id": labour_id,
+            "week_end": salary_record.week_end.isoformat(),
+            "new_paid_amount": new_paid,
+            "new_is_paid": salary_record.is_paid,
+        }
+
+    finally:
+        db.close()
+
+
+def get_all_payment_logs(limit: int = 50) -> list:
+    """Return recent payment logs across all labours for admin review."""
+    db = get_db_session()
+    try:
+        rows = db.query(SalaryPaymentDB).order_by(SalaryPaymentDB.paid_date.desc(), SalaryPaymentDB.created_at.desc()).limit(limit).all()
+        return [
+            PaymentLog(
+                id=r.id,
+                salary_record_id=r.salary_record_id,
+                labour_id=r.labour_id,
+                amount=r.amount,
+                paid_date=r.paid_date,
+                paid_by=r.paid_by,
+                comment=r.comment,
+            )
+            for r in rows
+        ]
+    finally:
+        db.close()
+
+
+
 # ============== OVERTIME OPERATIONS ==============
 
 

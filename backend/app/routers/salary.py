@@ -6,7 +6,7 @@ from datetime import date
 
 from ..models import SalaryRecord, SalaryPayment, User
 from ..auth import get_current_manager_or_admin, get_current_admin
-from ..db_wrapper import get_salary_records, mark_salary_paid, get_all_labours, get_labour, create_notification, get_pending_advances, get_advances, repay_advance_partial, mark_advance_deducted, delete_unpaid_salary_records, get_payment_logs, create_advance
+from ..db_wrapper import get_salary_records, mark_salary_paid, get_all_labours, get_labour, create_notification, get_pending_advances, get_advances, repay_advance_partial, mark_advance_deducted, delete_unpaid_salary_records, get_payment_logs, create_advance, revert_payment, get_all_payment_logs
 from ..whatsapp_service import send_whatsapp_message
 from ..push_service import send_push_to_user
 
@@ -441,6 +441,31 @@ async def get_salary_slip_all_pending(
     }
 
 
+@router.get("/payments")
+async def get_all_payments(
+    limit: int = 50,
+    current_user: User = Depends(get_current_admin)
+):
+    """Get recent payment logs across all labours (Admin only)"""
+    logs = get_all_payment_logs(limit=limit)
+    labour_map = {l.id: l.name for l in get_all_labours(include_inactive=True)}
+    return {
+        "payments": [
+            {
+                "id": p.id,
+                "salary_record_id": p.salary_record_id,
+                "labour_id": p.labour_id,
+                "labour_name": labour_map.get(p.labour_id, "Unknown"),
+                "amount": p.amount,
+                "paid_date": p.paid_date.isoformat(),
+                "paid_by": p.paid_by,
+                "comment": p.comment,
+            }
+            for p in logs
+        ],
+    }
+
+
 @router.get("/payments/{labour_id}")
 async def get_salary_payments(
     labour_id: str,
@@ -466,6 +491,36 @@ async def get_salary_payments(
             for p in sorted(logs, key=lambda x: x.paid_date)
         ],
         "total_paid": sum(p.amount for p in logs),
+    }
+
+
+@router.post("/revert-payment/{payment_id}")
+async def revert_salary_payment(
+    payment_id: str,
+    current_user: User = Depends(get_current_admin)
+):
+    """Revert a specific payment by its payment log ID (Admin only)"""
+    result = revert_payment(payment_id, reverted_by=current_user.username)
+    if not result:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Payment not found")
+
+    # Create notification for audit trail
+    try:
+        labour = get_labour(result["labour_id"])
+        labour_name = labour.name if labour else result["labour_id"]
+        create_notification(
+            user=current_user.username,
+            notif_type="payment_reverted",
+            title="Payment Reverted",
+            message=f"Reverted ₹{result['reverted_amount']:.0f} payment for {labour_name} by {current_user.username}",
+            labour_id=result["labour_id"]
+        )
+    except Exception:
+        pass
+
+    return {
+        "message": f"Payment of ₹{result['reverted_amount']:.0f} reverted successfully",
+        **result,
     }
 
 
