@@ -59,6 +59,7 @@ const Salary = () => {
   const [paymentHistory, setPaymentHistory] = useState(null);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [revertingId, setRevertingId] = useState(null);
+  const [historySearchTerm, setHistorySearchTerm] = useState('');
 
   useEffect(() => {
     fetchData();
@@ -725,20 +726,29 @@ const Salary = () => {
 
       {tab === 'history' && isAdmin && (
         <div className="card space-y-4">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between flex-wrap gap-3">
             <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100">Recent Payments</h3>
-            <button
-              onClick={fetchPaymentHistory}
-              disabled={historyLoading}
-              className="btn-secondary flex items-center gap-2 text-sm"
-            >
-              {historyLoading ? (
-                <div className="w-4 h-4 border-2 border-gray-500 border-t-transparent rounded-full animate-spin" />
-              ) : (
-                <RefreshCw size={14} />
-              )}
-              Refresh
-            </button>
+            <div className="flex items-center gap-3">
+              <input
+                type="text"
+                placeholder="Search by labour name..."
+                value={historySearchTerm}
+                onChange={(e) => setHistorySearchTerm(e.target.value)}
+                className="border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm w-64 bg-white dark:bg-gray-700 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500"
+              />
+              <button
+                onClick={fetchPaymentHistory}
+                disabled={historyLoading}
+                className="btn-secondary flex items-center gap-2 text-sm"
+              >
+                {historyLoading ? (
+                  <div className="w-4 h-4 border-2 border-gray-500 border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <RefreshCw size={14} />
+                )}
+                Refresh
+              </button>
+            </div>
           </div>
 
           {historyLoading && !paymentHistory ? (
@@ -748,20 +758,28 @@ const Salary = () => {
           ) : !paymentHistory || paymentHistory.length === 0 ? (
             <p className="text-center py-8 text-gray-400 dark:text-gray-500">No payment records found</p>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="bg-gray-50 dark:bg-gray-700">
-                  <tr>
-                    <th className="text-left px-3 py-2 text-gray-600 dark:text-gray-300">Labour</th>
-                    <th className="text-right px-3 py-2 text-gray-600 dark:text-gray-300">Amount</th>
-                    <th className="text-center px-3 py-2 text-gray-600 dark:text-gray-300">Date</th>
-                    <th className="text-left px-3 py-2 text-gray-600 dark:text-gray-300">Paid By</th>
-                    <th className="text-left px-3 py-2 text-gray-600 dark:text-gray-300">Comment</th>
-                    <th className="text-center px-3 py-2 text-gray-600 dark:text-gray-300">Action</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {paymentHistory.map((p) => (
+            <>
+              {historySearchTerm && (
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  Showing {paymentHistory.filter(p => p.labour_name.toLowerCase().includes(historySearchTerm.toLowerCase())).length} of {paymentHistory.length} payments
+                </p>
+              )}
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-gray-50 dark:bg-gray-700">
+                    <tr>
+                      <th className="text-left px-3 py-2 text-gray-600 dark:text-gray-300">Labour</th>
+                      <th className="text-right px-3 py-2 text-gray-600 dark:text-gray-300">Amount</th>
+                      <th className="text-center px-3 py-2 text-gray-600 dark:text-gray-300">Date</th>
+                      <th className="text-left px-3 py-2 text-gray-600 dark:text-gray-300">Paid By</th>
+                      <th className="text-left px-3 py-2 text-gray-600 dark:text-gray-300">Comment</th>
+                      <th className="text-center px-3 py-2 text-gray-600 dark:text-gray-300">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {paymentHistory
+                      .filter(p => p.labour_name.toLowerCase().includes(historySearchTerm.toLowerCase()))
+                      .map((p) => (
                     <tr key={p.id} className="border-t border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700/50">
                       <td className="px-3 py-2 font-medium text-gray-900 dark:text-gray-100">{p.labour_name}</td>
                       <td className="px-3 py-2 text-right font-semibold text-green-600">₹{p.amount.toLocaleString()}</td>
@@ -786,10 +804,11 @@ const Salary = () => {
                         </button>
                       </td>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
           )}
         </div>
       )}
