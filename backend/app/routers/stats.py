@@ -782,14 +782,20 @@ async def get_attendance_report(
     all_labours = get_all_labours(include_inactive=False)
 
     # Build month labels with actual calendar days
+    # For current month, use days up to today; for past months, use full calendar days
     month_labels = []
     month_calendar_days = {}
-    for yr, mo in month_list:
+    for i, (yr, mo) in enumerate(month_list):
         key = f"{yr:04d}-{mo:02d}"
         cal_days = cal_module.monthrange(yr, mo)[1]
-        month_calendar_days[key] = cal_days
+        # For the last month (current month), use actual days up to today
+        if i == len(month_list) - 1:
+            working_days = today.day
+        else:
+            working_days = cal_days
+        month_calendar_days[key] = working_days
         label = date(yr, mo, 1).strftime("%b %Y")
-        month_labels.append({"key": key, "label": label, "working_days": cal_days})
+        month_labels.append({"key": key, "label": label, "working_days": working_days})
 
     # Per-labour summary
     labour_rows = []
