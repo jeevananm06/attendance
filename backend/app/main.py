@@ -197,7 +197,7 @@ async def saturday_salary_scheduler():
                     from .salary_calculator import recalculate_all_salaries, get_last_friday
                     last_friday = get_last_friday(today)
                     results = recalculate_all_salaries(last_friday)
-                    total = sum(r.get("records_created", 0) for r in results.values() if isinstance(r, dict))
+                    total = sum(r.get("weeks_calculated", 0) for r in results.values() if isinstance(r, dict))
                     print(f"SCHEDULER: Saturday salary calculation complete: {len(results)} labours processed, {total} records created", flush=True)
                     last_run_date = today
                 except Exception as calc_err:
