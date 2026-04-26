@@ -354,9 +354,10 @@ async def get_attendance_trends(
         week_start, week_end = get_week_boundaries(target)
 
         attendance = get_attendance_by_labour(labour_id, week_start, week_end)
+        total_days = len(attendance) or 1  # total days with any record
         present = sum(1.0 if a.status == AttendanceStatus.PRESENT else 0.5
                       for a in attendance if a.status != AttendanceStatus.ABSENT)
-        pct = round((present / 6) * 100, 1)  # 6-day work week
+        pct = min(round((present / total_days) * 100, 1), 100.0)
 
         salary_records = get_salary_records(labour_id=labour_id)
         week_record = next((r for r in salary_records if r.week_end == week_end), None)
