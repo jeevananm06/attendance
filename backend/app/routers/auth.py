@@ -150,6 +150,11 @@ async def refresh_access_token(request: Request, refresh_token: Optional[str] = 
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="User not found"
         )
+    if not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="User account is inactive"
+        )
 
     # Create new access token
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)

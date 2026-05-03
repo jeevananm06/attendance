@@ -28,6 +28,8 @@ def authenticate_user(username: str, password: str) -> Optional[User]:
         return None
     if not verify_password(password, user.hashed_password):
         return None
+    if not user.is_active:
+        return None
     return user
 
 
