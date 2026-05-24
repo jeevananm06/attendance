@@ -22,7 +22,7 @@ from .routers import auth, labours, attendance, salary, stats, export
 
 from .routers import overtime, advances, leaves, sites, audit, backup, reports, notifications, push, documents
 
-from .routers import cafe_items, cafe_stock, designations
+from .routers import cafe_items, cafe_stock, designations, billing
 
 
 
@@ -147,6 +147,9 @@ app.include_router(cafe_stock.router)
 # Designation router
 
 app.include_router(designations.router)
+
+# Billing router
+app.include_router(billing.router)
 
 
 

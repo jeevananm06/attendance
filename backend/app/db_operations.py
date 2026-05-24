@@ -28,7 +28,7 @@ from .db_models import (
 
     NotificationDB, PushSubscriptionDB, RefreshTokenDB, SalaryPaymentDB,
 
-    DesignationDB, ist_now
+    DesignationDB, BillingItemDB, BillDB, BillLineItemDB, ist_now
 
 )
 
@@ -40,7 +40,9 @@ from .models import (
 
     Site, LabourSiteAssignment, AuditLog, AuditAction,
 
-    Notification, NotificationType
+    Notification, NotificationType,
+
+    BillingItem, Bill, BillStatus
 
 )
 
@@ -3664,15 +3666,288 @@ def delete_designation(designation_id: str) -> bool:
 
 
 
+# ============== BILLING ITEM OPERATIONS ==============
+
+
+def get_billing_items(include_inactive: bool = False) -> List[BillingItem]:
+    db = get_db_session()
+    try:
+        q = db.query(BillingItemDB)
+        if not include_inactive:
+            q = q.filter(BillingItemDB.is_active == True)
+        rows = q.order_by(BillingItemDB.name).all()
+        return [
+            BillingItem(id=r.id, name=r.name, default_rate=r.default_rate,
+                        is_active=r.is_active, created_at=r.created_at)
+            for r in rows
+        ]
+    finally:
+        db.close()
+
+
+def create_billing_item(name: str, default_rate: float = 0.0) -> BillingItem:
+    db = get_db_session()
+    try:
+        item_id = str(uuid.uuid4())[:8]
+        now = ist_now()
+        item = BillingItemDB(id=item_id, name=name, default_rate=default_rate, created_at=now)
+        db.add(item)
+        db.commit()
+        return BillingItem(id=item_id, name=name, default_rate=default_rate,
+                           is_active=True, created_at=now)
+    finally:
+        db.close()
+
+
+def update_billing_item(item_id: str, name: str = None, default_rate: float = None,
+                        is_active: bool = None) -> Optional[BillingItem]:
+    db = get_db_session()
+    try:
+        item = db.query(BillingItemDB).filter(BillingItemDB.id == item_id).first()
+        if not item:
+            return None
+        if name is not None:
+            item.name = name
+        if default_rate is not None:
+            item.default_rate = default_rate
+        if is_active is not None:
+            item.is_active = is_active
+        db.commit()
+        return BillingItem(id=item.id, name=item.name, default_rate=item.default_rate,
+                           is_active=item.is_active, created_at=item.created_at)
+    finally:
+        db.close()
+
+
+# ============== BILL OPERATIONS ==============
+
+
+def _generate_bill_number(db, bill_date: date) -> str:
+    """Generate auto-incrementing bill number: BILL-YYYYMMDD-NNN"""
+    date_str = bill_date.strftime("%Y%m%d")
+    prefix = f"BILL-{date_str}-"
+    existing = db.query(BillDB).filter(BillDB.bill_number.like(f"{prefix}%")).count()
+    return f"{prefix}{existing + 1:03d}"
+
+
+def create_bill(customer_name: str, customer_phone: str, customer_place: str,
+                bill_date: date, line_items: list, tax_percentage: float = 0.0,
+                notes: str = None, created_by: str = "admin") -> dict:
+    db = get_db_session()
+    try:
+        bill_id = str(uuid.uuid4())[:8]
+        bill_number = _generate_bill_number(db, bill_date)
+        now = ist_now()
+
+        subtotal = 0.0
+        db_line_items = []
+        for li in line_items:
+            amount = round(li["quantity"] * li["rate"], 2)
+            subtotal += amount
+            db_line_items.append(BillLineItemDB(
+                id=str(uuid.uuid4())[:8],
+                bill_id=bill_id,
+                item_name=li["item_name"],
+                quantity=li["quantity"],
+                rate=li["rate"],
+                amount=amount,
+            ))
+
+        subtotal = round(subtotal, 2)
+        tax_amount = round(subtotal * tax_percentage / 100, 2)
+        total_amount = round(subtotal + tax_amount, 2)
+
+        bill = BillDB(
+            id=bill_id, bill_number=bill_number,
+            customer_name=customer_name, customer_phone=customer_phone,
+            customer_place=customer_place, bill_date=bill_date,
+            status="draft", subtotal=subtotal,
+            tax_percentage=tax_percentage, tax_amount=tax_amount,
+            total_amount=total_amount, notes=notes,
+            created_by=created_by, created_at=now,
+        )
+        db.add(bill)
+        for li in db_line_items:
+            db.add(li)
+        db.commit()
+
+        return _bill_to_dict(bill, db_line_items)
+    finally:
+        db.close()
+
+
+def get_bill(bill_id: str) -> Optional[dict]:
+    db = get_db_session()
+    try:
+        bill = db.query(BillDB).filter(BillDB.id == bill_id).first()
+        if not bill:
+            return None
+        return _bill_to_dict(bill, bill.line_items)
+    finally:
+        db.close()
+
+
+def get_bill_by_number(bill_number: str) -> Optional[dict]:
+    db = get_db_session()
+    try:
+        bill = db.query(BillDB).filter(BillDB.bill_number == bill_number).first()
+        if not bill:
+            return None
+        return _bill_to_dict(bill, bill.line_items)
+    finally:
+        db.close()
+
+
+def search_bills(customer_name: str = None, customer_phone: str = None,
+                 bill_date: date = None, start_date: date = None,
+                 end_date: date = None, status: str = None,
+                 limit: int = 50, offset: int = 0) -> dict:
+    db = get_db_session()
+    try:
+        q = db.query(BillDB)
+        if customer_name:
+            q = q.filter(BillDB.customer_name.ilike(f"%{customer_name}%"))
+        if customer_phone:
+            q = q.filter(BillDB.customer_phone.ilike(f"%{customer_phone}%"))
+        if bill_date:
+            q = q.filter(BillDB.bill_date == bill_date)
+        if start_date:
+            q = q.filter(BillDB.bill_date >= start_date)
+        if end_date:
+            q = q.filter(BillDB.bill_date <= end_date)
+        if status:
+            q = q.filter(BillDB.status == status)
+
+        total = q.count()
+        bills = q.order_by(BillDB.created_at.desc()).offset(offset).limit(limit).all()
+        return {
+            "total": total,
+            "bills": [_bill_to_dict(b, b.line_items) for b in bills]
+        }
+    finally:
+        db.close()
+
+
+def update_bill_status(bill_id: str, new_status: str) -> Optional[dict]:
+    db = get_db_session()
+    try:
+        bill = db.query(BillDB).filter(BillDB.id == bill_id).first()
+        if not bill:
+            return None
+        bill.status = new_status
+        if new_status == "finalized" and not bill.finalized_at:
+            bill.finalized_at = ist_now()
+        db.commit()
+        return _bill_to_dict(bill, bill.line_items)
+    finally:
+        db.close()
+
+
+def delete_bill(bill_id: str) -> bool:
+    db = get_db_session()
+    try:
+        bill = db.query(BillDB).filter(BillDB.id == bill_id).first()
+        if not bill:
+            return False
+        db.delete(bill)
+        db.commit()
+        return True
+    finally:
+        db.close()
+
+
+def get_billing_summary(start_date: date = None, end_date: date = None) -> dict:
+    db = get_db_session()
+    try:
+        q = db.query(BillDB)
+        if start_date:
+            q = q.filter(BillDB.bill_date >= start_date)
+        if end_date:
+            q = q.filter(BillDB.bill_date <= end_date)
+
+        bills = q.all()
+        total_bills = len(bills)
+        total_revenue = sum(b.total_amount for b in bills)
+        draft_count = sum(1 for b in bills if b.status == "draft")
+        finalized_count = sum(1 for b in bills if b.status == "finalized")
+        paid_count = sum(1 for b in bills if b.status == "paid")
+
+        # Item-wise breakdown
+        item_map = {}
+        for b in bills:
+            for li in b.line_items:
+                key = li.item_name
+                if key not in item_map:
+                    item_map[key] = {"item_name": key, "total_qty": 0.0, "total_amount": 0.0}
+                item_map[key]["total_qty"] += li.quantity
+                item_map[key]["total_amount"] += li.amount
+
+        return {
+            "total_bills": total_bills,
+            "total_revenue": round(total_revenue, 2),
+            "draft_count": draft_count,
+            "finalized_count": finalized_count,
+            "paid_count": paid_count,
+            "item_breakdown": sorted(item_map.values(), key=lambda x: x["total_amount"], reverse=True),
+        }
+    finally:
+        db.close()
+
+
+def get_customer_suggestions(query: str) -> list:
+    """Return distinct customers matching query for auto-complete."""
+    db = get_db_session()
+    try:
+        rows = db.query(
+            BillDB.customer_name, BillDB.customer_phone, BillDB.customer_place
+        ).filter(
+            or_(
+                BillDB.customer_name.ilike(f"%{query}%"),
+                BillDB.customer_phone.ilike(f"%{query}%")
+            )
+        ).distinct().limit(10).all()
+        seen = set()
+        results = []
+        for name, phone, place in rows:
+            key = f"{name}|{phone}"
+            if key not in seen:
+                seen.add(key)
+                results.append({"customer_name": name, "customer_phone": phone, "customer_place": place})
+        return results
+    finally:
+        db.close()
+
+
+def _bill_to_dict(bill, line_items) -> dict:
+    return {
+        "id": bill.id,
+        "bill_number": bill.bill_number,
+        "customer_name": bill.customer_name,
+        "customer_phone": bill.customer_phone,
+        "customer_place": bill.customer_place,
+        "bill_date": bill.bill_date.isoformat() if bill.bill_date else None,
+        "status": bill.status,
+        "subtotal": bill.subtotal,
+        "tax_percentage": bill.tax_percentage,
+        "tax_amount": bill.tax_amount,
+        "total_amount": bill.total_amount,
+        "notes": bill.notes,
+        "created_by": bill.created_by,
+        "finalized_at": bill.finalized_at.isoformat() if bill.finalized_at else None,
+        "created_at": bill.created_at.isoformat() if bill.created_at else None,
+        "line_items": [
+            {"id": li.id, "item_name": li.item_name, "quantity": li.quantity,
+             "rate": li.rate, "amount": li.amount}
+            for li in (line_items or [])
+        ],
+    }
+
+
 # ============== INITIALIZATION ==============
 
 
-
 def init_db_tables():
-
     """Initialize database tables"""
-
     from .db_connection import init_db
-
     init_db()
 

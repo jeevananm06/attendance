@@ -284,3 +284,61 @@ class SalaryPaymentDB(Base):
     paid_by = Column(String(100), nullable=False)
     comment = Column(String(500), nullable=True)
     created_at = Column(DateTime, default=ist_now)
+
+
+# ============== BILLING MODELS ==============
+
+class BillStatusEnum(str, enum.Enum):
+    DRAFT = "draft"
+    FINALIZED = "finalized"
+    PAID = "paid"
+
+
+class BillingItemDB(Base):
+    """Configurable items that can be added to bills (e.g. Tea, Coffee, Milk)."""
+    __tablename__ = "billing_items"
+
+    id = Column(String(36), primary_key=True, index=True)
+    name = Column(String(200), nullable=False)
+    default_rate = Column(Float, default=0.0)
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=ist_now)
+
+
+class BillDB(Base):
+    """A bulk order bill for a customer."""
+    __tablename__ = "bills"
+
+    id = Column(String(36), primary_key=True, index=True)
+    bill_number = Column(String(50), nullable=False, unique=True, index=True)
+    customer_name = Column(String(200), nullable=False)
+    customer_phone = Column(String(20), nullable=True)
+    customer_place = Column(String(200), nullable=True)
+    bill_date = Column(Date, nullable=False)
+    status = Column(String(20), default="draft")  # draft, finalized, paid
+    subtotal = Column(Float, default=0.0)
+    tax_percentage = Column(Float, default=0.0)
+    tax_amount = Column(Float, default=0.0)
+    total_amount = Column(Float, default=0.0)
+    notes = Column(Text, nullable=True)
+    created_by = Column(String(100), nullable=False)
+    finalized_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=ist_now)
+
+    # Relationships
+    line_items = relationship("BillLineItemDB", back_populates="bill", cascade="all, delete-orphan")
+
+
+class BillLineItemDB(Base):
+    """Individual line item within a bill."""
+    __tablename__ = "bill_line_items"
+
+    id = Column(String(36), primary_key=True, index=True)
+    bill_id = Column(String(36), ForeignKey("bills.id", ondelete="CASCADE"), nullable=False, index=True)
+    item_name = Column(String(200), nullable=False)
+    quantity = Column(Float, nullable=False)
+    rate = Column(Float, nullable=False)
+    amount = Column(Float, nullable=False)
+
+    # Relationships
+    bill = relationship("BillDB", back_populates="line_items")

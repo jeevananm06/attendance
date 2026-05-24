@@ -22,6 +22,8 @@ import {
   TrendingUp,
   Package,
   Activity,
+  Receipt,
+  FileText,
 } from 'lucide-react';
 import OfflineIndicator from './OfflineIndicator';
 import { useDarkMode } from '../hooks/useDarkMode';
@@ -45,6 +47,12 @@ const cafeNavItems = [
   { path: '/cafe/history', icon: ClipboardList, label: 'Entry History', roles: ['admin'] },
   { path: '/cafe/analytics', icon: TrendingUp, label: 'Cafe Analytics', roles: ['admin'] },
   { path: '/cafe/items', icon: Package, label: 'Manage Items', roles: ['admin'] },
+];
+
+const billingNavItems = [
+  { path: '/billing', icon: Receipt, label: 'New Bill', roles: ['admin', 'manager'] },
+  { path: '/billing/history', icon: FileText, label: 'Bill History', roles: ['admin'] },
+  { path: '/billing/items', icon: Package, label: 'Billing Items', roles: ['admin'] },
 ];
 
 const Layout = ({ children }) => {
@@ -140,6 +148,38 @@ const Layout = ({ children }) => {
                 })}
             </>
           )}
+
+          {/* Billing Section */}
+          {billingNavItems.some((item) => !item.roles || item.roles.includes(user?.role)) && (
+            <>
+              <div className="pt-3 pb-1">
+                <p className="px-4 text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider flex items-center gap-2">
+                  <Receipt size={12} /> Billing
+                </p>
+              </div>
+              {billingNavItems
+                .filter((item) => !item.roles || item.roles.includes(user?.role))
+                .map((item) => {
+                  const Icon = item.icon;
+                  const isActive = location.pathname === item.path;
+                  return (
+                    <Link
+                      key={item.path}
+                      to={item.path}
+                      className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
+                        isActive
+                          ? 'bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
+                          : 'text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700'
+                      }`}
+                      onClick={() => setSidebarOpen(false)}
+                    >
+                      <Icon size={20} />
+                      <span className="font-medium">{item.label}</span>
+                    </Link>
+                  );
+                })}
+            </>
+          )}
         </nav>
 
         <div className="p-4 border-t border-gray-200 dark:border-gray-700 flex-shrink-0 bg-white dark:bg-gray-800">
@@ -171,7 +211,7 @@ const Layout = ({ children }) => {
             <Menu size={24} />
           </button>
           <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-100">
-            {[...navItems, ...cafeNavItems].find((item) => item.path === location.pathname)?.label || 'Dashboard'}
+            {[...navItems, ...cafeNavItems, ...billingNavItems].find((item) => item.path === location.pathname)?.label || 'Dashboard'}
           </h2>
           <div className="ml-auto flex items-center gap-1">
             <button

@@ -16,6 +16,9 @@ import CafeHistory from './pages/CafeHistory';
 import CafeAnalytics from './pages/CafeAnalytics';
 import CafeItems from './pages/CafeItems';
 import SalaryAnalytics from './pages/SalaryAnalytics';
+import BillingEntry from './pages/BillingEntry';
+import BillingHistory from './pages/BillingHistory';
+import BillingItems from './pages/BillingItems';
 import InstallPrompt from './components/InstallPrompt';
 
 const ProtectedRoute = ({ children, allowedRoles }) => {
@@ -157,6 +160,30 @@ const App = () => {
             element={
               <ProtectedRoute allowedRoles={['admin']}>
                 <CafeItems />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/billing"
+            element={
+              <ProtectedRoute allowedRoles={['admin', 'manager']}>
+                <BillingEntry />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/billing/history"
+            element={
+              <ProtectedRoute allowedRoles={['admin']}>
+                <BillingHistory />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/billing/items"
+            element={
+              <ProtectedRoute allowedRoles={['admin']}>
+                <BillingItems />
               </ProtectedRoute>
             }
           />

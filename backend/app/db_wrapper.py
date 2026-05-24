@@ -106,6 +106,14 @@ if USE_POSTGRES:
 
     )
 
+    # Billing operations
+    from .db_operations import (
+        get_billing_items, create_billing_item, update_billing_item,
+        create_bill, get_bill, get_bill_by_number, search_bills,
+        update_bill_status, delete_bill, get_billing_summary,
+        get_customer_suggestions,
+    )
+
 
 
     # Bulk functions (PostgreSQL only, already imported above)
@@ -579,4 +587,17 @@ else:
                 return a
 
         return None
+
+    # Billing stubs for CSV mode (not supported — requires PostgreSQL)
+    def get_billing_items(include_inactive=False): return []
+    def create_billing_item(name, default_rate=0.0): return None
+    def update_billing_item(item_id, name=None, default_rate=None, is_active=None): return None
+    def create_bill(**kwargs): return None
+    def get_bill(bill_id): return None
+    def get_bill_by_number(bill_number): return None
+    def search_bills(**kwargs): return {"total": 0, "bills": []}
+    def update_bill_status(bill_id, new_status): return None
+    def delete_bill(bill_id): return False
+    def get_billing_summary(start_date=None, end_date=None): return {}
+    def get_customer_suggestions(query): return []
 

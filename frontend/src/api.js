@@ -471,4 +471,41 @@ export const cafeStockAPI = {
   },
 };
 
+// ── Billing ─────────────────────────────────────────────────────────────────
+export const billingAPI = {
+  // Billing items (configurable)
+  getItems: (includeInactive = false) =>
+    cached(`billing:items:${includeInactive}`, () => api.get(`/billing/items?include_inactive=${includeInactive}`), 60_000),
+  createItem: (data) => { invalidateCache('billing:items:false', 'billing:items:true'); return api.post('/billing/items', data); },
+  updateItem: (id, data) => { invalidateCache('billing:items:false', 'billing:items:true'); return api.put(`/billing/items/${id}`, data); },
+
+  // Bills
+  createBill: (data) => api.post('/billing/bills', data),
+  getBill: (id) => api.get(`/billing/bills/${id}`),
+  getBillByNumber: (number) => api.get(`/billing/bills/number/${number}`),
+  searchBills: (params = {}) => {
+    const q = new URLSearchParams();
+    if (params.customer_name) q.append('customer_name', params.customer_name);
+    if (params.customer_phone) q.append('customer_phone', params.customer_phone);
+    if (params.bill_date) q.append('bill_date', params.bill_date);
+    if (params.start_date) q.append('start_date', params.start_date);
+    if (params.end_date) q.append('end_date', params.end_date);
+    if (params.bill_status) q.append('bill_status', params.bill_status);
+    if (params.limit) q.append('limit', params.limit);
+    if (params.offset) q.append('offset', params.offset);
+    return api.get(`/billing/bills/search?${q.toString()}`);
+  },
+  updateStatus: (id, newStatus) => api.put(`/billing/bills/${id}/status?new_status=${newStatus}`),
+  deleteBill: (id) => api.delete(`/billing/bills/${id}`),
+
+  // Summary & suggestions
+  getSummary: (params = {}) => {
+    const q = new URLSearchParams();
+    if (params.start_date) q.append('start_date', params.start_date);
+    if (params.end_date) q.append('end_date', params.end_date);
+    return api.get(`/billing/summary?${q.toString()}`);
+  },
+  suggestCustomers: (query) => api.get(`/billing/customers/suggest?q=${encodeURIComponent(query)}`),
+};
+
 export default api;

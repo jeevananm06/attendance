@@ -408,3 +408,65 @@ class CafeStockEntryUpdate(BaseModel):
     supplier: Optional[str] = None
     entry_date: Optional[date] = None
     comments: Optional[str] = None
+
+
+# ============== BILLING ==============
+
+class BillStatus(str, Enum):
+    DRAFT = "draft"
+    FINALIZED = "finalized"
+    PAID = "paid"
+
+
+class BillingItem(BaseModel):
+    id: str
+    name: str
+    default_rate: float = 0.0
+    is_active: bool = True
+    created_at: datetime
+
+
+class BillingItemCreate(BaseModel):
+    name: str
+    default_rate: float = 0.0
+
+
+class BillingItemUpdate(BaseModel):
+    name: Optional[str] = None
+    default_rate: Optional[float] = None
+    is_active: Optional[bool] = None
+
+
+class BillLineItem(BaseModel):
+    item_name: str
+    quantity: float
+    rate: float
+
+
+class BillCreate(BaseModel):
+    customer_name: str
+    customer_phone: Optional[str] = None
+    customer_place: Optional[str] = None
+    bill_date: date
+    tax_percentage: float = 0.0
+    notes: Optional[str] = None
+    line_items: List[BillLineItem]
+
+
+class Bill(BaseModel):
+    id: str
+    bill_number: str
+    customer_name: str
+    customer_phone: Optional[str] = None
+    customer_place: Optional[str] = None
+    bill_date: date
+    status: BillStatus = BillStatus.DRAFT
+    subtotal: float = 0.0
+    tax_percentage: float = 0.0
+    tax_amount: float = 0.0
+    total_amount: float = 0.0
+    notes: Optional[str] = None
+    created_by: str
+    finalized_at: Optional[datetime] = None
+    created_at: datetime
+    line_items: List[dict] = []
