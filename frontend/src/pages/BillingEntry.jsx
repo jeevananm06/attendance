@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import html2canvas from 'html2canvas';
 import {
-  Plus, Trash2, Eye, Printer, Share2, Save, AlertTriangle,
-  Search, X, ChevronDown, Receipt,
+  Plus, Trash2, Printer, Share2, AlertTriangle, X, Receipt,
 } from 'lucide-react';
 import { billingAPI } from '../api';
 import { useAuth } from '../context/AuthContext';
@@ -12,11 +12,27 @@ const today = () => new Date().toISOString().slice(0, 10);
 
 const emptyLine = { item_name: '', quantity: '', rate: '' };
 
+// Convert logo to base64 so it embeds correctly in print windows and canvas
+async function fetchLogoBase64(url) {
+  try {
+    const res = await fetch(url);
+    const blob = await res.blob();
+    return await new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result);
+      reader.readAsDataURL(blob);
+    });
+  } catch {
+    return null;
+  }
+}
+
 export default function BillingEntry() {
   const { user, isAdmin } = useAuth();
 
   // ── configurable items ──
   const [billingItems, setBillingItems] = useState([]);
+  const [logoBase64, setLogoBase64] = useState(null);
 
   // ── form state ──
   const [customerName, setCustomerName] = useState('');
@@ -32,18 +48,20 @@ export default function BillingEntry() {
   const [showSuggestions, setShowSuggestions] = useState(false);
   const suggestTimeout = useRef(null);
 
-  // ── preview / bill ──
-  const [previewBill, setPreviewBill] = useState(null);
+  // ── bill (created once, reused) ──
+  const [savedBill, setSavedBill] = useState(null);
   const [showPreview, setShowPreview] = useState(false);
   const [duplicateWarning, setDuplicateWarning] = useState(null);
 
   // ── loading ──
   const [saving, setSaving] = useState(false);
+  const [sharing, setSharing] = useState(false);
   const [error, setError] = useState('');
   const printRef = useRef(null);
 
   useEffect(() => {
     billingAPI.getItems().then(r => setBillingItems(r.data || [])).catch(() => {});
+    fetchLogoBase64(LOGO_URL).then(b64 => setLogoBase64(b64));
   }, []);
 
   // ── customer auto-complete ──
@@ -110,8 +128,8 @@ export default function BillingEntry() {
 
   useEffect(() => { checkDuplicate(); }, [checkDuplicate]);
 
-  // ── save bill ──
-  const handleSave = async () => {
+  // ── create bill (once) ──
+  const handleSaveAndPrint = async () => {
     setError('');
     const validLines = lineItems.filter(li => li.item_name && li.quantity && li.rate);
     if (!customerName) return setError('Customer name is required');
@@ -133,7 +151,7 @@ export default function BillingEntry() {
         })),
       };
       const r = await billingAPI.createBill(payload);
-      setPreviewBill(r.data);
+      setSavedBill(r.data);
       setShowPreview(true);
     } catch (e) {
       setError(e.response?.data?.detail || 'Failed to create bill');
@@ -144,84 +162,110 @@ export default function BillingEntry() {
 
   // ── finalize ──
   const handleFinalize = async () => {
-    if (!previewBill) return;
+    if (!savedBill) return;
     try {
-      const r = await billingAPI.updateStatus(previewBill.id, 'finalized');
-      setPreviewBill(r.data);
+      const r = await billingAPI.updateStatus(savedBill.id, 'finalized');
+      setSavedBill(r.data);
     } catch (e) {
       setError(e.response?.data?.detail || 'Failed to finalize');
     }
   };
 
-  // ── print ──
-  const handlePrint = () => {
-    const printContent = printRef.current;
-    if (!printContent) return;
+  // ── print (with base64 logo) ──
+  const handlePrint = (bill) => {
+    const b = bill || savedBill;
+    if (!b) return;
+    const logoSrc = logoBase64 || '';
+    const statusBg = b.status === 'finalized' ? '#DEF7EC' : b.status === 'paid' ? '#DBEAFE' : '#FEF3C7';
+    const statusColor = b.status === 'finalized' ? '#03543F' : b.status === 'paid' ? '#1E40AF' : '#92400E';
+    const rows = b.line_items.map(li =>
+      `<tr>
+        <td style="padding:6px 8px;font-size:12px;border-bottom:1px solid #eee">${li.item_name}</td>
+        <td style="padding:6px 8px;font-size:12px;border-bottom:1px solid #eee;text-align:right">${li.quantity}</td>
+        <td style="padding:6px 8px;font-size:12px;border-bottom:1px solid #eee;text-align:right">₹${li.rate.toFixed(2)}</td>
+        <td style="padding:6px 8px;font-size:12px;border-bottom:1px solid #eee;text-align:right">₹${li.amount.toFixed(2)}</td>
+      </tr>`
+    ).join('');
     const win = window.open('', '_blank');
-    win.document.write(`
-      <html><head><title>Bill - ${previewBill?.bill_number || ''}</title>
-      <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: 'Segoe UI', sans-serif; padding: 20px; color: #333; }
-        .bill-container { max-width: 420px; margin: 0 auto; }
-        .bill-header { text-align: center; border-bottom: 2px dashed #8B4513; padding-bottom: 12px; margin-bottom: 12px; }
-        .bill-logo { width: 80px; height: 80px; margin: 0 auto 8px; border-radius: 50%; object-fit: cover; }
-        .bill-title { font-size: 20px; font-weight: 700; color: #5D3A1A; }
-        .bill-subtitle { font-size: 11px; color: #8B6914; letter-spacing: 1.5px; }
-        .bill-info { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 10px; }
-        .bill-info-block { line-height: 1.6; }
-        .bill-info-label { color: #888; }
-        table { width: 100%; border-collapse: collapse; margin: 10px 0; }
-        th { background: #F5E6D3; color: #5D3A1A; font-size: 11px; padding: 6px 8px; text-align: left; text-transform: uppercase; letter-spacing: .5px; }
-        td { padding: 6px 8px; font-size: 12px; border-bottom: 1px solid #eee; }
-        .text-right { text-align: right; }
-        .totals { border-top: 2px solid #D4A574; margin-top: 4px; padding-top: 8px; }
-        .total-row { display: flex; justify-content: space-between; padding: 3px 0; font-size: 13px; }
-        .total-row.grand { font-size: 16px; font-weight: 700; color: #5D3A1A; border-top: 2px dashed #8B4513; padding-top: 8px; margin-top: 4px; }
-        .bill-footer { text-align: center; border-top: 2px dashed #8B4513; margin-top: 16px; padding-top: 10px; font-size: 11px; color: #888; }
-        .status-badge { display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: 10px; font-weight: 600; }
-        .status-finalized { background: #DEF7EC; color: #03543F; }
-        .status-draft { background: #FEF3C7; color: #92400E; }
-        .status-paid { background: #DBEAFE; color: #1E40AF; }
-        @media print { body { padding: 0; } }
-      </style></head><body>
-      ${printContent.innerHTML}
-      <script>window.print();window.close();</script>
-      </body></html>
-    `);
+    win.document.write(`<html><head><title>Bill - ${b.bill_number}</title>
+    <style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Segoe UI',sans-serif;padding:20px;color:#333;max-width:420px;margin:0 auto}@media print{body{padding:0}}</style>
+    </head><body>
+    <div style="text-align:center;border-bottom:2px dashed #8B4513;padding-bottom:12px;margin-bottom:12px">
+      ${logoSrc ? `<img src="${logoSrc}" style="width:80px;height:80px;border-radius:50%;object-fit:cover;display:block;margin:0 auto 8px" />` : ''}
+      <div style="font-size:20px;font-weight:700;color:#5D3A1A">Selvam Tea Stall</div>
+      <div style="font-size:11px;color:#8B6914;letter-spacing:1.5px">TEA • COFFEE • SNACKS</div>
+    </div>
+    <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:10px">
+      <div style="line-height:1.6">
+        <div><span style="color:#888">Bill No:</span> <strong>${b.bill_number}</strong></div>
+        <div><span style="color:#888">Date:</span> ${b.bill_date}</div>
+        <div><span style="color:#888">Status:</span> <span style="display:inline-block;padding:2px 10px;border-radius:12px;font-size:10px;font-weight:600;background:${statusBg};color:${statusColor}">${b.status.toUpperCase()}</span></div>
+      </div>
+      <div style="line-height:1.6;text-align:right">
+        <div><strong>${b.customer_name}</strong></div>
+        ${b.customer_phone ? `<div>${b.customer_phone}</div>` : ''}
+        ${b.customer_place ? `<div>${b.customer_place}</div>` : ''}
+      </div>
+    </div>
+    <table style="width:100%;border-collapse:collapse;margin:10px 0">
+      <thead><tr>
+        <th style="background:#F5E6D3;color:#5D3A1A;font-size:11px;padding:6px 8px;text-align:left">Item</th>
+        <th style="background:#F5E6D3;color:#5D3A1A;font-size:11px;padding:6px 8px;text-align:right">Qty</th>
+        <th style="background:#F5E6D3;color:#5D3A1A;font-size:11px;padding:6px 8px;text-align:right">Rate</th>
+        <th style="background:#F5E6D3;color:#5D3A1A;font-size:11px;padding:6px 8px;text-align:right">Amount</th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+    <div style="border-top:2px solid #D4A574;margin-top:4px;padding-top:8px">
+      <div style="display:flex;justify-content:space-between;padding:3px 0;font-size:13px"><span>Subtotal</span><span>₹${b.subtotal.toFixed(2)}</span></div>
+      ${b.tax_amount > 0 ? `<div style="display:flex;justify-content:space-between;padding:3px 0;font-size:13px"><span>Tax (${b.tax_percentage}%)</span><span>₹${b.tax_amount.toFixed(2)}</span></div>` : ''}
+      <div style="display:flex;justify-content:space-between;padding:8px 0 0;font-size:16px;font-weight:700;color:#5D3A1A;border-top:2px dashed #8B4513;margin-top:4px"><span>Total</span><span>₹${b.total_amount.toFixed(2)}</span></div>
+    </div>
+    ${b.notes ? `<div style="margin-top:8px;font-size:11px;color:#666;font-style:italic">Note: ${b.notes}</div>` : ''}
+    <div style="text-align:center;border-top:2px dashed #8B4513;margin-top:16px;padding-top:10px;font-size:11px;color:#888">Thank you for your order!<br/>Selvam Tea Stall</div>
+    <script>window.print();window.close();</script>
+    </body></html>`);
     win.document.close();
+    // After printing from new bill flow, clear form
+    if (!bill) {
+      setTimeout(() => resetForm(), 1000);
+    }
   };
 
-  // ── share via WhatsApp ──
-  const handleShare = () => {
-    if (!previewBill) return;
-    const lines = previewBill.line_items.map(
-      li => `  ${li.item_name}: ${li.quantity} × ₹${li.rate} = ₹${li.amount.toFixed(2)}`
-    );
-    const text = [
-      `🧾 *Selvam Tea Stall*`,
-      `Bill No: ${previewBill.bill_number}`,
-      `Date: ${previewBill.bill_date}`,
-      ``,
-      `Customer: ${previewBill.customer_name}`,
-      previewBill.customer_phone ? `Phone: ${previewBill.customer_phone}` : '',
-      previewBill.customer_place ? `Place: ${previewBill.customer_place}` : '',
-      ``,
-      `Items:`,
-      ...lines,
-      ``,
-      `Subtotal: ₹${previewBill.subtotal.toFixed(2)}`,
-      previewBill.tax_amount > 0 ? `Tax (${previewBill.tax_percentage}%): ₹${previewBill.tax_amount.toFixed(2)}` : '',
-      `*Total: ₹${previewBill.total_amount.toFixed(2)}*`,
-      ``,
-      `Thank you for your order!`,
-    ].filter(Boolean).join('\n');
-
-    const phone = previewBill.customer_phone?.replace(/\D/g, '') || '';
-    const url = phone
-      ? `https://wa.me/91${phone}?text=${encodeURIComponent(text)}`
-      : `https://wa.me/?text=${encodeURIComponent(text)}`;
-    window.open(url, '_blank');
+  // ── share as image via WhatsApp ──
+  const handleShare = async (bill) => {
+    const b = bill || savedBill;
+    if (!b) return;
+    setSharing(true);
+    try {
+      const node = printRef.current;
+      if (!node) throw new Error('no ref');
+      const canvas = await html2canvas(node, { useCORS: true, scale: 2, backgroundColor: '#ffffff' });
+      canvas.toBlob(async (blob) => {
+        const file = new File([blob], `bill-${b.bill_number}.png`, { type: 'image/png' });
+        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+          try {
+            await navigator.share({ files: [file], title: `Bill ${b.bill_number}` });
+            setSharing(false);
+            return;
+          } catch { /* fall through to WhatsApp link */ }
+        }
+        // Fallback: open WhatsApp with image download link
+        const imgUrl = canvas.toDataURL('image/png');
+        const a = document.createElement('a');
+        a.href = imgUrl;
+        a.download = `bill-${b.bill_number}.png`;
+        a.click();
+        const phone = b.customer_phone?.replace(/\D/g, '') || '';
+        const waUrl = phone
+          ? `https://wa.me/91${phone}?text=${encodeURIComponent(`Bill ${b.bill_number} - ₹${b.total_amount.toFixed(2)} (image attached above)`)}`
+          : `https://wa.me/`;
+        setTimeout(() => window.open(waUrl, '_blank'), 500);
+        setSharing(false);
+      }, 'image/png');
+    } catch {
+      setSharing(false);
+    }
   };
 
   // ── reset form ──
@@ -229,20 +273,24 @@ export default function BillingEntry() {
     setCustomerName(''); setCustomerPhone(''); setCustomerPlace('');
     setBillDate(today()); setTaxPct(0); setNotes('');
     setLineItems([{ ...emptyLine }]);
-    setPreviewBill(null); setShowPreview(false);
+    setSavedBill(null); setShowPreview(false);
     setDuplicateWarning(null); setError('');
   };
 
-  // ── Bill Preview Component ──
+  // ── Bill Preview Content ──
   const BillPreviewContent = ({ bill }) => (
-    <div className="bill-container" ref={printRef}>
-      <div className="bill-header" style={{ textAlign: 'center', borderBottom: '2px dashed #8B4513', paddingBottom: 12, marginBottom: 12 }}>
-        <img src={LOGO_URL} alt="Logo" style={{ width: 80, height: 80, borderRadius: '50%', objectFit: 'cover', margin: '0 auto 8px' }}
-          onError={e => { e.target.style.display = 'none'; }} />
+    <div ref={printRef} style={{
+      background: '#fff', padding: 20, maxWidth: 420, margin: '0 auto',
+      fontFamily: "'Segoe UI', sans-serif", color: '#333',
+    }}>
+      <div style={{ textAlign: 'center', borderBottom: '2px dashed #8B4513', paddingBottom: 12, marginBottom: 12 }}>
+        {logoBase64 && (
+          <img src={logoBase64} alt="Logo"
+            style={{ width: 80, height: 80, borderRadius: '50%', objectFit: 'cover', display: 'block', margin: '0 auto 8px' }} />
+        )}
         <div style={{ fontSize: 20, fontWeight: 700, color: '#5D3A1A' }}>Selvam Tea Stall</div>
         <div style={{ fontSize: 11, color: '#8B6914', letterSpacing: 1.5 }}>TEA • COFFEE • SNACKS</div>
       </div>
-
       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 10 }}>
         <div style={{ lineHeight: 1.6 }}>
           <div><span style={{ color: '#888' }}>Bill No:</span> <strong>{bill.bill_number}</strong></div>
@@ -262,7 +310,6 @@ export default function BillingEntry() {
           {bill.customer_place && <div>{bill.customer_place}</div>}
         </div>
       </div>
-
       <table style={{ width: '100%', borderCollapse: 'collapse', margin: '10px 0' }}>
         <thead>
           <tr>
@@ -283,7 +330,6 @@ export default function BillingEntry() {
           ))}
         </tbody>
       </table>
-
       <div style={{ borderTop: '2px solid #D4A574', marginTop: 4, paddingTop: 8 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0', fontSize: 13 }}>
           <span>Subtotal</span><span>₹{bill.subtotal.toFixed(2)}</span>
@@ -300,11 +346,9 @@ export default function BillingEntry() {
           <span>Total</span><span>₹{bill.total_amount.toFixed(2)}</span>
         </div>
       </div>
-
       {bill.notes && (
         <div style={{ marginTop: 8, fontSize: 11, color: '#666', fontStyle: 'italic' }}>Note: {bill.notes}</div>
       )}
-
       <div style={{ textAlign: 'center', borderTop: '2px dashed #8B4513', marginTop: 16, paddingTop: 10, fontSize: 11, color: '#888' }}>
         Thank you for your order!<br />Selvam Tea Stall
       </div>
@@ -317,8 +361,8 @@ export default function BillingEntry() {
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
           <Receipt className="text-amber-600" /> New Bill
         </h1>
-        {previewBill && (
-          <button onClick={resetForm} className="btn btn-secondary text-sm">
+        {savedBill && (
+          <button onClick={resetForm} className="btn btn-secondary text-sm flex items-center gap-1">
             <Plus size={16} /> New Bill
           </button>
         )}
@@ -334,38 +378,30 @@ export default function BillingEntry() {
         </div>
       )}
 
-      {/* ── Bill Preview Modal ── */}
-      {showPreview && previewBill && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
-            <div className="sticky top-0 bg-white dark:bg-gray-800 p-4 border-b flex items-center justify-between z-10">
-              <h2 className="font-bold text-lg">Bill Preview</h2>
-              <button onClick={() => setShowPreview(false)} className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700">
-                <X size={20} />
-              </button>
-            </div>
-            <div className="p-4">
-              <BillPreviewContent bill={previewBill} />
-            </div>
-            <div className="sticky bottom-0 bg-white dark:bg-gray-800 p-4 border-t flex flex-wrap gap-2 justify-end">
-              {previewBill.status === 'draft' && isAdmin && (
-                <button onClick={handleFinalize} className="btn bg-green-600 hover:bg-green-700 text-white text-sm">
-                  Finalize
-                </button>
+      {/* ── Bill (saved) view ── */}
+      {showPreview && savedBill && (
+        <div className="card">
+          <div className="flex items-center justify-between mb-4">
+            <span className="font-semibold text-gray-700 dark:text-gray-200">Bill Created ✓</span>
+            <div className="flex gap-2">
+              {savedBill.status === 'draft' && isAdmin && (
+                <button onClick={handleFinalize} className="btn bg-green-600 hover:bg-green-700 text-white text-sm">Finalize</button>
               )}
-              <button onClick={handlePrint} className="btn bg-amber-600 hover:bg-amber-700 text-white text-sm flex items-center gap-1">
-                <Printer size={15} /> Print
+              <button onClick={() => handlePrint()} className="btn bg-amber-600 hover:bg-amber-700 text-white text-sm flex items-center gap-1">
+                <Printer size={15} /> Print &amp; New Bill
               </button>
-              <button onClick={handleShare} className="btn bg-green-500 hover:bg-green-600 text-white text-sm flex items-center gap-1">
-                <Share2 size={15} /> WhatsApp
+              <button onClick={() => handleShare()} disabled={sharing} className="btn bg-green-500 hover:bg-green-600 text-white text-sm flex items-center gap-1">
+                {sharing ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <Share2 size={15} />}
+                WhatsApp
               </button>
             </div>
           </div>
+          <BillPreviewContent bill={savedBill} />
         </div>
       )}
 
       {/* ── Form ── */}
-      {!showPreview && (
+      {!showPreview && !savedBill && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Customer details */}
           <div className="lg:col-span-1 space-y-4">
@@ -501,14 +537,14 @@ export default function BillingEntry() {
 
               {/* Actions */}
               <div className="mt-6 flex flex-wrap gap-3 justify-end">
-                <button onClick={handleSave} disabled={saving}
+                <button onClick={handleSaveAndPrint} disabled={saving}
                   className="btn bg-amber-600 hover:bg-amber-700 text-white flex items-center gap-2">
                   {saving ? (
                     <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                   ) : (
-                    <Eye size={16} />
+                    <Printer size={16} />
                   )}
-                  {saving ? 'Creating...' : 'Preview Bill'}
+                  {saving ? 'Creating...' : 'Print Bill'}
                 </button>
               </div>
             </div>
