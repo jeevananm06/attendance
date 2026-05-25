@@ -5,7 +5,6 @@ import html2canvas from 'html2canvas';
  */
 export function buildBillHTML(bill, logoBase64) {
   const status = bill.status || 'consolidated';
-  const statusBg = status === 'finalized' ? '#DEF7EC' : status === 'paid' ? '#DBEAFE' : status === 'consolidated' ? '#E0E7FF' : '#FEF3C7';
   const statusColor = status === 'finalized' ? '#03543F' : status === 'paid' ? '#1E40AF' : status === 'consolidated' ? '#3730A3' : '#92400E';
   const rows = (bill.line_items || []).map(li =>
     `<tr>
@@ -26,7 +25,7 @@ export function buildBillHTML(bill, logoBase64) {
     <div style="line-height:1.6">
       <div><span style="color:#888">Bill No:</span> <strong>${bill.bill_number}</strong></div>
       <div><span style="color:#888">Date:</span> ${bill.bill_date}</div>
-      <div><span style="color:#888">Status:</span> <span style="background:${statusBg};color:${statusColor};padding:3px 10px;border-radius:12px;font-size:10px;font-weight:600;line-height:1;white-space:nowrap">${status.toUpperCase()}</span></div>
+      <div><span style="color:#888">Status:</span> <strong style="color:${statusColor};font-size:11px;margin-left:4px">${status.toUpperCase()}</strong></div>
     </div>
     <div style="line-height:1.6;text-align:right">
       <div><strong>${bill.customer_name}</strong></div>
@@ -121,17 +120,15 @@ export async function shareBillAsImage(bill, logoBase64) {
         a.download = `bill-${bill.bill_number}.png`;
         a.click();
 
-        let phone = bill.customer_phone?.replace(/[\s\-()]/g, '') || '';
-        // Ensure proper format: strip leading 0, add 91 if no country code
-        if (phone && !phone.startsWith('+') && !phone.startsWith('91')) {
-          phone = phone.replace(/^0+/, '');
-          phone = '91' + phone;
-        } else if (phone.startsWith('+')) {
-          phone = phone.slice(1);
-        }
+        let phone = (bill.customer_phone || '').replace(/\D/g, '');
+        // Add 91 country code if it's a 10-digit Indian number
+        if (phone.length === 10) phone = '91' + phone;
+        // Strip leading 0 for numbers like 08883665822
+        if (phone.startsWith('0')) phone = '91' + phone.slice(1);
+        const msg = encodeURIComponent(`Bill ${bill.bill_number} - ₹${bill.total_amount.toFixed(2)}\n(Please find the bill image downloaded to your device)`);
         const waUrl = phone
-          ? `https://wa.me/${phone}?text=${encodeURIComponent(`Bill ${bill.bill_number} - ₹${bill.total_amount.toFixed(2)}\n(Please find the bill image downloaded to your device)`)}`
-          : `https://wa.me/`;
+          ? `https://api.whatsapp.com/send?phone=${phone}&text=${msg}`
+          : `https://api.whatsapp.com/send`;
         setTimeout(() => window.open(waUrl, '_blank'), 500);
         resolve(true);
       }, 'image/png');
