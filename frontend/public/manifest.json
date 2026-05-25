@@ -1,31 +1,31 @@
 {
-  "name": "Labour Attendance Management System",
-  "short_name": "Labour Attendance",
-  "description": "Manage labour attendance, salary, and payroll for small organizations",
+  "name": "Selvam Tea Stall",
+  "short_name": "Selvam Tea",
+  "description": "Selvam Tea Stall - Attendance, Billing and Inventory Management",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",
-  "theme_color": "#1e40af",
+  "theme_color": "#92400E",
   "orientation": "portrait-primary",
   "scope": "/",
   "icons": [
     {
-      "src": "/icons/icon-72x72.svg",
-      "sizes": "72x72",
-      "type": "image/svg+xml",
-      "purpose": "maskable any"
-    },
-    {
-      "src": "/icons/icon-192x192.svg",
+      "src": "/icons/selvam-logo.png",
       "sizes": "192x192",
-      "type": "image/svg+xml",
-      "purpose": "maskable any"
+      "type": "image/png",
+      "purpose": "any"
     },
     {
-      "src": "/icons/icon-512x512.svg",
+      "src": "/icons/selvam-logo.png",
       "sizes": "512x512",
-      "type": "image/svg+xml",
-      "purpose": "maskable any"
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/selvam-logo.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
     }
   ],
   "categories": ["business", "productivity"],
@@ -35,14 +35,14 @@
       "short_name": "Attendance",
       "description": "Mark today's attendance",
       "url": "/attendance",
-      "icons": [{ "src": "/icons/icon-96x96.png", "sizes": "96x96" }]
+      "icons": [{ "src": "/icons/selvam-logo.png", "sizes": "192x192" }]
     },
     {
-      "name": "View Salary",
-      "short_name": "Salary",
-      "description": "View salary details",
-      "url": "/salary",
-      "icons": [{ "src": "/icons/icon-96x96.png", "sizes": "96x96" }]
+      "name": "New Bill",
+      "short_name": "New Bill",
+      "description": "Create a new bill",
+      "url": "/billing",
+      "icons": [{ "src": "/icons/selvam-logo.png", "sizes": "192x192" }]
     }
   ]
 }

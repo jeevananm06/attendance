@@ -94,24 +94,30 @@ export default function BillingEntry() {
   const taxAmount = subtotal * (parseFloat(taxPct) || 0) / 100;
   const total = subtotal + taxAmount;
 
-  // ── duplicate check ──
-  const checkDuplicate = useCallback(async () => {
-    if (!customerName || !billDate) return;
-    try {
-      const r = await billingAPI.searchBills({ customer_name: customerName, bill_date: billDate });
-      const existing = r.data?.bills || [];
-      if (existing.length > 0) {
-        const similar = existing.find(b => Math.abs(b.total_amount - total) < 1);
-        if (similar) {
-          setDuplicateWarning(`Duplicate? Bill ${similar.bill_number} (₹${similar.total_amount}) exists for this customer on this date.`);
-          return;
-        }
-      }
+  // ── duplicate check (debounced — only fires 800ms after user stops typing) ──
+  const dupTimeout = useRef(null);
+  useEffect(() => {
+    if (!customerName || customerName.length < 3 || !billDate) {
       setDuplicateWarning(null);
-    } catch { /* ignore */ }
+      return;
+    }
+    clearTimeout(dupTimeout.current);
+    dupTimeout.current = setTimeout(async () => {
+      try {
+        const r = await billingAPI.searchBills({ customer_name: customerName, bill_date: billDate });
+        const existing = r.data?.bills || [];
+        if (existing.length > 0) {
+          const similar = existing.find(b => Math.abs(b.total_amount - total) < 1);
+          if (similar) {
+            setDuplicateWarning(`Duplicate? Bill ${similar.bill_number} (₹${similar.total_amount}) exists for this customer on this date.`);
+            return;
+          }
+        }
+        setDuplicateWarning(null);
+      } catch { /* ignore */ }
+    }, 800);
+    return () => clearTimeout(dupTimeout.current);
   }, [customerName, billDate, total]);
-
-  useEffect(() => { checkDuplicate(); }, [checkDuplicate]);
 
   // ── create bill (once) ──
   const handleSaveAndPrint = async () => {
