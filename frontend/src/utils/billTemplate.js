@@ -26,7 +26,7 @@ export function buildBillHTML(bill, logoBase64) {
     <div style="line-height:1.6">
       <div><span style="color:#888">Bill No:</span> <strong>${bill.bill_number}</strong></div>
       <div><span style="color:#888">Date:</span> ${bill.bill_date}</div>
-      <div><span style="color:#888">Status:</span> <span style="display:inline-block;padding:2px 10px;border-radius:12px;font-size:10px;font-weight:600;background:${statusBg};color:${statusColor}">${status.toUpperCase()}</span></div>
+      <div><span style="color:#888">Status:</span> <span style="background:${statusBg};color:${statusColor};padding:3px 10px;border-radius:12px;font-size:10px;font-weight:600;line-height:1;white-space:nowrap">${status.toUpperCase()}</span></div>
     </div>
     <div style="line-height:1.6;text-align:right">
       <div><strong>${bill.customer_name}</strong></div>
@@ -121,9 +121,16 @@ export async function shareBillAsImage(bill, logoBase64) {
         a.download = `bill-${bill.bill_number}.png`;
         a.click();
 
-        const phone = bill.customer_phone?.replace(/\D/g, '') || '';
+        let phone = bill.customer_phone?.replace(/[\s\-()]/g, '') || '';
+        // Ensure proper format: strip leading 0, add 91 if no country code
+        if (phone && !phone.startsWith('+') && !phone.startsWith('91')) {
+          phone = phone.replace(/^0+/, '');
+          phone = '91' + phone;
+        } else if (phone.startsWith('+')) {
+          phone = phone.slice(1);
+        }
         const waUrl = phone
-          ? `https://wa.me/91${phone}?text=${encodeURIComponent(`Bill ${bill.bill_number} - ₹${bill.total_amount.toFixed(2)}\n(Please find the bill image downloaded to your device)`)}`
+          ? `https://wa.me/${phone}?text=${encodeURIComponent(`Bill ${bill.bill_number} - ₹${bill.total_amount.toFixed(2)}\n(Please find the bill image downloaded to your device)`)}`
           : `https://wa.me/`;
         setTimeout(() => window.open(waUrl, '_blank'), 500);
         resolve(true);
