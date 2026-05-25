@@ -97,7 +97,7 @@ export default function BillingEntry() {
   // ── duplicate check (debounced — only fires 800ms after user stops typing) ──
   const dupTimeout = useRef(null);
   useEffect(() => {
-    if (!customerName || customerName.length < 3 || !billDate) {
+    if (!customerName || customerName.length < 4 || !billDate) {
       setDuplicateWarning(null);
       return;
     }
