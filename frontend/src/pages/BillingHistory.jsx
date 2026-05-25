@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import {
   Search, Printer, Share2, Trash2, CheckCircle, Filter,
   ChevronDown, ChevronUp, Receipt, BarChart3, X, Pencil, Plus, CheckSquare, Square,
+  DollarSign, AlertTriangle, CreditCard, Ban,
 } from 'lucide-react';
 import { billingAPI } from '../api';
 import { useAuth } from '../context/AuthContext';
@@ -13,6 +14,7 @@ const emptyLine = { item_name: '', quantity: '', rate: '' };
 const statusColors = {
   draft: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300',
   finalized: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300',
+  partial_paid: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300',
   paid: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300',
 };
 
@@ -43,6 +45,14 @@ export default function BillingHistory() {
   // ── multi-select ──
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [deleting, setDeleting] = useState(false);
+  const [markingPaid, setMarkingPaid] = useState(false);
+
+  // ── payment modal ──
+  const [paymentModal, setPaymentModal] = useState(null); // { billId, billNumber, totalAmount }
+  const [partialAmount, setPartialAmount] = useState('');
+
+  // ── delete confirmation modal ──
+  const [deleteConfirm, setDeleteConfirm] = useState(null); // { id, label, multi }
 
   // ── edit ──
   const [editBill, setEditBill] = useState(null);
@@ -90,9 +100,9 @@ export default function BillingHistory() {
 
   const handleSearch = () => { fetchBills(); fetchSummary(); };
 
-  const handleStatusChange = async (billId, newStatus) => {
+  const handleStatusChange = async (billId, newStatus, paidAmount = 0) => {
     try {
-      await billingAPI.updateStatus(billId, newStatus);
+      await billingAPI.updateStatus(billId, newStatus, paidAmount);
       fetchBills();
       fetchSummary();
       if (selectedBill?.id === billId) {
@@ -102,14 +112,59 @@ export default function BillingHistory() {
     } catch { /* ignore */ }
   };
 
-  const handleDelete = async (billId) => {
-    if (!window.confirm('Delete this bill permanently?')) return;
+  const handleDelete = (billId, label = 'this bill') => {
+    setDeleteConfirm({ id: billId, label, multi: false });
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteConfirm) return;
     try {
-      await billingAPI.deleteBill(billId);
+      if (deleteConfirm.multi) {
+        setDeleting(true);
+        await Promise.all([...selectedIds].map(id => billingAPI.deleteBill(id)));
+        setSelectedIds(new Set());
+        setDeleting(false);
+      } else {
+        await billingAPI.deleteBill(deleteConfirm.id);
+        if (selectedBill?.id === deleteConfirm.id) { setSelectedBill(null); setShowDetail(false); }
+      }
       fetchBills();
       fetchSummary();
-      if (selectedBill?.id === billId) { setSelectedBill(null); setShowDetail(false); }
     } catch { /* ignore */ }
+    setDeleteConfirm(null);
+  };
+
+  const openPaymentModal = (bill) => {
+    setPaymentModal({ billId: bill.id, billNumber: bill.bill_number, totalAmount: bill.total_amount, paidAmount: bill.paid_amount || 0 });
+    setPartialAmount('');
+  };
+
+  const handleMarkPaid = async (billId) => {
+    await handleStatusChange(billId, 'paid');
+  };
+
+  const handlePartialPay = async () => {
+    if (!paymentModal) return;
+    const amt = parseFloat(partialAmount);
+    if (!amt || amt <= 0) return;
+    if (amt >= paymentModal.totalAmount) {
+      await handleStatusChange(paymentModal.billId, 'paid');
+    } else {
+      await handleStatusChange(paymentModal.billId, 'partial_paid', amt);
+    }
+    setPaymentModal(null);
+  };
+
+  const handleMarkPaidSelected = async () => {
+    if (selectedIds.size === 0) return;
+    setMarkingPaid(true);
+    try {
+      await Promise.all([...selectedIds].map(id => billingAPI.updateStatus(id, 'paid')));
+      setSelectedIds(new Set());
+      fetchBills();
+      fetchSummary();
+    } catch { /* ignore */ }
+    setMarkingPaid(false);
   };
 
   const ensureFullBill = async (bill) => {
@@ -134,17 +189,9 @@ export default function BillingHistory() {
     else setSelectedIds(new Set(bills.map(b => b.id)));
   };
 
-  const handleDeleteSelected = async () => {
+  const handleDeleteSelected = () => {
     if (selectedIds.size === 0) return;
-    if (!window.confirm(`Delete ${selectedIds.size} bill(s) permanently?`)) return;
-    setDeleting(true);
-    try {
-      await Promise.all([...selectedIds].map(id => billingAPI.deleteBill(id)));
-      setSelectedIds(new Set());
-      fetchBills();
-      fetchSummary();
-    } catch { /* ignore */ }
-    setDeleting(false);
+    setDeleteConfirm({ id: null, label: `${selectedIds.size} bill(s)`, multi: true });
   };
 
   const handleConsolidatedPrint = async () => {
@@ -322,7 +369,7 @@ export default function BillingHistory() {
 
       {/* Summary cards */}
       {isAdmin && summary && (
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
           <div className="card p-3 text-center">
             <div className="text-2xl font-bold text-amber-600">{summary.total_bills}</div>
             <div className="text-xs text-gray-500">Total Bills</div>
@@ -338,6 +385,10 @@ export default function BillingHistory() {
           <div className="card p-3 text-center">
             <div className="text-2xl font-bold text-emerald-600">{summary.finalized_count}</div>
             <div className="text-xs text-gray-500">Finalized</div>
+          </div>
+          <div className="card p-3 text-center">
+            <div className="text-2xl font-bold text-orange-600">{summary.partial_paid_count || 0}</div>
+            <div className="text-xs text-gray-500">Partial Paid</div>
           </div>
           <div className="card p-3 text-center">
             <div className="text-2xl font-bold text-blue-600">{summary.paid_count}</div>
@@ -366,7 +417,7 @@ export default function BillingHistory() {
         </div>
       )}
 
-      {/* Filters */}
+      {/* Filters (moved below item breakdown) */}
       {showFilters && (
         <div className="card">
           <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
@@ -394,6 +445,7 @@ export default function BillingHistory() {
                 <option value="">All</option>
                 <option value="draft">Draft</option>
                 <option value="finalized">Finalized</option>
+                <option value="partial_paid">Partial Paid</option>
                 <option value="paid">Paid</option>
               </select>
             </div>
@@ -415,8 +467,13 @@ export default function BillingHistory() {
 
       {/* Multi-select action bar */}
       {isAdmin && selectedIds.size > 0 && (
-        <div className="card flex items-center gap-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
-          <span className="text-sm font-medium text-red-700 dark:text-red-300">{selectedIds.size} bill(s) selected</span>
+        <div className="card flex flex-wrap items-center gap-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
+          <span className="text-sm font-medium text-amber-700 dark:text-amber-300">{selectedIds.size} bill(s) selected</span>
+          <button onClick={handleMarkPaidSelected} disabled={markingPaid}
+            className="btn bg-blue-600 hover:bg-blue-700 text-white text-sm flex items-center gap-1 rounded-lg">
+            {markingPaid ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <DollarSign size={14} />}
+            Mark as Paid
+          </button>
           <button onClick={handleDeleteSelected} disabled={deleting}
             className="btn bg-red-600 hover:bg-red-700 text-white text-sm flex items-center gap-1 rounded-lg">
             {deleting ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <Trash2 size={14} />}
@@ -475,7 +532,7 @@ export default function BillingHistory() {
                   <td className="py-2 px-3 text-right font-medium">₹{bill.total_amount.toFixed(2)}</td>
                   <td className="py-2 px-3">
                     <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${statusColors[bill.status] || ''}`}>
-                      {bill.status}
+                      {bill.status === 'partial_paid' ? `partial ₹${(bill.paid_amount || 0).toLocaleString()}` : bill.status}
                     </span>
                   </td>
                   <td className="py-2 px-3 text-right" onClick={e => e.stopPropagation()}>
@@ -496,8 +553,18 @@ export default function BillingHistory() {
                           <CheckCircle size={14} />
                         </button>
                       )}
+                      {isAdmin && bill.status !== 'paid' && (
+                        <button onClick={() => handleMarkPaid(bill.id)} className="p-1 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded text-blue-600" title="Mark Paid">
+                          <DollarSign size={14} />
+                        </button>
+                      )}
+                      {isAdmin && bill.status !== 'paid' && (
+                        <button onClick={() => openPaymentModal(bill)} className="p-1 hover:bg-orange-50 dark:hover:bg-orange-900/30 rounded text-orange-600" title="Partial Pay">
+                          <CreditCard size={14} />
+                        </button>
+                      )}
                       {isAdmin && (
-                        <button onClick={() => handleDelete(bill.id)} className="p-1 hover:bg-red-50 dark:hover:bg-red-900/30 rounded text-red-500" title="Delete">
+                        <button onClick={() => handleDelete(bill.id, bill.bill_number)} className="p-1 hover:bg-red-50 dark:hover:bg-red-900/30 rounded text-red-500" title="Delete">
                           <Trash2 size={14} />
                         </button>
                       )}
@@ -608,9 +675,17 @@ export default function BillingHistory() {
                 <button onClick={() => handleStatusChange(selectedBill.id, 'finalized')}
                   className="btn bg-green-600 hover:bg-green-700 text-white text-sm">Finalize</button>
               )}
-              {isAdmin && selectedBill.status === 'finalized' && (
-                <button onClick={() => handleStatusChange(selectedBill.id, 'paid')}
-                  className="btn bg-blue-600 hover:bg-blue-700 text-white text-sm">Mark Paid</button>
+              {isAdmin && selectedBill.status !== 'paid' && (
+                <button onClick={() => handleMarkPaid(selectedBill.id)}
+                  className="btn bg-blue-600 hover:bg-blue-700 text-white text-sm flex items-center gap-1">
+                  <DollarSign size={15} /> Mark Paid
+                </button>
+              )}
+              {isAdmin && selectedBill.status !== 'paid' && (
+                <button onClick={() => { setShowDetail(false); openPaymentModal(selectedBill); }}
+                  className="btn bg-orange-500 hover:bg-orange-600 text-white text-sm flex items-center gap-1">
+                  <CreditCard size={15} /> Partial Pay
+                </button>
               )}
               <button onClick={() => handlePrint(selectedBill)}
                 className="btn bg-amber-600 hover:bg-amber-700 text-white text-sm flex items-center gap-1">
@@ -620,6 +695,69 @@ export default function BillingHistory() {
                 className="btn bg-green-500 hover:bg-green-600 text-white text-sm flex items-center gap-1">
                 {sharing ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <Share2 size={15} />}
                 WhatsApp
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Delete Confirmation Modal */}
+      {deleteConfirm && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-sm w-full p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-2 bg-red-100 dark:bg-red-900/30 rounded-full">
+                <AlertTriangle size={24} className="text-red-600" />
+              </div>
+              <h3 className="font-bold text-lg text-gray-900 dark:text-white">Confirm Delete</h3>
+            </div>
+            <p className="text-gray-600 dark:text-gray-300 mb-6">
+              Are you sure you want to permanently delete <strong>{deleteConfirm.label}</strong>? This action cannot be undone.
+            </p>
+            <div className="flex gap-2 justify-end">
+              <button onClick={() => setDeleteConfirm(null)} className="btn btn-secondary text-sm">Cancel</button>
+              <button onClick={confirmDelete} className="btn bg-red-600 hover:bg-red-700 text-white text-sm flex items-center gap-1">
+                <Trash2 size={14} /> Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Partial Payment Modal */}
+      {paymentModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-sm w-full p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-2 bg-orange-100 dark:bg-orange-900/30 rounded-full">
+                <CreditCard size={24} className="text-orange-600" />
+              </div>
+              <h3 className="font-bold text-lg text-gray-900 dark:text-white">Record Payment</h3>
+            </div>
+            <div className="space-y-3 mb-6">
+              <div className="text-sm text-gray-500">Bill: <strong>{paymentModal.billNumber}</strong></div>
+              <div className="text-sm text-gray-500">Total: <strong className="text-gray-900 dark:text-white">₹{paymentModal.totalAmount.toLocaleString()}</strong></div>
+              {paymentModal.paidAmount > 0 && (
+                <div className="text-sm text-gray-500">Already Paid: <strong className="text-green-600">₹{paymentModal.paidAmount.toLocaleString()}</strong></div>
+              )}
+              <div>
+                <label className="label">Payment Amount (₹)</label>
+                <input type="number" value={partialAmount} onChange={e => setPartialAmount(e.target.value)}
+                  className="input" placeholder="Enter amount" min="1" max={paymentModal.totalAmount}
+                  autoFocus />
+              </div>
+              <div className="flex gap-2">
+                <button onClick={() => setPartialAmount(String(paymentModal.totalAmount))}
+                  className="text-xs text-blue-600 hover:underline">Full amount</button>
+                <button onClick={() => setPartialAmount(String(Math.round(paymentModal.totalAmount / 2)))}
+                  className="text-xs text-blue-600 hover:underline">Half</button>
+              </div>
+            </div>
+            <div className="flex gap-2 justify-end">
+              <button onClick={() => setPaymentModal(null)} className="btn btn-secondary text-sm">Cancel</button>
+              <button onClick={handlePartialPay}
+                disabled={!partialAmount || parseFloat(partialAmount) <= 0}
+                className="btn bg-orange-500 hover:bg-orange-600 text-white text-sm flex items-center gap-1 disabled:opacity-50">
+                <DollarSign size={14} /> Record Payment
               </button>
             </div>
           </div>

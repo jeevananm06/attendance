@@ -315,7 +315,8 @@ class BillDB(Base):
     customer_phone = Column(String(20), nullable=True)
     customer_place = Column(String(200), nullable=True)
     bill_date = Column(Date, nullable=False)
-    status = Column(String(20), default="draft")  # draft, finalized, paid
+    status = Column(String(20), default="draft")  # draft, finalized, partial_paid, paid
+    paid_amount = Column(Float, default=0.0)
     subtotal = Column(Float, default=0.0)
     tax_percentage = Column(Float, default=0.0)
     tax_amount = Column(Float, default=0.0)

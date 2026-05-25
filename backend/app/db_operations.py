@@ -3828,7 +3828,7 @@ def search_bills(customer_name: str = None, customer_phone: str = None,
         db.close()
 
 
-def update_bill_status(bill_id: str, new_status: str) -> Optional[dict]:
+def update_bill_status(bill_id: str, new_status: str, paid_amount: float = 0) -> Optional[dict]:
     db = get_db_session()
     try:
         bill = db.query(BillDB).filter(BillDB.id == bill_id).first()
@@ -3837,6 +3837,10 @@ def update_bill_status(bill_id: str, new_status: str) -> Optional[dict]:
         bill.status = new_status
         if new_status == "finalized" and not bill.finalized_at:
             bill.finalized_at = ist_now()
+        if new_status == "paid":
+            bill.paid_amount = bill.total_amount
+        elif new_status == "partial_paid" and paid_amount > 0:
+            bill.paid_amount = paid_amount
         db.commit()
         return _bill_to_dict(bill, bill.line_items)
     finally:
@@ -3870,7 +3874,9 @@ def get_billing_summary(start_date: date = None, end_date: date = None) -> dict:
         total_revenue = sum(b.total_amount for b in bills)
         draft_count = sum(1 for b in bills if b.status == "draft")
         finalized_count = sum(1 for b in bills if b.status == "finalized")
+        partial_paid_count = sum(1 for b in bills if b.status == "partial_paid")
         paid_count = sum(1 for b in bills if b.status == "paid")
+        total_paid = sum(getattr(b, 'paid_amount', 0) or 0 for b in bills)
 
         # Item-wise breakdown
         item_map = {}
@@ -3887,7 +3893,9 @@ def get_billing_summary(start_date: date = None, end_date: date = None) -> dict:
             "total_revenue": round(total_revenue, 2),
             "draft_count": draft_count,
             "finalized_count": finalized_count,
+            "partial_paid_count": partial_paid_count,
             "paid_count": paid_count,
+            "total_paid": round(total_paid, 2),
             "item_breakdown": sorted(item_map.values(), key=lambda x: x["total_amount"], reverse=True),
         }
     finally:
@@ -3930,6 +3938,7 @@ def _bill_to_dict(bill, line_items) -> dict:
         "customer_place": bill.customer_place,
         "bill_date": bill.bill_date.isoformat() if bill.bill_date else None,
         "status": bill.status,
+        "paid_amount": getattr(bill, 'paid_amount', 0) or 0,
         "subtotal": bill.subtotal,
         "tax_percentage": bill.tax_percentage,
         "tax_amount": bill.tax_amount,

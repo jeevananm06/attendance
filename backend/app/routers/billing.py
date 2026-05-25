@@ -124,12 +124,13 @@ async def get_bill_detail(
 async def change_bill_status(
     bill_id: str,
     new_status: str,
+    paid_amount: float = 0,
     current_user: User = Depends(get_current_admin)
 ):
-    """Update bill status — finalize or mark paid (Admin only)"""
-    if new_status not in ("draft", "finalized", "paid"):
+    """Update bill status — finalize, mark paid, or partial paid (Admin only)"""
+    if new_status not in ("draft", "finalized", "partial_paid", "paid"):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid status")
-    result = update_bill_status(bill_id, new_status)
+    result = update_bill_status(bill_id, new_status, paid_amount=paid_amount)
     if not result:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Bill not found")
     return result

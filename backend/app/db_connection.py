@@ -48,8 +48,20 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 
 def init_db():
-    """Create all tables"""
+    """Create all tables and run lightweight migrations"""
     Base.metadata.create_all(bind=engine)
+    # Add paid_amount column if missing (for existing DBs)
+    try:
+        with engine.connect() as conn:
+            from sqlalchemy import text, inspect
+            insp = inspect(engine)
+            if 'bills' in insp.get_table_names():
+                cols = [c['name'] for c in insp.get_columns('bills')]
+                if 'paid_amount' not in cols:
+                    conn.execute(text("ALTER TABLE bills ADD COLUMN paid_amount FLOAT DEFAULT 0.0"))
+                    conn.commit()
+    except Exception:
+        pass
 
 
 def get_db():

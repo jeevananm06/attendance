@@ -495,7 +495,7 @@ export const billingAPI = {
     if (params.offset) q.append('offset', params.offset);
     return api.get(`/billing/bills/search?${q.toString()}`);
   },
-  updateStatus: (id, newStatus) => api.put(`/billing/bills/${id}/status?new_status=${newStatus}`),
+  updateStatus: (id, newStatus, paidAmount = 0) => api.put(`/billing/bills/${id}/status?new_status=${newStatus}&paid_amount=${paidAmount}`),
   deleteBill: (id) => api.delete(`/billing/bills/${id}`),
 
   // Summary & suggestions
