@@ -4,8 +4,9 @@ import html2canvas from 'html2canvas';
  * Build bill HTML string (for print window & off-screen capture)
  */
 export function buildBillHTML(bill, logoBase64) {
-  const statusBg = bill.status === 'finalized' ? '#DEF7EC' : bill.status === 'paid' ? '#DBEAFE' : '#FEF3C7';
-  const statusColor = bill.status === 'finalized' ? '#03543F' : bill.status === 'paid' ? '#1E40AF' : '#92400E';
+  const status = bill.status || 'consolidated';
+  const statusBg = status === 'finalized' ? '#DEF7EC' : status === 'paid' ? '#DBEAFE' : status === 'consolidated' ? '#E0E7FF' : '#FEF3C7';
+  const statusColor = status === 'finalized' ? '#03543F' : status === 'paid' ? '#1E40AF' : status === 'consolidated' ? '#3730A3' : '#92400E';
   const rows = (bill.line_items || []).map(li =>
     `<tr>
       <td style="padding:6px 8px;font-size:12px;border-bottom:1px solid #eee">${li.item_name}</td>
@@ -25,7 +26,7 @@ export function buildBillHTML(bill, logoBase64) {
     <div style="line-height:1.6">
       <div><span style="color:#888">Bill No:</span> <strong>${bill.bill_number}</strong></div>
       <div><span style="color:#888">Date:</span> ${bill.bill_date}</div>
-      <div><span style="color:#888">Status:</span> <span style="display:inline-block;padding:2px 10px;border-radius:12px;font-size:10px;font-weight:600;background:${statusBg};color:${statusColor}">${bill.status.toUpperCase()}</span></div>
+      <div><span style="color:#888">Status:</span> <span style="display:inline-block;padding:2px 10px;border-radius:12px;font-size:10px;font-weight:600;background:${statusBg};color:${statusColor}">${status.toUpperCase()}</span></div>
     </div>
     <div style="line-height:1.6;text-align:right">
       <div><strong>${bill.customer_name}</strong></div>
