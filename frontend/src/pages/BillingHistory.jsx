@@ -148,7 +148,7 @@ export default function BillingHistory() {
   };
 
   const handleConsolidatedPrint = async () => {
-    // Group filtered bills by customer and print consolidated
+    // Group filtered bills by customer
     const customerBills = {};
     for (const bill of bills) {
       const key = bill.customer_name;
@@ -156,42 +156,73 @@ export default function BillingHistory() {
       customerBills[key].push(bill);
     }
 
-    // Build consolidated HTML for each customer
+    // Build consolidated HTML for each customer with date-wise breakdown
     let allHTML = '';
     for (const [customer, cBills] of Object.entries(customerBills)) {
-      // Fetch full details for each bill
       const fullBills = await Promise.all(cBills.map(b => ensureFullBill(b)));
-      // Merge all line items
-      const mergedItems = {};
+      // Sort by date
+      fullBills.sort((a, b) => (a.bill_date || '').localeCompare(b.bill_date || ''));
+
       let totalAmount = 0;
+      // Build date-wise rows: Date | Item | Qty | Rate | Amount
+      let rows = '';
       fullBills.forEach(fb => {
-        (fb.line_items || []).forEach(li => {
-          const key = li.item_name;
-          if (!mergedItems[key]) mergedItems[key] = { item_name: li.item_name, quantity: 0, rate: li.rate, amount: 0 };
-          mergedItems[key].quantity += li.quantity;
-          mergedItems[key].amount += li.quantity * li.rate;
-        });
+        const items = fb.line_items || [];
         totalAmount += fb.total_amount || 0;
+        items.forEach((li, idx) => {
+          const dateCell = idx === 0
+            ? `<td style="padding:6px 8px;font-size:12px;border-bottom:1px solid #eee;vertical-align:top" rowspan="${items.length}">${fb.bill_date}</td>`
+            : '';
+          rows += `<tr>
+            ${dateCell}
+            <td style="padding:6px 8px;font-size:12px;border-bottom:1px solid #eee">${li.item_name}</td>
+            <td style="padding:6px 8px;font-size:12px;border-bottom:1px solid #eee;text-align:right">${li.quantity}</td>
+            <td style="padding:6px 8px;font-size:12px;border-bottom:1px solid #eee;text-align:right">₹${li.rate.toFixed(2)}</td>
+            <td style="padding:6px 8px;font-size:12px;border-bottom:1px solid #eee;text-align:right">₹${(li.quantity * li.rate).toFixed(2)}</td>
+          </tr>`;
+        });
       });
 
-      const dateRange = startDate && endDate ? `${startDate} to ${endDate}` : `${cBills[0]?.bill_date} - ${cBills[cBills.length - 1]?.bill_date}`;
-      const consolidatedBill = {
-        bill_number: `Consolidated (${cBills.length} bills)`,
-        customer_name: customer,
-        customer_phone: cBills[0]?.customer_phone || '',
-        customer_place: cBills[0]?.customer_place || '',
-        bill_date: dateRange,
-        line_items: Object.values(mergedItems),
-        subtotal: Object.values(mergedItems).reduce((s, i) => s + i.amount, 0),
-        tax_percentage: 0,
-        tax_amount: 0,
-        total_amount: totalAmount,
-        notes: `Period: ${dateRange}`,
-      };
-      allHTML += buildBillHTML(consolidatedBill, logoBase64) + '<div style="page-break-after:always"></div>';
+      const dateRange = startDate && endDate ? `${startDate} to ${endDate}` : `${fullBills[0]?.bill_date} - ${fullBills[fullBills.length - 1]?.bill_date}`;
+
+      const html = `<div style="background:#fff;padding:20px;max-width:520px;margin:0 auto;font-family:'Segoe UI',sans-serif;color:#333">
+        <div style="text-align:center;border-bottom:2px dashed #8B4513;padding-bottom:12px;margin-bottom:12px">
+          ${logoBase64 ? `<img src="${logoBase64}" style="width:80px;height:80px;border-radius:50%;object-fit:cover;display:block;margin:0 auto 8px" />` : ''}
+          <div style="font-size:20px;font-weight:700;color:#5D3A1A">Selvam Tea Stall</div>
+          <div style="font-size:11px;color:#8B6914;letter-spacing:1.5px">TEA • COFFEE • SNACKS</div>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:10px">
+          <div style="line-height:1.6">
+            <div><span style="color:#888">Bill No:</span> <strong>Consolidated (${fullBills.length} bills)</strong></div>
+            <div><span style="color:#888">Period:</span> ${dateRange}</div>
+            <div><span style="color:#888">Status:</span> <span style="display:inline-block;padding:2px 10px;border-radius:12px;font-size:10px;font-weight:600;background:#E0E7FF;color:#3730A3">CONSOLIDATED</span></div>
+          </div>
+          <div style="line-height:1.6;text-align:right">
+            <div><strong>${customer}</strong></div>
+            ${cBills[0]?.customer_phone ? `<div>${cBills[0].customer_phone}</div>` : ''}
+            ${cBills[0]?.customer_place ? `<div>${cBills[0].customer_place}</div>` : ''}
+          </div>
+        </div>
+        <table style="width:100%;border-collapse:collapse;margin:10px 0">
+          <thead><tr>
+            <th style="background:#F5E6D3;color:#5D3A1A;font-size:11px;padding:6px 8px;text-align:left">Date</th>
+            <th style="background:#F5E6D3;color:#5D3A1A;font-size:11px;padding:6px 8px;text-align:left">Item</th>
+            <th style="background:#F5E6D3;color:#5D3A1A;font-size:11px;padding:6px 8px;text-align:right">Qty</th>
+            <th style="background:#F5E6D3;color:#5D3A1A;font-size:11px;padding:6px 8px;text-align:right">Rate</th>
+            <th style="background:#F5E6D3;color:#5D3A1A;font-size:11px;padding:6px 8px;text-align:right">Amount</th>
+          </tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+        <div style="border-top:2px solid #D4A574;margin-top:4px;padding-top:8px">
+          <div style="display:flex;justify-content:space-between;padding:8px 0 0;font-size:16px;font-weight:700;color:#5D3A1A;border-top:2px dashed #8B4513;margin-top:4px"><span>Total</span><span>₹${totalAmount.toFixed(2)}</span></div>
+        </div>
+        <div style="margin-top:8px;font-size:11px;color:#666;font-style:italic">Note: Period: ${dateRange}</div>
+        <div style="text-align:center;border-top:2px dashed #8B4513;margin-top:16px;padding-top:10px;font-size:11px;color:#888">Thank you for your order!<br/>Selvam Tea Stall</div>
+      </div>`;
+
+      allHTML += html + '<div style="page-break-after:always"></div>';
     }
 
-    // Print
     const win = window.open('', '_blank');
     win.document.write(`<html><head><title>Consolidated Bills</title></head><body>${allHTML}</body></html>`);
     win.document.close();

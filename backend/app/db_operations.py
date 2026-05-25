@@ -3895,17 +3895,20 @@ def get_billing_summary(start_date: date = None, end_date: date = None) -> dict:
 
 
 def get_customer_suggestions(query: str) -> list:
-    """Return distinct customers matching query for auto-complete."""
+    """Return distinct customers matching query for auto-complete. Empty query returns all."""
     db = get_db_session()
     try:
-        rows = db.query(
+        q = db.query(
             BillDB.customer_name, BillDB.customer_phone, BillDB.customer_place
-        ).filter(
-            or_(
-                BillDB.customer_name.ilike(f"%{query}%"),
-                BillDB.customer_phone.ilike(f"%{query}%")
+        )
+        if query:
+            q = q.filter(
+                or_(
+                    BillDB.customer_name.ilike(f"%{query}%"),
+                    BillDB.customer_phone.ilike(f"%{query}%")
+                )
             )
-        ).distinct().limit(10).all()
+        rows = q.distinct().limit(200).all()
         seen = set()
         results = []
         for name, phone, place in rows:

@@ -13,8 +13,26 @@
     <meta name="apple-mobile-web-app-title" content="AttendanceMS" />
     
     <!-- Icons -->
-    <link rel="icon" type="image/png" href="/icons/selvam-logo.png" />
+    <link rel="icon" id="dynamic-favicon" type="image/png" href="/icons/selvam-logo.png" />
     <link rel="apple-touch-icon" href="/icons/selvam-logo.png" />
+    <script>
+      (function() {
+        var img = new Image();
+        img.onload = function() {
+          var c = document.createElement('canvas');
+          c.width = c.height = 64;
+          var ctx = c.getContext('2d');
+          ctx.beginPath();
+          ctx.arc(32, 32, 32, 0, Math.PI * 2);
+          ctx.closePath();
+          ctx.clip();
+          ctx.drawImage(img, 0, 0, 64, 64);
+          var link = document.getElementById('dynamic-favicon');
+          link.href = c.toDataURL('image/png');
+        };
+        img.src = '/icons/selvam-logo.png';
+      })();
+    </script>
     
     <!-- PWA Manifest -->
     <link rel="manifest" href="/manifest.json" />

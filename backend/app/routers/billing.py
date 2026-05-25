@@ -164,7 +164,5 @@ async def suggest_customers(
     q: str = "",
     current_user: User = Depends(get_current_manager_or_admin)
 ):
-    """Auto-complete customer suggestions based on previous bills"""
-    if len(q) < 2:
-        return []
+    """Auto-complete customer suggestions based on previous bills. Empty q returns all distinct customers."""
     return get_customer_suggestions(q)

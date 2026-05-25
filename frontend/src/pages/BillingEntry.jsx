@@ -29,6 +29,7 @@ export default function BillingEntry() {
   const [lineItems, setLineItems] = useState([{ ...emptyLine }]);
 
   // ── suggestions ──
+  const [allCustomers, setAllCustomers] = useState([]);
   const [suggestions, setSuggestions] = useState([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const suggestTimeout = useRef(null);
@@ -46,20 +47,20 @@ export default function BillingEntry() {
   useEffect(() => {
     billingAPI.getItems().then(r => setBillingItems(r.data || [])).catch(() => {});
     fetchLogoBase64(LOGO_URL).then(b64 => setLogoBase64(b64));
+    // Preload all distinct customers into memory (single API call)
+    billingAPI.suggestCustomers('').then(r => setAllCustomers(r.data || [])).catch(() => {});
   }, []);
 
-  // ── customer auto-complete ──
+  // ── customer auto-complete (local filter, no API hits per keystroke) ──
   const handleCustomerNameChange = (val) => {
     setCustomerName(val);
     if (val.length >= 2) {
-      clearTimeout(suggestTimeout.current);
-      suggestTimeout.current = setTimeout(async () => {
-        try {
-          const r = await billingAPI.suggestCustomers(val);
-          setSuggestions(r.data || []);
-          setShowSuggestions(true);
-        } catch { setSuggestions([]); }
-      }, 300);
+      const query = val.toLowerCase();
+      const filtered = allCustomers.filter(c =>
+        (c.customer_name || '').toLowerCase().includes(query)
+      );
+      setSuggestions(filtered.slice(0, 10));
+      setShowSuggestions(filtered.length > 0);
     } else {
       setSuggestions([]);
       setShowSuggestions(false);
