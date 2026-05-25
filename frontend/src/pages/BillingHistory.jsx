@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import {
-  Search, Printer, Share2, Trash2, CheckCircle, Filter,
-  ChevronDown, ChevronUp, Receipt, BarChart3, X, Pencil, Plus, CheckSquare, Square,
-  DollarSign, AlertTriangle, CreditCard, Ban,
+  Search, Printer, Share2, Trash2, CheckCircle,
+  Receipt, BarChart3, X, Pencil, Plus, CheckSquare, Square,
+  DollarSign, AlertTriangle, CreditCard,
 } from 'lucide-react';
 import { billingAPI } from '../api';
 import { useAuth } from '../context/AuthContext';
@@ -30,7 +30,6 @@ export default function BillingHistory() {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
-  const [showFilters, setShowFilters] = useState(false);
 
   // ── data ──
   const [bills, setBills] = useState([]);
@@ -357,15 +356,9 @@ export default function BillingHistory() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
-          <Receipt className="text-amber-600" /> Bill History
-        </h1>
-        <button onClick={() => setShowFilters(p => !p)}
-          className="btn btn-secondary text-sm flex items-center gap-1">
-          <Filter size={15} /> Filters {showFilters ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-        </button>
-      </div>
+      <h1 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+        <Receipt className="text-amber-600" /> Bill History
+      </h1>
 
       {/* Summary cards */}
       {isAdmin && summary && (
@@ -417,10 +410,9 @@ export default function BillingHistory() {
         </div>
       )}
 
-      {/* Filters (moved below item breakdown) */}
-      {showFilters && (
-        <div className="card">
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
+      {/* Filters */}
+      <div className="card">
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
             <div>
               <label className="label">Customer</label>
               <input type="text" value={customerName} onChange={e => setCustomerName(e.target.value)}
@@ -463,7 +455,6 @@ export default function BillingHistory() {
             </button>
           </div>
         </div>
-      )}
 
       {/* Multi-select action bar */}
       {isAdmin && selectedIds.size > 0 && (
