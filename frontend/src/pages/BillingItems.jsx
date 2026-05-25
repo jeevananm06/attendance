@@ -109,7 +109,7 @@ export default function BillingItems() {
           <div className="mt-4 flex gap-2">
             <button onClick={handleSave} disabled={saving}
               className="btn bg-amber-600 hover:bg-amber-700 text-white text-sm flex items-center gap-1">
-              {saving ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <Check size={15} />}
+              {saving ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin rounded-lg" /> : <Check size={15} />}
               {editId ? 'Update' : 'Add'}
             </button>
             <button onClick={cancel} className="btn btn-secondary text-sm flex items-center gap-1">
@@ -122,7 +122,7 @@ export default function BillingItems() {
       <div className="card overflow-x-auto">
         {loading ? (
           <div className="flex justify-center py-12">
-            <div className="w-8 h-8 border-4 border-amber-600 border-t-transparent rounded-full animate-spin" />
+            <div className="w-8 h-8 border-4 border-amber-600 border-t-transparent rounded-full animate-spin rounded-lg" />
           </div>
         ) : items.length === 0 ? (
           <div className="text-center py-12 text-gray-400">

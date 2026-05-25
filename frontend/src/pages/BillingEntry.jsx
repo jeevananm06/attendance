@@ -374,7 +374,7 @@ export default function BillingEntry() {
               {/* Actions */}
               <div className="mt-6 flex flex-wrap gap-3 justify-end">
                 <button onClick={handleSaveAndPrint} disabled={saving}
-                  className="btn bg-amber-600 hover:bg-amber-700 text-white flex items-center gap-2">
+                  className="btn bg-amber-600 hover:bg-amber-700 text-white flex items-center gap-2 rounded-lg">
                   {saving ? (
                     <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                   ) : (

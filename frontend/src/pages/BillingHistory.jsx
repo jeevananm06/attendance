@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import {
   Search, Printer, Share2, Trash2, CheckCircle, Filter,
-  ChevronDown, ChevronUp, Receipt, BarChart3, X, Pencil, Plus,
+  ChevronDown, ChevronUp, Receipt, BarChart3, X, Pencil, Plus, CheckSquare, Square,
 } from 'lucide-react';
 import { billingAPI } from '../api';
 import { useAuth } from '../context/AuthContext';
@@ -39,6 +39,10 @@ export default function BillingHistory() {
   // ── detail ──
   const [selectedBill, setSelectedBill] = useState(null);
   const [showDetail, setShowDetail] = useState(false);
+
+  // ── multi-select ──
+  const [selectedIds, setSelectedIds] = useState(new Set());
+  const [deleting, setDeleting] = useState(false);
 
   // ── edit ──
   const [editBill, setEditBill] = useState(null);
@@ -116,6 +120,84 @@ export default function BillingHistory() {
     } catch { return bill; }
   };
 
+  const toggleSelect = (billId) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(billId)) next.delete(billId);
+      else next.add(billId);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === bills.length) setSelectedIds(new Set());
+    else setSelectedIds(new Set(bills.map(b => b.id)));
+  };
+
+  const handleDeleteSelected = async () => {
+    if (selectedIds.size === 0) return;
+    if (!window.confirm(`Delete ${selectedIds.size} bill(s) permanently?`)) return;
+    setDeleting(true);
+    try {
+      await Promise.all([...selectedIds].map(id => billingAPI.deleteBill(id)));
+      setSelectedIds(new Set());
+      fetchBills();
+      fetchSummary();
+    } catch { /* ignore */ }
+    setDeleting(false);
+  };
+
+  const handleConsolidatedPrint = async () => {
+    // Group filtered bills by customer and print consolidated
+    const customerBills = {};
+    for (const bill of bills) {
+      const key = bill.customer_name;
+      if (!customerBills[key]) customerBills[key] = [];
+      customerBills[key].push(bill);
+    }
+
+    // Build consolidated HTML for each customer
+    let allHTML = '';
+    for (const [customer, cBills] of Object.entries(customerBills)) {
+      // Fetch full details for each bill
+      const fullBills = await Promise.all(cBills.map(b => ensureFullBill(b)));
+      // Merge all line items
+      const mergedItems = {};
+      let totalAmount = 0;
+      fullBills.forEach(fb => {
+        (fb.line_items || []).forEach(li => {
+          const key = li.item_name;
+          if (!mergedItems[key]) mergedItems[key] = { item_name: li.item_name, quantity: 0, rate: li.rate, amount: 0 };
+          mergedItems[key].quantity += li.quantity;
+          mergedItems[key].amount += li.quantity * li.rate;
+        });
+        totalAmount += fb.total_amount || 0;
+      });
+
+      const dateRange = startDate && endDate ? `${startDate} to ${endDate}` : `${cBills[0]?.bill_date} - ${cBills[cBills.length - 1]?.bill_date}`;
+      const consolidatedBill = {
+        bill_number: `Consolidated (${cBills.length} bills)`,
+        customer_name: customer,
+        customer_phone: cBills[0]?.customer_phone || '',
+        customer_place: cBills[0]?.customer_place || '',
+        bill_date: dateRange,
+        line_items: Object.values(mergedItems),
+        subtotal: Object.values(mergedItems).reduce((s, i) => s + i.amount, 0),
+        tax_percentage: 0,
+        tax_amount: 0,
+        total_amount: totalAmount,
+        notes: `Period: ${dateRange}`,
+      };
+      allHTML += buildBillHTML(consolidatedBill, logoBase64) + '<div style="page-break-after:always"></div>';
+    }
+
+    // Print
+    const win = window.open('', '_blank');
+    win.document.write(`<html><head><title>Consolidated Bills</title></head><body>${allHTML}</body></html>`);
+    win.document.close();
+    win.onload = () => { win.print(); };
+  };
+
   const handlePrint = async (bill) => {
     const full = await ensureFullBill(bill);
     printBill(full, logoBase64);
@@ -187,7 +269,7 @@ export default function BillingHistory() {
         })),
       });
       setEditBill(null);
-      fetchBills();
+      fetchBills(); 
       fetchSummary();
     } catch (e) {
       setEditError(e.response?.data?.detail || 'Failed to save');
@@ -285,13 +367,31 @@ export default function BillingHistory() {
               </select>
             </div>
           </div>
-          <div className="mt-3 flex gap-2">
-            <button onClick={handleSearch} className="btn bg-amber-600 hover:bg-amber-700 text-white text-sm flex items-center gap-1">
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button onClick={handleSearch} className="btn bg-amber-600 hover:bg-amber-700 text-white text-sm flex items-center gap-1 rounded-lg">
               <Search size={15} /> Search
             </button>
             <button onClick={() => { setCustomerName(''); setCustomerPhone(''); setStartDate(''); setEndDate(''); setStatusFilter(''); }}
-              className="btn btn-secondary text-sm">Clear</button>
+              className="btn btn-secondary text-sm rounded-lg">Clear</button>
+            <button onClick={handleConsolidatedPrint}
+              className="btn bg-blue-600 hover:bg-blue-700 text-white text-sm flex items-center gap-1 rounded-lg"
+              title="Print consolidated bill per customer for current filter results">
+              <Printer size={15} /> Print Consolidated
+            </button>
           </div>
+        </div>
+      )}
+
+      {/* Multi-select action bar */}
+      {isAdmin && selectedIds.size > 0 && (
+        <div className="card flex items-center gap-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
+          <span className="text-sm font-medium text-red-700 dark:text-red-300">{selectedIds.size} bill(s) selected</span>
+          <button onClick={handleDeleteSelected} disabled={deleting}
+            className="btn bg-red-600 hover:bg-red-700 text-white text-sm flex items-center gap-1 rounded-lg">
+            {deleting ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <Trash2 size={14} />}
+            Delete Selected
+          </button>
+          <button onClick={() => setSelectedIds(new Set())} className="btn btn-secondary text-sm rounded-lg">Cancel</button>
         </div>
       )}
 
@@ -310,6 +410,13 @@ export default function BillingHistory() {
           <table className="min-w-full text-sm">
             <thead>
               <tr className="border-b text-left text-xs text-gray-500 uppercase">
+                {isAdmin && (
+                  <th className="py-2 px-3 w-8">
+                    <button onClick={toggleSelectAll} className="text-gray-400 hover:text-gray-700 dark:hover:text-gray-200">
+                      {selectedIds.size === bills.length ? <CheckSquare size={16} /> : <Square size={16} />}
+                    </button>
+                  </th>
+                )}
                 <th className="py-2 px-3">Bill #</th>
                 <th className="py-2 px-3">Date</th>
                 <th className="py-2 px-3">Customer</th>
@@ -323,6 +430,13 @@ export default function BillingHistory() {
               {bills.map(bill => (
                 <tr key={bill.id} className="border-b hover:bg-gray-50 dark:hover:bg-gray-800/50 cursor-pointer"
                   onClick={() => viewBill(bill)}>
+                  {isAdmin && (
+                    <td className="py-2 px-3" onClick={e => e.stopPropagation()}>
+                      <button onClick={() => toggleSelect(bill.id)} className="text-gray-400 hover:text-gray-700 dark:hover:text-gray-200">
+                        {selectedIds.has(bill.id) ? <CheckSquare size={16} className="text-amber-600" /> : <Square size={16} />}
+                      </button>
+                    </td>
+                  )}
                   <td className="py-2 px-3 font-mono text-xs">{bill.bill_number}</td>
                   <td className="py-2 px-3">{bill.bill_date}</td>
                   <td className="py-2 px-3 font-medium">{bill.customer_name}</td>
