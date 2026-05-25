@@ -100,39 +100,25 @@ export async function shareBillAsImage(bill, logoBase64) {
     const canvas = await html2canvas(container, { useCORS: true, scale: 2, backgroundColor: '#ffffff' });
     document.body.removeChild(container);
 
-    return new Promise((resolve) => {
-      canvas.toBlob(async (blob) => {
-        const file = new File([blob], `bill-${bill.bill_number}.png`, { type: 'image/png' });
+    // Download image first
+    const imgUrl = canvas.toDataURL('image/png');
+    const a = document.createElement('a');
+    a.href = imgUrl;
+    a.download = `bill-${bill.bill_number}.png`;
+    a.click();
 
-        // Try native Web Share API (works on mobile)
-        if (navigator.canShare && navigator.canShare({ files: [file] })) {
-          try {
-            await navigator.share({ files: [file], title: `Bill ${bill.bill_number}` });
-            resolve(true);
-            return;
-          } catch { /* fall through */ }
-        }
+    // Build WhatsApp direct chat URL
+    let phone = (bill.customer_phone || '').replace(/\D/g, '');
+    if (phone.length === 10) phone = '91' + phone;
+    if (phone.startsWith('0')) phone = '91' + phone.slice(1);
+    const msg = encodeURIComponent(`Bill ${bill.bill_number} - ₹${bill.total_amount.toFixed(2)}\nPlease attach the downloaded bill image.`);
+    const waUrl = phone
+      ? `https://api.whatsapp.com/send?phone=${phone}&text=${msg}`
+      : `https://api.whatsapp.com/send`;
 
-        // Fallback: download image then open WhatsApp
-        const imgUrl = canvas.toDataURL('image/png');
-        const a = document.createElement('a');
-        a.href = imgUrl;
-        a.download = `bill-${bill.bill_number}.png`;
-        a.click();
-
-        let phone = (bill.customer_phone || '').replace(/\D/g, '');
-        // Add 91 country code if it's a 10-digit Indian number
-        if (phone.length === 10) phone = '91' + phone;
-        // Strip leading 0 for numbers like 08883665822
-        if (phone.startsWith('0')) phone = '91' + phone.slice(1);
-        const msg = encodeURIComponent(`Bill ${bill.bill_number} - ₹${bill.total_amount.toFixed(2)}\n(Please find the bill image downloaded to your device)`);
-        const waUrl = phone
-          ? `https://api.whatsapp.com/send?phone=${phone}&text=${msg}`
-          : `https://api.whatsapp.com/send`;
-        setTimeout(() => window.open(waUrl, '_blank'), 500);
-        resolve(true);
-      }, 'image/png');
-    });
+    // Open WhatsApp chat with the customer directly
+    setTimeout(() => window.open(waUrl, '_blank'), 600);
+    return true;
   } catch {
     document.body.removeChild(container);
     return false;
