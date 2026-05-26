@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { Link } from 'react-router-dom';
 import {
   Plus, Trash2, Printer, Share2, AlertTriangle, X, Receipt,
+  History, List,
 } from 'lucide-react';
 import { billingAPI } from '../api';
 import { useAuth } from '../context/AuthContext';
@@ -204,11 +206,23 @@ export default function BillingEntry() {
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
           <Receipt className="text-amber-600" /> New Bill
         </h1>
-        {savedBill && (
-          <button onClick={resetForm} className="btn btn-secondary text-sm flex items-center gap-1">
-            <Plus size={16} /> New Bill
-          </button>
-        )}
+        <div className="flex items-center gap-2">
+          {isAdmin && (
+            <>
+              <Link to="/billing/history" className="btn btn-secondary text-sm flex items-center gap-1">
+                <History size={14} /> Bill History
+              </Link>
+              <Link to="/billing/items" className="btn btn-secondary text-sm flex items-center gap-1">
+                <List size={14} /> Items
+              </Link>
+            </>
+          )}
+          {savedBill && (
+            <button onClick={resetForm} className="btn btn-secondary text-sm flex items-center gap-1">
+              <Plus size={16} /> New Bill
+            </button>
+          )}
+        </div>
       </div>
 
       {error && (
