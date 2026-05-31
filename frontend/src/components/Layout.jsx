@@ -61,7 +61,7 @@ const sections = [
     label: 'Billing',
     items: [
       { path: '/billing', icon: Receipt, label: 'New Bill', roles: ['admin', 'manager'] },
-      { path: '/billing/history', icon: FileText, label: 'Bill History', roles: ['admin'] },
+      { path: '/billing/history', icon: FileText, label: 'Bill History', roles: ['admin', 'manager'] },
       { path: '/billing/items', icon: Package, label: 'Billing Items', roles: ['admin'] },
     ],
   },

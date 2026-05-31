@@ -174,7 +174,7 @@ const App = () => {
           <Route
             path="/billing/history"
             element={
-              <ProtectedRoute allowedRoles={['admin']}>
+              <ProtectedRoute allowedRoles={['admin', 'manager']}>
                 <BillingHistory />
               </ProtectedRoute>
             }
