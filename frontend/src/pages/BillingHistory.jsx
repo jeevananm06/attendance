@@ -19,7 +19,8 @@ const statusColors = {
 };
 
 export default function BillingHistory() {
-  const { isAdmin } = useAuth();
+  const { isAdmin, isManager } = useAuth();
+  const canViewBills = isAdmin || isManager;
   const printRef = useRef(null);
   const [logoBase64, setLogoBase64] = useState(null);
   const [sharing, setSharing] = useState(false);
@@ -30,6 +31,7 @@ export default function BillingHistory() {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
+  const [includePaid, setIncludePaid] = useState(false); // Default: hide paid bills
 
   // ── data ──
   const [bills, setBills] = useState([]);
@@ -75,7 +77,12 @@ export default function BillingHistory() {
       if (statusFilter) params.bill_status = statusFilter;
       params.limit = 100;
       const r = await billingAPI.searchBills(params);
-      setBills(r.data?.bills || []);
+      let fetchedBills = r.data?.bills || [];
+      // Filter out paid bills by default unless explicitly included
+      if (!includePaid && !statusFilter) {
+        fetchedBills = fetchedBills.filter(b => b.status !== 'paid');
+      }
+      setBills(fetchedBills);
       setTotal(r.data?.total || 0);
     } catch { setBills([]); } finally { setLoading(false); }
   };
@@ -277,7 +284,7 @@ export default function BillingHistory() {
 
   const handlePrint = async (bill) => {
     const full = await ensureFullBill(bill);
-    printBill(full, logoBase64);
+    await printBill(full, logoBase64);
   };
 
   const handleShare = async (bill) => {
@@ -434,7 +441,7 @@ export default function BillingHistory() {
             <div>
               <label className="label">Status</label>
               <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="input text-sm">
-                <option value="">All</option>
+                <option value="">All (Unpaid)</option>
                 <option value="draft">Draft</option>
                 <option value="finalized">Finalized</option>
                 <option value="partial_paid">Partial Paid</option>
@@ -442,17 +449,30 @@ export default function BillingHistory() {
               </select>
             </div>
           </div>
-          <div className="mt-3 flex flex-wrap gap-2">
-            <button onClick={handleSearch} className="btn bg-amber-600 hover:bg-amber-700 text-white text-sm flex items-center gap-1 rounded-lg">
-              <Search size={15} /> Search
-            </button>
-            <button onClick={() => { setCustomerName(''); setCustomerPhone(''); setStartDate(''); setEndDate(''); setStatusFilter(''); }}
-              className="btn btn-secondary text-sm rounded-lg">Clear</button>
-            <button onClick={handleConsolidatedPrint}
-              className="btn bg-blue-600 hover:bg-blue-700 text-white text-sm flex items-center gap-1 rounded-lg"
-              title="Print consolidated bill per customer for current filter results">
-              <Printer size={15} /> Print Consolidated
-            </button>
+          <div className="mt-3 flex flex-wrap items-center gap-3">
+            <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={includePaid}
+                onChange={e => setIncludePaid(e.target.checked)}
+                className="w-4 h-4 rounded border-gray-300 text-amber-600 focus:ring-amber-500"
+              />
+              Include paid bills
+            </label>
+            <div className="flex flex-wrap gap-2 ml-auto">
+              <button onClick={handleSearch} className="btn bg-amber-600 hover:bg-amber-700 text-white text-sm flex items-center gap-1 rounded-lg">
+                <Search size={15} /> Search
+              </button>
+              <button onClick={() => { setCustomerName(''); setCustomerPhone(''); setStartDate(''); setEndDate(''); setStatusFilter(''); setIncludePaid(false); }}
+                className="btn btn-secondary text-sm rounded-lg">Clear</button>
+              {isAdmin && (
+                <button onClick={handleConsolidatedPrint}
+                  className="btn bg-blue-600 hover:bg-blue-700 text-white text-sm flex items-center gap-1 rounded-lg"
+                  title="Print consolidated bill per customer for current filter results">
+                  <Printer size={15} /> Print Consolidated
+                </button>
+              )}
+            </div>
           </div>
         </div>
 

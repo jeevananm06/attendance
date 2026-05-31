@@ -70,17 +70,50 @@ export async function fetchLogoBase64(url) {
 }
 
 /**
- * Print bill in a new window with logo embedded as base64
+ * Print bill - on mobile: generates and downloads image, on desktop: opens print dialog
  */
-export function printBill(bill, logoBase64) {
-  const html = buildBillHTML(bill, logoBase64);
-  const win = window.open('', '_blank');
-  win.document.write(`<html><head><title>Bill - ${bill.bill_number}</title>
-  <style>*{margin:0;padding:0;box-sizing:border-box}body{padding:0;margin:0}@media print{body{padding:0}}</style>
-  </head><body>${html}
-  <script>window.onload=function(){window.print();window.close();};</script>
-  </body></html>`);
-  win.document.close();
+export async function printBill(bill, logoBase64) {
+  const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+
+  if (isMobile) {
+    // Mobile: generate image and open in new tab for printing/saving
+    const container = document.createElement('div');
+    container.style.cssText = 'position:fixed;left:-9999px;top:0;z-index:-1;width:420px;';
+    container.innerHTML = buildBillHTML(bill, logoBase64);
+    document.body.appendChild(container);
+
+    await new Promise(r => setTimeout(r, 100));
+
+    try {
+      const canvas = await html2canvas(container, { useCORS: true, scale: 2, backgroundColor: '#ffffff' });
+      document.body.removeChild(container);
+
+      const imgUrl = canvas.toDataURL('image/png');
+      // Open image in new tab - user can then print or save from there
+      const win = window.open();
+      win.document.write(`<html><head><title>Bill - ${bill.bill_number}</title>
+        <style>body{margin:0;display:flex;justify-content:center;align-items:center;min-height:100vh;background:#f5f5f5}
+        img{max-width:100%;box-shadow:0 4px 12px rgba(0,0,0,0.15)}
+        .btn{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);padding:12px 24px;
+        background:#8B4513;color:#fff;border:none;border-radius:8px;font-size:16px;cursor:pointer}
+        @media print{.btn{display:none}}</style></head>
+        <body><img src="${imgUrl}" alt="Bill" /><button class="btn" onclick="window.print()">Print Bill</button>
+        </body></html>`);
+      win.document.close();
+    } catch {
+      document.body.removeChild(container);
+    }
+  } else {
+    // Desktop: traditional print window
+    const html = buildBillHTML(bill, logoBase64);
+    const win = window.open('', '_blank');
+    win.document.write(`<html><head><title>Bill - ${bill.bill_number}</title>
+    <style>*{margin:0;padding:0;box-sizing:border-box}body{padding:0;margin:0}@media print{body{padding:0}}</style>
+    </head><body>${html}
+    <script>window.onload=function(){window.print();window.close();};</script>
+    </body></html>`);
+    win.document.close();
+  }
 }
 
 /**
