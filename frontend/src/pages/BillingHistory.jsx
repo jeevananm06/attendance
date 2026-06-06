@@ -4,6 +4,7 @@ import {
   Receipt, BarChart3, X, Pencil, Plus, CheckSquare, Square,
   DollarSign, AlertTriangle, CreditCard,
 } from 'lucide-react';
+import html2canvas from 'html2canvas';
 import { billingAPI } from '../api';
 import { useAuth } from '../context/AuthContext';
 import { fetchLogoBase64, printBill, shareBillAsImage, buildBillHTML } from '../utils/billTemplate';
@@ -54,6 +55,9 @@ export default function BillingHistory() {
 
   // ── delete confirmation modal ──
   const [deleteConfirm, setDeleteConfirm] = useState(null); // { id, label, multi }
+
+  // ── consolidated print modal ──
+  const [consolidatedModal, setConsolidatedModal] = useState(null); // { html, customerCount }
 
   // ── edit ──
   const [editBill, setEditBill] = useState(null);
@@ -276,8 +280,26 @@ export default function BillingHistory() {
       allHTML += html + '<div style="page-break-after:always"></div>';
     }
 
+    // Detect mobile devices: iPhone, iPad (including modern iPadOS), iPod, Android
+    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) ||
+      (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1); // Modern iPad Pro
+
+    if (isMobile) {
+      // Mobile: show modal instead of new window (prevents getting stuck)
+      setConsolidatedModal({ html: allHTML, customerCount: Object.keys(customerBills).length });
+    } else {
+      // Desktop: open new window
+      const win = window.open('', '_blank');
+      win.document.write(`<html><head><title>Consolidated Bills</title></head><body>${allHTML}</body></html>`);
+      win.document.close();
+      win.onload = () => { win.print(); };
+    }
+  };
+
+  const printConsolidatedFromModal = () => {
+    if (!consolidatedModal) return;
     const win = window.open('', '_blank');
-    win.document.write(`<html><head><title>Consolidated Bills</title></head><body>${allHTML}</body></html>`);
+    win.document.write(`<html><head><title>Consolidated Bills</title></head><body>${consolidatedModal.html}</body></html>`);
     win.document.close();
     win.onload = () => { win.print(); };
   };
@@ -769,6 +791,30 @@ export default function BillingHistory() {
                 disabled={!partialAmount || parseFloat(partialAmount) <= 0}
                 className="btn bg-orange-500 hover:bg-orange-600 text-white text-sm flex items-center gap-1 disabled:opacity-50">
                 <DollarSign size={14} /> Record Payment
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Consolidated Print Modal (Mobile) */}
+      {consolidatedModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-lg w-full max-h-[90vh] flex flex-col">
+            <div className="flex items-center justify-between p-4 border-b">
+              <h3 className="font-bold text-lg text-gray-900 dark:text-white">Consolidated Report Preview</h3>
+              <button onClick={() => setConsolidatedModal(null)} className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700">
+                <X size={20} />
+              </button>
+            </div>
+            <div className="p-4 overflow-auto flex-1">
+              <div dangerouslySetInnerHTML={{ __html: consolidatedModal.html }} />
+            </div>
+            <div className="sticky bottom-0 bg-white dark:bg-gray-800 p-4 border-t flex flex-wrap gap-2 justify-end">
+              <button onClick={() => setConsolidatedModal(null)} className="btn btn-secondary text-sm">Close</button>
+              <button onClick={printConsolidatedFromModal}
+                className="btn bg-amber-600 hover:bg-amber-700 text-white text-sm flex items-center gap-1">
+                <Printer size={15} /> Print
               </button>
             </div>
           </div>
