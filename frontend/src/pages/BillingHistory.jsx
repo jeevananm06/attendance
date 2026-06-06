@@ -438,7 +438,7 @@ export default function BillingHistory() {
 
       {/* Filters */}
       <div className="card">
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-3 [&>div]:min-w-0">
           <div className="col-span-2 md:col-span-1">
             <label className="label">Customer</label>
             <input type="text" value={customerName} onChange={e => setCustomerName(e.target.value)}

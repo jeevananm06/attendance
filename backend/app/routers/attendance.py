@@ -42,6 +42,14 @@ async def mark_single_attendance(
     current_user: User = Depends(get_current_manager_or_admin)
 ):
     """Mark attendance for a single labour."""
+    labour = get_labour(attendance_data.labour_id)
+    if not labour:
+        raise HTTPException(status_code=404, detail="Labour not found")
+    if labour.joined_date and attendance_data.date < labour.joined_date:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Cannot mark attendance for {attendance_data.date.isoformat()} \u2014 {labour.name} joined on {labour.joined_date.isoformat()}",
+        )
     return mark_attendance(
         labour_id=attendance_data.labour_id,
         target_date=attendance_data.date,
@@ -57,6 +65,20 @@ async def mark_bulk_attendance(
     current_user: User = Depends(get_current_manager_or_admin)
 ):
     """Mark attendance for multiple labours at once."""
+    # Validate all records up front so nothing is committed if any labour
+    # would be marked before their joining date.
+    invalid = []
+    for record in bulk_data.records:
+        labour = get_labour(record["labour_id"])
+        if not labour:
+            invalid.append(f"{record['labour_id']} (not found)")
+        elif labour.joined_date and bulk_data.date < labour.joined_date:
+            invalid.append(f"{labour.name} (joined {labour.joined_date.isoformat()})")
+    if invalid:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Cannot mark attendance for {bulk_data.date.isoformat()} before joining date: {', '.join(invalid)}",
+        )
     results = []
     for record in bulk_data.records:
         attendance = mark_attendance(
@@ -102,7 +124,9 @@ async def fill_month_attendance(
 
     while current <= end:
         is_sunday = current.weekday() == 6
-        if skip_sundays and is_sunday:
+        if labour.joined_date and current < labour.joined_date:
+            skipped.append({"date": current.isoformat(), "reason": "before_joining"})
+        elif skip_sundays and is_sunday:
             skipped.append({"date": current.isoformat(), "reason": "sunday"})
         elif not overwrite and current in existing_dates:
             skipped.append({"date": current.isoformat(), "reason": "already_marked"})
