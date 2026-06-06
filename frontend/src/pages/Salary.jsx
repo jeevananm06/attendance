@@ -972,7 +972,16 @@ const LabourSalaryCard = ({
                           ) : (
                             <CreditCard size={16} />
                           )}
-                          Confirm Pay
+                          {(() => {
+                            const entered = parseFloat(payAmount);
+                            const pendingAdvance = advances[labour.labour_id] || 0;
+                            const deductAmt = advanceDeduction === 'full'
+                              ? pendingAdvance
+                              : (advanceDeduction === 'partial' ? (parseFloat(advanceDeductionAmount) || 0) : 0);
+                            return deductAmt > 0 && !isNaN(entered)
+                              ? `Pay ₹${Math.max(0, entered - deductAmt).toLocaleString()}`
+                              : 'Confirm Pay';
+                          })()}
                         </button>
                         <button onClick={closePayPanel} className="text-gray-400 hover:text-gray-600">
                           <X size={18} />
@@ -1072,8 +1081,9 @@ const LabourSalaryCard = ({
                                   )}
                                 </div>
                                 {deductAmt > 0 && !isNaN(entered) && (
-                                  <p className="text-xs mt-2 text-amber-700 dark:text-amber-400">
-                                    Net payment after deduction: <strong>₹{netPayment.toLocaleString()}</strong>
+                                  <p className="text-sm mt-2 font-semibold text-amber-800 dark:text-amber-300">
+                                    Net payable to labour: ₹{Math.max(0, netPayment).toLocaleString()}
+                                    <span className="font-normal text-xs text-amber-700/80 dark:text-amber-400/80"> (₹{entered.toLocaleString()} salary − ₹{deductAmt.toLocaleString()} advance)</span>
                                   </p>
                                 )}
                               </div>

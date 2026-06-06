@@ -228,12 +228,22 @@ async def pay_salary(
                     remaining_to_deduct -= to_deduct
                     advances_updated.append({"id": adv.id, "amount": to_deduct, "type": "partial"})
 
+    # Record the advance deduction in the saved payment comment so it is
+    # traceable in the payment history (the log only stores the gross amount).
+    effective_comment = payment.payment_comment
+    if advance_deducted > 0:
+        gross = payment.amount_paid
+        deduction_note = f"Advance deducted: \u20b9{advance_deducted:.0f}"
+        if gross is not None:
+            deduction_note += f", net paid: \u20b9{gross - advance_deducted:.0f}"
+        effective_comment = f"{effective_comment} | {deduction_note}" if effective_comment else deduction_note
+
     result = mark_salary_paid(
         labour_id=payment.labour_id,
         week_end=payment.week_end,
         paid_by=current_user.username,
         amount_paid=payment.amount_paid,
-        payment_comment=payment.payment_comment
+        payment_comment=effective_comment
     )
 
     if not result:
