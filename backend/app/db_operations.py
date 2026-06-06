@@ -3723,11 +3723,20 @@ def update_billing_item(item_id: str, name: str = None, default_rate: float = No
 
 
 def _generate_bill_number(db, bill_date: date) -> str:
-    """Generate auto-incrementing bill number: BILL-YYYYMMDD-NNN"""
+    """Generate auto-incrementing bill number: BILL-YYYYMMDD-NNN
+
+    Uses the highest existing suffix for the date (+1) rather than a raw count,
+    so deleted bills do not cause the next number to collide with a surviving one.
+    """
     date_str = bill_date.strftime("%Y%m%d")
     prefix = f"BILL-{date_str}-"
-    existing = db.query(BillDB).filter(BillDB.bill_number.like(f"{prefix}%")).count()
-    return f"{prefix}{existing + 1:03d}"
+    existing = db.query(BillDB.bill_number).filter(BillDB.bill_number.like(f"{prefix}%")).all()
+    max_seq = 0
+    for (number,) in existing:
+        suffix = number[len(prefix):]
+        if suffix.isdigit():
+            max_seq = max(max_seq, int(suffix))
+    return f"{prefix}{max_seq + 1:03d}"
 
 
 def create_bill(customer_name: str, customer_phone: str, customer_place: str,
@@ -3841,6 +3850,59 @@ def update_bill_status(bill_id: str, new_status: str, paid_amount: float = 0) ->
             bill.paid_amount = bill.total_amount
         elif new_status == "partial_paid" and paid_amount > 0:
             bill.paid_amount = paid_amount
+        db.commit()
+        return _bill_to_dict(bill, bill.line_items)
+    finally:
+        db.close()
+
+
+def update_bill(bill_id: str, customer_phone: str = None, customer_place: str = None,
+                bill_date: date = None, line_items: list = None,
+                tax_percentage: float = None, notes: str = None) -> Optional[dict]:
+    """Update an existing bill in place, preserving its id and bill_number.
+
+    Line items (when provided) replace the existing ones and totals are
+    recalculated. The whole change happens in a single transaction so a bill is
+    never lost on failure.
+    """
+    db = get_db_session()
+    try:
+        bill = db.query(BillDB).filter(BillDB.id == bill_id).first()
+        if not bill:
+            return None
+
+        if customer_phone is not None:
+            bill.customer_phone = customer_phone
+        if customer_place is not None:
+            bill.customer_place = customer_place
+        if bill_date is not None:
+            bill.bill_date = bill_date
+        if notes is not None:
+            bill.notes = notes
+
+        if line_items is not None:
+            # Replace line items (cascade delete-orphan removes the old ones)
+            bill.line_items.clear()
+            subtotal = 0.0
+            for li in line_items:
+                amount = round(li["quantity"] * li["rate"], 2)
+                subtotal += amount
+                bill.line_items.append(BillLineItemDB(
+                    id=str(uuid.uuid4())[:8],
+                    bill_id=bill.id,
+                    item_name=li["item_name"],
+                    quantity=li["quantity"],
+                    rate=li["rate"],
+                    amount=amount,
+                ))
+            bill.subtotal = round(subtotal, 2)
+
+        if tax_percentage is not None:
+            bill.tax_percentage = tax_percentage
+
+        bill.tax_amount = round(bill.subtotal * (bill.tax_percentage or 0) / 100, 2)
+        bill.total_amount = round(bill.subtotal + bill.tax_amount, 2)
+
         db.commit()
         return _bill_to_dict(bill, bill.line_items)
     finally:

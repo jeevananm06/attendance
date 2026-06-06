@@ -358,14 +358,11 @@ export default function BillingHistory() {
     if (validLines.length === 0) { setEditError('Add at least one item'); return; }
     setEditSaving(true); setEditError('');
     try {
-      // Delete old bill and create a new one preserving bill number is not supported;
-      // instead update via delete + recreate keeping same customer/date
-      await billingAPI.deleteBill(editBill.id);
-      await billingAPI.createBill({
-        customer_name: editBill.customer_name,
+      // Edit the bill in place so its id and bill number are preserved and the
+      // record can never be lost on a partial failure.
+      await billingAPI.updateBill(editBill.id, {
         customer_phone: editPhone,
         customer_place: editPlace,
-        bill_date: editBill.bill_date,
         tax_percentage: parseFloat(editTax) || 0,
         notes: editNotes || null,
         line_items: validLines.map(li => ({
