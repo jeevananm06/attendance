@@ -441,54 +441,52 @@ export default function BillingHistory() {
 
       {/* Filters */}
       <div className="card">
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
-            <div>
-              <label className="label">Customer</label>
-              <input type="text" value={customerName} onChange={e => setCustomerName(e.target.value)}
-                className="input text-sm" placeholder="Name" />
-            </div>
-            <div>
-              <label className="label">Phone</label>
-              <input type="text" value={customerPhone} onChange={e => setCustomerPhone(e.target.value)}
-                className="input text-sm" placeholder="Phone" />
-            </div>
-            <div>
-              <label className="label">From</label>
-              <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="input text-sm" />
-            </div>
-            <div>
-              <label className="label">To</label>
-              <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="input text-sm" />
-            </div>
-            <div>
-              <label className="label">Status</label>
-              <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="input text-sm">
-                <option value="unpaid">Unpaid</option>
-                <option value="draft">Draft</option>
-                <option value="finalized">Finalized</option>
-                <option value="partial_paid">Partial Paid</option>
-                <option value="paid">Paid</option>
-                <option value="">All</option>
-              </select>
-            </div>
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+          <div className="col-span-2 md:col-span-1">
+            <label className="label">Customer</label>
+            <input type="text" value={customerName} onChange={e => setCustomerName(e.target.value)}
+              className="input text-sm w-full" placeholder="Name" />
           </div>
-          <div className="mt-3 flex flex-wrap items-center gap-3">
-            <div className="flex flex-wrap gap-2 ml-auto">
-              <button onClick={handleSearch} className="btn bg-amber-600 hover:bg-amber-700 text-white text-sm flex items-center gap-1 rounded-lg">
-                <Search size={15} /> Search
-              </button>
-              <button onClick={() => { setCustomerName(''); setCustomerPhone(''); setStartDate(''); setEndDate(''); setStatusFilter('unpaid'); }}
-                className="btn btn-secondary text-sm rounded-lg">Clear</button>
-              {isAdmin && (
-                <button onClick={handleConsolidatedPrint}
-                  className="btn bg-blue-600 hover:bg-blue-700 text-white text-sm flex items-center gap-1 rounded-lg"
-                  title="Print consolidated bill per customer for current filter results">
-                  <Printer size={15} /> Print Consolidated
-                </button>
-              )}
-            </div>
+          <div>
+            <label className="label">Phone</label>
+            <input type="text" value={customerPhone} onChange={e => setCustomerPhone(e.target.value)}
+              className="input text-sm w-full" placeholder="Phone" />
+          </div>
+          <div>
+            <label className="label">From</label>
+            <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="input text-sm w-full" />
+          </div>
+          <div>
+            <label className="label">To</label>
+            <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="input text-sm w-full" />
+          </div>
+          <div>
+            <label className="label">Status</label>
+            <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="input text-sm w-full">
+              <option value="unpaid">Unpaid</option>
+              <option value="draft">Draft</option>
+              <option value="finalized">Finalized</option>
+              <option value="partial_paid">Partial Paid</option>
+              <option value="paid">Paid</option>
+              <option value="">All</option>
+            </select>
           </div>
         </div>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <button onClick={handleSearch} className="btn bg-amber-600 hover:bg-amber-700 text-white text-sm flex items-center gap-1 rounded-lg flex-1 md:flex-none justify-center">
+            <Search size={15} /> Search
+          </button>
+          <button onClick={() => { setCustomerName(''); setCustomerPhone(''); setStartDate(''); setEndDate(''); setStatusFilter('unpaid'); }}
+            className="btn btn-secondary text-sm rounded-lg flex-1 md:flex-none">Clear</button>
+          {isAdmin && (
+            <button onClick={handleConsolidatedPrint}
+              className="btn bg-blue-600 hover:bg-blue-700 text-white text-sm flex items-center gap-1 rounded-lg flex-1 md:flex-none justify-center"
+              title="Print consolidated bill per customer for current filter results">
+              <Printer size={15} /> Consolidated
+            </button>
+          )}
+        </div>
+      </div>
 
       {/* Multi-select action bar */}
       {isAdmin && selectedIds.size > 0 && (
@@ -508,8 +506,8 @@ export default function BillingHistory() {
         </div>
       )}
 
-      {/* Bills table */}
-      <div className="card overflow-x-auto">
+      {/* Bills list - card view on mobile, table on desktop */}
+      <div className="card">
         {loading ? (
           <div className="flex justify-center py-12">
             <div className="w-8 h-8 border-4 border-amber-600 border-t-transparent rounded-full animate-spin" />
@@ -520,85 +518,125 @@ export default function BillingHistory() {
             <p>No bills found</p>
           </div>
         ) : (
-          <table className="min-w-full text-sm">
-            <thead>
-              <tr className="border-b text-left text-xs text-gray-500 uppercase">
-                {isAdmin && (
-                  <th className="py-2 px-3 w-8">
-                    <button onClick={toggleSelectAll} className="text-gray-400 hover:text-gray-700 dark:hover:text-gray-200">
-                      {selectedIds.size === bills.length ? <CheckSquare size={16} /> : <Square size={16} />}
-                    </button>
-                  </th>
-                )}
-                <th className="py-2 px-3">Bill #</th>
-                <th className="py-2 px-3">Date</th>
-                <th className="py-2 px-3">Customer</th>
-                <th className="py-2 px-3">Phone</th>
-                <th className="py-2 px-3 text-right">Amount</th>
-                <th className="py-2 px-3">Status</th>
-                <th className="py-2 px-3 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
+          <>
+            {/* Mobile: Card view */}
+            <div className="md:hidden space-y-3">
               {bills.map(bill => (
-                <tr key={bill.id} className="border-b hover:bg-gray-50 dark:hover:bg-gray-800/50 cursor-pointer"
+                <div key={bill.id} className="border rounded-lg p-3 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer"
                   onClick={() => viewBill(bill)}>
-                  {isAdmin && (
-                    <td className="py-2 px-3" onClick={e => e.stopPropagation()}>
-                      <button onClick={() => toggleSelect(bill.id)} className="text-gray-400 hover:text-gray-700 dark:hover:text-gray-200">
-                        {selectedIds.has(bill.id) ? <CheckSquare size={16} className="text-amber-600" /> : <Square size={16} />}
-                      </button>
-                    </td>
-                  )}
-                  <td className="py-2 px-3 font-mono text-xs">{bill.bill_number}</td>
-                  <td className="py-2 px-3">{bill.bill_date}</td>
-                  <td className="py-2 px-3 font-medium">{bill.customer_name}</td>
-                  <td className="py-2 px-3 text-gray-500">{bill.customer_phone || '-'}</td>
-                  <td className="py-2 px-3 text-right font-medium">₹{bill.total_amount.toFixed(2)}</td>
-                  <td className="py-2 px-3">
+                  <div className="flex items-start justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      {isAdmin && (
+                        <button onClick={e => { e.stopPropagation(); toggleSelect(bill.id); }} className="text-gray-400 hover:text-gray-700">
+                          {selectedIds.has(bill.id) ? <CheckSquare size={18} className="text-amber-600" /> : <Square size={18} />}
+                        </button>
+                      )}
+                      <span className="font-mono text-xs font-bold">{bill.bill_number}</span>
+                    </div>
                     <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${statusColors[bill.status] || ''}`}>
                       {bill.status === 'partial_paid' ? `partial ₹${(bill.paid_amount || 0).toLocaleString()}` : bill.status}
                     </span>
-                  </td>
-                  <td className="py-2 px-3 text-right" onClick={e => e.stopPropagation()}>
-                    <div className="flex gap-1 justify-end">
-                      <button onClick={() => handlePrint(bill)} className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded" title="Print">
-                        <Printer size={14} />
+                  </div>
+                  <div className="text-sm font-medium mb-1">{bill.customer_name}</div>
+                  <div className="text-xs text-gray-500 mb-2">{bill.bill_date} · {bill.customer_phone || 'No phone'}</div>
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-amber-700">₹{bill.total_amount.toFixed(2)}</span>
+                    <div className="flex gap-1" onClick={e => e.stopPropagation()}>
+                      <button onClick={() => handlePrint(bill)} className="p-2 hover:bg-gray-100 rounded" title="Print">
+                        <Printer size={16} />
                       </button>
-                      <button onClick={() => handleShare(bill)} className="p-1 hover:bg-green-50 dark:hover:bg-green-900/30 rounded text-green-600" title="Share">
-                        <Share2 size={14} />
+                      <button onClick={() => handleShare(bill)} className="p-2 hover:bg-green-50 rounded text-green-600" title="Share">
+                        <Share2 size={16} />
                       </button>
-                      {isAdmin && (
-                        <button onClick={() => openEdit(bill)} className="p-1 hover:bg-amber-50 dark:hover:bg-amber-900/30 rounded text-amber-600" title="Edit">
-                          <Pencil size={14} />
-                        </button>
-                      )}
-                      {isAdmin && bill.status === 'draft' && (
-                        <button onClick={() => handleStatusChange(bill.id, 'finalized')} className="p-1 hover:bg-green-50 dark:hover:bg-green-900/30 rounded text-emerald-600" title="Finalize">
-                          <CheckCircle size={14} />
-                        </button>
-                      )}
-                      {isAdmin && bill.status !== 'paid' && (
-                        <button onClick={() => handleMarkPaid(bill.id)} className="p-1 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded text-blue-600" title="Mark Paid">
-                          <DollarSign size={14} />
-                        </button>
-                      )}
-                      {isAdmin && bill.status !== 'paid' && (
-                        <button onClick={() => openPaymentModal(bill)} className="p-1 hover:bg-orange-50 dark:hover:bg-orange-900/30 rounded text-orange-600" title="Partial Pay">
-                          <CreditCard size={14} />
-                        </button>
-                      )}
-                      {isAdmin && (
-                        <button onClick={() => handleDelete(bill.id, bill.bill_number)} className="p-1 hover:bg-red-50 dark:hover:bg-red-900/30 rounded text-red-500" title="Delete">
-                          <Trash2 size={14} />
-                        </button>
-                      )}
                     </div>
-                  </td>
-                </tr>
+                  </div>
+                </div>
               ))}
-            </tbody>
-          </table>
+            </div>
+
+            {/* Desktop: Table view */}
+            <div className="hidden md:block overflow-x-auto">
+              <table className="min-w-full text-sm">
+                <thead>
+                  <tr className="border-b text-left text-xs text-gray-500 uppercase">
+                    {isAdmin && (
+                      <th className="py-2 px-3 w-8">
+                        <button onClick={toggleSelectAll} className="text-gray-400 hover:text-gray-700 dark:hover:text-gray-200">
+                          {selectedIds.size === bills.length ? <CheckSquare size={16} /> : <Square size={16} />}
+                        </button>
+                      </th>
+                    )}
+                    <th className="py-2 px-3">Bill #</th>
+                    <th className="py-2 px-3">Date</th>
+                    <th className="py-2 px-3">Customer</th>
+                    <th className="py-2 px-3">Phone</th>
+                    <th className="py-2 px-3 text-right">Amount</th>
+                    <th className="py-2 px-3">Status</th>
+                    <th className="py-2 px-3 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {bills.map(bill => (
+                    <tr key={bill.id} className="border-b hover:bg-gray-50 dark:hover:bg-gray-800/50 cursor-pointer"
+                      onClick={() => viewBill(bill)}>
+                      {isAdmin && (
+                        <td className="py-2 px-3" onClick={e => e.stopPropagation()}>
+                          <button onClick={() => toggleSelect(bill.id)} className="text-gray-400 hover:text-gray-700 dark:hover:text-gray-200">
+                            {selectedIds.has(bill.id) ? <CheckSquare size={16} className="text-amber-600" /> : <Square size={16} />}
+                          </button>
+                        </td>
+                      )}
+                      <td className="py-2 px-3 font-mono text-xs">{bill.bill_number}</td>
+                      <td className="py-2 px-3">{bill.bill_date}</td>
+                      <td className="py-2 px-3 font-medium">{bill.customer_name}</td>
+                      <td className="py-2 px-3 text-gray-500">{bill.customer_phone || '-'}</td>
+                      <td className="py-2 px-3 text-right font-medium">₹{bill.total_amount.toFixed(2)}</td>
+                      <td className="py-2 px-3">
+                        <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${statusColors[bill.status] || ''}`}>
+                          {bill.status === 'partial_paid' ? `partial ₹${(bill.paid_amount || 0).toLocaleString()}` : bill.status}
+                        </span>
+                      </td>
+                      <td className="py-2 px-3 text-right" onClick={e => e.stopPropagation()}>
+                        <div className="flex gap-1 justify-end">
+                          <button onClick={() => handlePrint(bill)} className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded" title="Print">
+                            <Printer size={14} />
+                          </button>
+                          <button onClick={() => handleShare(bill)} className="p-1 hover:bg-green-50 dark:hover:bg-green-900/30 rounded text-green-600" title="Share">
+                            <Share2 size={14} />
+                          </button>
+                          {isAdmin && (
+                            <button onClick={() => openEdit(bill)} className="p-1 hover:bg-amber-50 dark:hover:bg-amber-900/30 rounded text-amber-600" title="Edit">
+                              <Pencil size={14} />
+                            </button>
+                          )}
+                          {isAdmin && bill.status === 'draft' && (
+                            <button onClick={() => handleStatusChange(bill.id, 'finalized')} className="p-1 hover:bg-green-50 dark:hover:bg-green-900/30 rounded text-emerald-600" title="Finalize">
+                              <CheckCircle size={14} />
+                            </button>
+                          )}
+                          {isAdmin && bill.status !== 'paid' && (
+                            <button onClick={() => handleMarkPaid(bill.id)} className="p-1 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded text-blue-600" title="Mark Paid">
+                              <DollarSign size={14} />
+                            </button>
+                          )}
+                          {isAdmin && bill.status !== 'paid' && (
+                            <button onClick={() => openPaymentModal(bill)} className="p-1 hover:bg-orange-50 dark:hover:bg-orange-900/30 rounded text-orange-600" title="Partial Pay">
+                              <CreditCard size={14} />
+                            </button>
+                          )}
+                          {isAdmin && (
+                            <button onClick={() => handleDelete(bill.id, bill.bill_number)} className="p-1 hover:bg-red-50 dark:hover:bg-red-900/30 rounded text-red-500" title="Delete">
+                              <Trash2 size={14} />
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
         {total > 0 && (
           <div className="mt-3 text-xs text-gray-500 text-right">Showing {bills.length} of {total} bills</div>
