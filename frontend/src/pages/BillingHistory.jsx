@@ -31,8 +31,7 @@ export default function BillingHistory() {
   const [customerPhone, setCustomerPhone] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
-  const [includePaid, setIncludePaid] = useState(false); // Default: hide paid bills
+  const [statusFilter, setStatusFilter] = useState('unpaid'); // Default: show unpaid bills only
 
   // ── data ──
   const [bills, setBills] = useState([]);
@@ -78,12 +77,13 @@ export default function BillingHistory() {
       if (customerPhone) params.customer_phone = customerPhone;
       if (startDate) params.start_date = startDate;
       if (endDate) params.end_date = endDate;
-      if (statusFilter) params.bill_status = statusFilter;
+      // Handle 'unpaid' pseudo-status: exclude paid bills (not sent to backend)
+      if (statusFilter && statusFilter !== 'unpaid') params.bill_status = statusFilter;
       params.limit = 100;
       const r = await billingAPI.searchBills(params);
       let fetchedBills = r.data?.bills || [];
-      // Filter out paid bills by default unless explicitly included
-      if (!includePaid && !statusFilter) {
+      // Filter out paid bills when 'unpaid' is selected
+      if (statusFilter === 'unpaid') {
         fetchedBills = fetchedBills.filter(b => b.status !== 'paid');
       }
       setBills(fetchedBills);
@@ -463,29 +463,21 @@ export default function BillingHistory() {
             <div>
               <label className="label">Status</label>
               <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="input text-sm">
-                <option value="">All (Unpaid)</option>
+                <option value="unpaid">Unpaid</option>
                 <option value="draft">Draft</option>
                 <option value="finalized">Finalized</option>
                 <option value="partial_paid">Partial Paid</option>
                 <option value="paid">Paid</option>
+                <option value="">All</option>
               </select>
             </div>
           </div>
           <div className="mt-3 flex flex-wrap items-center gap-3">
-            <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={includePaid}
-                onChange={e => setIncludePaid(e.target.checked)}
-                className="w-4 h-4 rounded border-gray-300 text-amber-600 focus:ring-amber-500"
-              />
-              Include paid bills
-            </label>
             <div className="flex flex-wrap gap-2 ml-auto">
               <button onClick={handleSearch} className="btn bg-amber-600 hover:bg-amber-700 text-white text-sm flex items-center gap-1 rounded-lg">
                 <Search size={15} /> Search
               </button>
-              <button onClick={() => { setCustomerName(''); setCustomerPhone(''); setStartDate(''); setEndDate(''); setStatusFilter(''); setIncludePaid(false); }}
+              <button onClick={() => { setCustomerName(''); setCustomerPhone(''); setStartDate(''); setEndDate(''); setStatusFilter('unpaid'); }}
                 className="btn btn-secondary text-sm rounded-lg">Clear</button>
               {isAdmin && (
                 <button onClick={handleConsolidatedPrint}
