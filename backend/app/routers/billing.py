@@ -2,12 +2,12 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from typing import Optional
 from datetime import date
 
-from ..models import User, BillCreate, BillingItemCreate, BillingItemUpdate
+from ..models import User, BillCreate, BillUpdate, BillingItemCreate, BillingItemUpdate
 from ..auth import get_current_manager_or_admin, get_current_admin
 from ..db_wrapper import (
     get_billing_items, create_billing_item, update_billing_item,
     create_bill, get_bill, get_bill_by_number, search_bills,
-    update_bill_status, delete_bill, get_billing_summary,
+    update_bill_status, update_bill, delete_bill, get_billing_summary,
     get_customer_suggestions,
 )
 
@@ -131,6 +131,37 @@ async def change_bill_status(
     if new_status not in ("draft", "finalized", "partial_paid", "paid"):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid status")
     result = update_bill_status(bill_id, new_status, paid_amount=paid_amount)
+    if not result:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Bill not found")
+    return result
+
+
+@router.put("/bills/{bill_id}")
+async def edit_bill(
+    bill_id: str,
+    data: BillUpdate,
+    current_user: User = Depends(get_current_manager_or_admin)
+):
+    """Edit an existing bill in place (Manager + Admin).
+
+    Preserves the bill id and bill_number; replaces line items and recalculates
+    totals atomically so the bill is never lost on failure.
+    """
+    line_items = None
+    if data.line_items is not None:
+        if not data.line_items:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="At least one line item required")
+        line_items = [{"item_name": li.item_name, "quantity": li.quantity, "rate": li.rate} for li in data.line_items]
+
+    result = update_bill(
+        bill_id,
+        customer_phone=data.customer_phone,
+        customer_place=data.customer_place,
+        bill_date=data.bill_date,
+        line_items=line_items,
+        tax_percentage=data.tax_percentage,
+        notes=data.notes,
+    )
     if not result:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Bill not found")
     return result

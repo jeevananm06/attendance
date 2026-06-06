@@ -453,6 +453,15 @@ class BillCreate(BaseModel):
     line_items: List[BillLineItem]
 
 
+class BillUpdate(BaseModel):
+    customer_phone: Optional[str] = None
+    customer_place: Optional[str] = None
+    bill_date: Optional[date] = None
+    tax_percentage: Optional[float] = None
+    notes: Optional[str] = None
+    line_items: Optional[List[BillLineItem]] = None
+
+
 class Bill(BaseModel):
     id: str
     bill_number: str
