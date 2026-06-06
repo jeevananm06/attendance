@@ -442,7 +442,11 @@ const Attendance = () => {
 
   const markAllPresent = () => {
     const map = {};
-    labours.forEach((l) => { map[l.id] = 'present'; });
+    labours.forEach((l) => {
+      // Don't mark labours that haven't joined as of the selected date.
+      if (l.joined_date && selectedDate < l.joined_date) return;
+      map[l.id] = 'present';
+    });
     setAttendance(map);
   };
 
@@ -711,13 +715,23 @@ const Attendance = () => {
                         </tr>
 
                         {/* Labour rows for this site */}
-                        {expandedSites[site.id] && siteLabours.map((labour) => (
-                          <tr key={labour.id} className="border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700">
+                        {expandedSites[site.id] && siteLabours.map((labour) => {
+                          const notJoined = labour.joined_date && selectedDate < labour.joined_date;
+                          return (
+                          <tr key={labour.id} className={`border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 ${notJoined ? 'opacity-60' : ''}`}>
                             <td className="py-4 px-4">
                               <p className="font-medium text-gray-800 dark:text-gray-100">{labour.name}</p>
                               {labour.phone && <p className="text-sm text-gray-500 dark:text-gray-400">{labour.phone}</p>}
+                              {notJoined && (
+                                <p className="text-xs text-amber-600 dark:text-amber-400 mt-0.5">
+                                  Not joined yet (joins {labour.joined_date})
+                                </p>
+                              )}
                             </td>
                             <td className="py-4 px-4">
+                              {notJoined ? (
+                                <p className="text-center text-xs text-gray-400 dark:text-gray-500">—</p>
+                              ) : (
                               <div className="flex justify-center gap-2 items-center">
                                 {[
                                   { status: 'present',  icon: <Check size={20} />,  hover: 'hover:bg-green-100' },
@@ -751,6 +765,7 @@ const Attendance = () => {
                                   <MoreHorizontal size={20} />
                                 </button>
                               </div>
+                              )}
                             </td>
                             <td className="py-4 px-4">
                               <input
@@ -762,7 +777,8 @@ const Attendance = () => {
                               />
                             </td>
                           </tr>
-                        ))}
+                          );
+                        })}
                       </Fragment>
                     ))}
                   </tbody>

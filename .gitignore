@@ -30,7 +30,7 @@ dist/
 .cache/
 PpZsUbIB72pOMQ3V
 
-%USERPROFILE%/.gitconfig
-%USERPROFILE%/.viminfo
+# Junk created when a Windows tool ran without expanding %USERPROFILE%
+%USERPROFILE%/
 
 .claude/
