@@ -14,9 +14,9 @@ from datetime import date, datetime, timedelta
 
 import uuid
 
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
-from sqlalchemy import and_, or_
+from sqlalchemy import and_, or_, func
 
 
 
@@ -3828,7 +3828,13 @@ def search_bills(customer_name: str = None, customer_phone: str = None,
             q = q.filter(BillDB.status == status)
 
         total = q.count()
-        bills = q.order_by(BillDB.created_at.desc()).offset(offset).limit(limit).all()
+        bills = (
+            q.options(joinedload(BillDB.line_items))
+            .order_by(BillDB.created_at.desc())
+            .offset(offset)
+            .limit(limit)
+            .all()
+        )
         return {
             "total": total,
             "bills": [_bill_to_dict(b, b.line_items) for b in bills]
@@ -3925,40 +3931,63 @@ def delete_bill(bill_id: str) -> bool:
 def get_billing_summary(start_date: date = None, end_date: date = None) -> dict:
     db = get_db_session()
     try:
-        q = db.query(BillDB)
+        date_filters = []
         if start_date:
-            q = q.filter(BillDB.bill_date >= start_date)
+            date_filters.append(BillDB.bill_date >= start_date)
         if end_date:
-            q = q.filter(BillDB.bill_date <= end_date)
+            date_filters.append(BillDB.bill_date <= end_date)
 
-        bills = q.all()
-        total_bills = len(bills)
-        total_revenue = sum(b.total_amount for b in bills)
-        draft_count = sum(1 for b in bills if b.status == "draft")
-        finalized_count = sum(1 for b in bills if b.status == "finalized")
-        partial_paid_count = sum(1 for b in bills if b.status == "partial_paid")
-        paid_count = sum(1 for b in bills if b.status == "paid")
-        total_paid = sum(getattr(b, 'paid_amount', 0) or 0 for b in bills)
+        # Per-status counts + revenue in a single grouped query (avoids loading
+        # every bill into Python).
+        status_rows = (
+            db.query(
+                BillDB.status,
+                func.count(BillDB.id),
+                func.coalesce(func.sum(BillDB.total_amount), 0.0),
+                func.coalesce(func.sum(BillDB.paid_amount), 0.0),
+            )
+            .filter(*date_filters)
+            .group_by(BillDB.status)
+            .all()
+        )
+        counts = {"draft": 0, "finalized": 0, "partial_paid": 0, "paid": 0}
+        total_bills = 0
+        total_revenue = 0.0
+        total_paid = 0.0
+        for status_val, cnt, revenue, paid in status_rows:
+            total_bills += cnt
+            total_revenue += float(revenue or 0)
+            total_paid += float(paid or 0)
+            if status_val in counts:
+                counts[status_val] = cnt
 
-        # Item-wise breakdown
-        item_map = {}
-        for b in bills:
-            for li in b.line_items:
-                key = li.item_name
-                if key not in item_map:
-                    item_map[key] = {"item_name": key, "total_qty": 0.0, "total_amount": 0.0}
-                item_map[key]["total_qty"] += li.quantity
-                item_map[key]["total_amount"] += li.amount
+        # Item-wise breakdown via a grouped join (no per-bill Python loop).
+        item_rows = (
+            db.query(
+                BillLineItemDB.item_name,
+                func.coalesce(func.sum(BillLineItemDB.quantity), 0.0),
+                func.coalesce(func.sum(BillLineItemDB.amount), 0.0),
+            )
+            .join(BillDB, BillLineItemDB.bill_id == BillDB.id)
+            .filter(*date_filters)
+            .group_by(BillLineItemDB.item_name)
+            .order_by(func.sum(BillLineItemDB.amount).desc())
+            .all()
+        )
+        item_breakdown = [
+            {"item_name": name, "total_qty": float(qty or 0), "total_amount": round(float(amt or 0), 2)}
+            for name, qty, amt in item_rows
+        ]
 
         return {
             "total_bills": total_bills,
             "total_revenue": round(total_revenue, 2),
-            "draft_count": draft_count,
-            "finalized_count": finalized_count,
-            "partial_paid_count": partial_paid_count,
-            "paid_count": paid_count,
+            "draft_count": counts["draft"],
+            "finalized_count": counts["finalized"],
+            "partial_paid_count": counts["partial_paid"],
+            "paid_count": counts["paid"],
             "total_paid": round(total_paid, 2),
-            "item_breakdown": sorted(item_map.values(), key=lambda x: x["total_amount"], reverse=True),
+            "item_breakdown": item_breakdown,
         }
     finally:
         db.close()
