@@ -14,6 +14,40 @@ const today = () => new Date().toISOString().slice(0, 10);
 
 const emptyLine = { item_name: '', quantity: '', rate: '' };
 
+// Type-to-search item picker (replaces the plain dropdown). Filters configured
+// items as the user types and still allows free-typed custom item names.
+function ItemAutocomplete({ value, items, onSelect }) {
+  const [open, setOpen] = useState(false);
+  const q = (value || '').trim().toLowerCase();
+  const filtered = q ? items.filter(i => (i.name || '').toLowerCase().includes(q)) : items;
+  return (
+    <div className="relative">
+      <input
+        type="text"
+        value={value}
+        onChange={e => { onSelect(e.target.value, null); setOpen(true); }}
+        onFocus={() => setOpen(true)}
+        onBlur={() => setTimeout(() => setOpen(false), 200)}
+        className="input text-sm"
+        placeholder="Search item..."
+        autoComplete="off"
+      />
+      {open && filtered.length > 0 && (
+        <div className="absolute z-20 mt-1 w-full bg-white dark:bg-gray-700 border rounded-lg shadow-lg max-h-48 overflow-y-auto">
+          {filtered.map(bi => (
+            <button key={bi.id} type="button"
+              onMouseDown={() => { onSelect(bi.name, bi.default_rate); setOpen(false); }}
+              className="w-full text-left px-3 py-2 hover:bg-amber-50 dark:hover:bg-gray-600 text-sm flex justify-between gap-2">
+              <span className="truncate">{bi.name}</span>
+              <span className="text-xs text-gray-500 shrink-0">₹{bi.default_rate}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function BillingEntry() {
   const { user, isAdmin } = useAuth();
 
@@ -343,13 +377,14 @@ export default function BillingEntry() {
                   return (
                     <div key={idx} className="grid grid-cols-12 gap-2 items-center">
                       <div className="col-span-12 md:col-span-5">
-                        <select value={li.item_name} onChange={e => updateLine(idx, 'item_name', e.target.value)}
-                          className="input text-sm">
-                          <option value="">Select item...</option>
-                          {billingItems.map(bi => (
-                            <option key={bi.id} value={bi.name}>{bi.name}</option>
-                          ))}
-                        </select>
+                        <ItemAutocomplete
+                          value={li.item_name}
+                          items={billingItems}
+                          onSelect={(name, rate) => {
+                            updateLine(idx, 'item_name', name);
+                            if (rate != null) updateLine(idx, 'rate', rate);
+                          }}
+                        />
                       </div>
                       <div className="col-span-4 md:col-span-2">
                         <input type="number" value={li.quantity} onChange={e => updateLine(idx, 'quantity', e.target.value)}
