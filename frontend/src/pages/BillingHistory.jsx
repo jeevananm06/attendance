@@ -12,6 +12,17 @@ import { fetchLogoBase64, printBill, shareBillAsImage, buildBillHTML } from '../
 const LOGO_URL = '/icons/selvam-logo.png';
 const emptyLine = { item_name: '', quantity: '', rate: '' };
 
+// Default the Billing History to a snapshot of the current month.
+const pad = n => String(n).padStart(2, '0');
+const fmtDate = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+const currentMonthRange = () => {
+  const now = new Date();
+  return {
+    start: fmtDate(new Date(now.getFullYear(), now.getMonth(), 1)),
+    end: fmtDate(new Date(now.getFullYear(), now.getMonth() + 1, 0)),
+  };
+};
+
 const statusColors = {
   draft: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300',
   finalized: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300',
@@ -29,8 +40,8 @@ export default function BillingHistory() {
   // ── filters ──
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
+  const [startDate, setStartDate] = useState(currentMonthRange().start);
+  const [endDate, setEndDate] = useState(currentMonthRange().end);
   const [statusFilter, setStatusFilter] = useState('unpaid'); // Default: show unpaid bills only
 
   // ── data ──
@@ -473,7 +484,7 @@ export default function BillingHistory() {
           <button onClick={handleSearch} className="btn bg-amber-600 hover:bg-amber-700 text-white text-sm flex items-center gap-1 rounded-lg flex-1 md:flex-none justify-center">
             <Search size={15} /> Search
           </button>
-          <button onClick={() => { setCustomerName(''); setCustomerPhone(''); setStartDate(''); setEndDate(''); setStatusFilter('unpaid'); }}
+          <button onClick={() => { const m = currentMonthRange(); setCustomerName(''); setCustomerPhone(''); setStartDate(m.start); setEndDate(m.end); setStatusFilter('unpaid'); }}
             className="btn btn-secondary text-sm rounded-lg flex-1 md:flex-none">Clear</button>
           {isAdmin && (
             <button onClick={handleConsolidatedPrint}
