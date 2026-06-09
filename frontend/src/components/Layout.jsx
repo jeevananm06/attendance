@@ -247,7 +247,7 @@ const Layout = ({ children }) => {
         </aside>
 
         {/* Page content */}
-        <main className="flex-1 p-4 lg:p-8 md:ml-56">{children}</main>
+        <main className="flex-1 min-w-0 p-4 lg:p-8 md:ml-56">{children}</main>
       </div>
 
       <OfflineIndicator isOnline={isOnline} pendingCount={pendingCount} onFlush={flushPending} />
