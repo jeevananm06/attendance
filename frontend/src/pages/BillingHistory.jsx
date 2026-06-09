@@ -80,21 +80,26 @@ export default function BillingHistory() {
   const [editError, setEditError] = useState('');
   const [billingItems, setBillingItems] = useState([]);
 
-  const fetchBills = async () => {
+  const fetchBills = async (overrides = {}) => {
+    const cName = overrides.customerName ?? customerName;
+    const cPhone = overrides.customerPhone ?? customerPhone;
+    const sDate = overrides.startDate ?? startDate;
+    const eDate = overrides.endDate ?? endDate;
+    const sFilter = overrides.statusFilter ?? statusFilter;
     setLoading(true);
     try {
       const params = {};
-      if (customerName) params.customer_name = customerName;
-      if (customerPhone) params.customer_phone = customerPhone;
-      if (startDate) params.start_date = startDate;
-      if (endDate) params.end_date = endDate;
+      if (cName) params.customer_name = cName;
+      if (cPhone) params.customer_phone = cPhone;
+      if (sDate) params.start_date = sDate;
+      if (eDate) params.end_date = eDate;
       // Handle 'unpaid' pseudo-status: exclude paid bills (not sent to backend)
-      if (statusFilter && statusFilter !== 'unpaid') params.bill_status = statusFilter;
+      if (sFilter && sFilter !== 'unpaid') params.bill_status = sFilter;
       params.limit = 100;
       const r = await billingAPI.searchBills(params);
       let fetchedBills = r.data?.bills || [];
       // Filter out paid bills when 'unpaid' is selected
-      if (statusFilter === 'unpaid') {
+      if (sFilter === 'unpaid') {
         fetchedBills = fetchedBills.filter(b => b.status !== 'paid');
       }
       setBills(fetchedBills);
@@ -102,11 +107,13 @@ export default function BillingHistory() {
     } catch { setBills([]); } finally { setLoading(false); }
   };
 
-  const fetchSummary = async () => {
+  const fetchSummary = async (overrides = {}) => {
+    const sDate = overrides.startDate ?? startDate;
+    const eDate = overrides.endDate ?? endDate;
     try {
       const params = {};
-      if (startDate) params.start_date = startDate;
-      if (endDate) params.end_date = endDate;
+      if (sDate) params.start_date = sDate;
+      if (eDate) params.end_date = eDate;
       const r = await billingAPI.getSummary(params);
       setSummary(r.data);
     } catch { setSummary(null); }
@@ -484,7 +491,7 @@ export default function BillingHistory() {
           <button onClick={handleSearch} className="btn bg-amber-600 hover:bg-amber-700 text-white text-sm flex items-center gap-1 rounded-lg flex-1 md:flex-none justify-center">
             <Search size={15} /> Search
           </button>
-          <button onClick={() => { const m = currentMonthRange(); setCustomerName(''); setCustomerPhone(''); setStartDate(m.start); setEndDate(m.end); setStatusFilter('unpaid'); }}
+          <button onClick={() => { const m = currentMonthRange(); const reset = { customerName: '', customerPhone: '', startDate: m.start, endDate: m.end, statusFilter: 'unpaid' }; setCustomerName(''); setCustomerPhone(''); setStartDate(m.start); setEndDate(m.end); setStatusFilter('unpaid'); fetchBills(reset); fetchSummary(reset); }}
             className="btn btn-secondary text-sm rounded-lg flex-1 md:flex-none">Clear</button>
           {isAdmin && (
             <button onClick={handleConsolidatedPrint}
