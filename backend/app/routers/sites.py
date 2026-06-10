@@ -31,7 +31,7 @@ async def get_sites_summary(
     active_ids = {l.id for l in all_labours}
     
     summary = []
-    assigned_count = 0
+    assigned_ids = set()
     
     for site in sites:
         labour_ids = [lid for lid in get_labours_by_site(site.id) if lid in active_ids]
@@ -41,13 +41,13 @@ async def get_sites_summary(
             "address": site.address,
             "labour_count": len(labour_ids)
         })
-        assigned_count += len(labour_ids)
+        assigned_ids.update(labour_ids)
     
     return {
         "total_sites": len(sites),
         "total_labours": len(all_labours),
-        "assigned_labours": assigned_count,
-        "unassigned_labours": len(all_labours) - assigned_count,
+        "assigned_labours": len(assigned_ids),
+        "unassigned_labours": len(active_ids - assigned_ids),
         "sites": summary
     }
 
