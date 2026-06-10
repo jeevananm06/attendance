@@ -25,15 +25,16 @@ async def list_sites(
 async def get_sites_summary(
     current_user: User = Depends(get_current_manager_or_admin)
 ):
-    """Get summary of all sites with labour counts"""
+    """Get summary of all sites with labour counts (inactive labours excluded)"""
     sites = get_sites()
     all_labours = get_all_labours()
+    active_ids = {l.id for l in all_labours}
     
     summary = []
     assigned_count = 0
     
     for site in sites:
-        labour_ids = get_labours_by_site(site.id)
+        labour_ids = [lid for lid in get_labours_by_site(site.id) if lid in active_ids]
         summary.append({
             "site_id": site.id,
             "name": site.name,
@@ -168,7 +169,7 @@ async def get_site_labours(
     labours = []
     for lid in labour_ids:
         labour = get_labour(lid)
-        if labour:
+        if labour and labour.is_active:
             labours.append(labour)
     
     return {

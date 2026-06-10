@@ -126,6 +126,14 @@ export default function BillingHistory() {
     billingAPI.getItems().then(r => setBillingItems(r.data || [])).catch(() => {});
   }, []);
 
+  // Close the bill detail popup on Escape
+  useEffect(() => {
+    if (!showDetail) return;
+    const onKey = (e) => { if (e.key === 'Escape') setShowDetail(false); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [showDetail]);
+
   const handleSearch = () => { fetchBills(); fetchSummary(); };
 
   const handleStatusChange = async (billId, newStatus, paidAmount = 0) => {
@@ -731,8 +739,10 @@ export default function BillingHistory() {
 
       {/* Bill Detail Modal */}
       {showDetail && selectedBill && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 overflow-y-auto"
+          onClick={() => setShowDetail(false)}>
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto"
+            onClick={e => e.stopPropagation()}>
             <div className="sticky top-0 bg-white dark:bg-gray-800 p-4 border-b flex items-center justify-between z-10">
               <h2 className="font-bold text-lg">{selectedBill.bill_number}</h2>
               <button onClick={() => setShowDetail(false)} className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700">
