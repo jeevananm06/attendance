@@ -28,6 +28,7 @@ function ItemAutocomplete({ value, items, onSelect }) {
         onChange={e => { onSelect(e.target.value, null); setOpen(true); }}
         onFocus={() => setOpen(true)}
         onBlur={() => setTimeout(() => setOpen(false), 200)}
+        onKeyDown={e => { if (e.key === 'Tab') setOpen(false); }}
         className="input text-sm"
         placeholder="Search item..."
         autoComplete="off"
@@ -35,7 +36,7 @@ function ItemAutocomplete({ value, items, onSelect }) {
       {open && filtered.length > 0 && (
         <div className="absolute z-20 mt-1 w-full bg-white dark:bg-gray-700 border rounded-lg shadow-lg max-h-48 overflow-y-auto">
           {filtered.map(bi => (
-            <button key={bi.id} type="button"
+            <button key={bi.id} type="button" tabIndex={-1}
               onMouseDown={() => { onSelect(bi.name, bi.default_rate); setOpen(false); }}
               className="w-full text-left px-3 py-2 hover:bg-amber-50 dark:hover:bg-gray-600 text-sm flex justify-between gap-2">
               <span className="truncate">{bi.name}</span>
