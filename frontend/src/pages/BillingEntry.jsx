@@ -14,12 +14,46 @@ const today = () => new Date().toISOString().slice(0, 10);
 
 const emptyLine = { item_name: '', quantity: '', rate: '' };
 
-// Type-to-search item picker (replaces the plain dropdown). Filters configured
-// items as the user types and still allows free-typed custom item names.
+// Type-to-search item picker. Only items configured in the DB can be chosen:
+// supports keyboard navigation (Up/Down + Enter) and clears any free-typed text
+// that doesn't match a configured item on blur.
 function ItemAutocomplete({ value, items, onSelect }) {
   const [open, setOpen] = useState(false);
+  const [highlight, setHighlight] = useState(0);
+  const listRef = useRef(null);
   const q = (value || '').trim().toLowerCase();
   const filtered = q ? items.filter(i => (i.name || '').toLowerCase().includes(q)) : items;
+
+  useEffect(() => { setHighlight(0); }, [value]);
+
+  const choose = (bi) => { onSelect(bi.name, bi.default_rate); setOpen(false); };
+
+  const handleBlur = () => setTimeout(() => {
+    setOpen(false);
+    const v = (value || '').trim();
+    if (!v) return;
+    const exact = items.find(i => (i.name || '').toLowerCase() === v.toLowerCase());
+    // Normalize casing to the configured name, or clear free-typed non-items.
+    if (exact) { if (exact.name !== value) onSelect(exact.name, exact.default_rate); }
+    else onSelect('', null);
+  }, 200);
+
+  const handleKeyDown = (e) => {
+    if (e.key === 'Tab') { setOpen(false); return; }
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      if (!open) { setOpen(true); return; }
+      setHighlight(h => Math.min(h + 1, filtered.length - 1));
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setHighlight(h => Math.max(h - 1, 0));
+    } else if (e.key === 'Enter') {
+      if (open && filtered[highlight]) { e.preventDefault(); choose(filtered[highlight]); }
+    } else if (e.key === 'Escape') {
+      setOpen(false);
+    }
+  };
+
   return (
     <div className="relative">
       <input
@@ -27,18 +61,20 @@ function ItemAutocomplete({ value, items, onSelect }) {
         value={value}
         onChange={e => { onSelect(e.target.value, null); setOpen(true); }}
         onFocus={() => setOpen(true)}
-        onBlur={() => setTimeout(() => setOpen(false), 200)}
-        onKeyDown={e => { if (e.key === 'Tab') setOpen(false); }}
+        onBlur={handleBlur}
+        onKeyDown={handleKeyDown}
         className="input text-sm"
         placeholder="Search item..."
         autoComplete="off"
       />
       {open && filtered.length > 0 && (
-        <div className="absolute z-20 mt-1 w-full bg-white dark:bg-gray-700 border rounded-lg shadow-lg max-h-48 overflow-y-auto">
-          {filtered.map(bi => (
+        <div ref={listRef} className="absolute z-20 mt-1 w-full bg-white dark:bg-gray-700 border rounded-lg shadow-lg max-h-48 overflow-y-auto">
+          {filtered.map((bi, i) => (
             <button key={bi.id} type="button" tabIndex={-1}
-              onMouseDown={() => { onSelect(bi.name, bi.default_rate); setOpen(false); }}
-              className="w-full text-left px-3 py-2 hover:bg-amber-50 dark:hover:bg-gray-600 text-sm flex justify-between gap-2">
+              ref={el => { if (i === highlight && el) el.scrollIntoView({ block: 'nearest' }); }}
+              onMouseEnter={() => setHighlight(i)}
+              onMouseDown={() => choose(bi)}
+              className={`w-full text-left px-3 py-2 text-sm flex justify-between gap-2 ${i === highlight ? 'bg-amber-100 dark:bg-gray-600' : 'hover:bg-amber-50 dark:hover:bg-gray-600'}`}>
               <span className="truncate">{bi.name}</span>
               <span className="text-xs text-gray-500 shrink-0">₹{bi.default_rate}</span>
             </button>
@@ -162,6 +198,9 @@ export default function BillingEntry() {
     const validLines = lineItems.filter(li => li.item_name && li.quantity && li.rate);
     if (!customerName) return setError('Customer name is required');
     if (validLines.length === 0) return setError('Add at least one item');
+    const itemNames = new Set(billingItems.map(i => i.name));
+    const invalid = validLines.filter(li => !itemNames.has(li.item_name));
+    if (invalid.length > 0) return setError(`Select items from the list. Not configured: ${invalid.map(li => li.item_name).join(', ')}`);
 
     setSaving(true);
     try {
