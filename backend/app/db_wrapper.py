@@ -110,8 +110,8 @@ if USE_POSTGRES:
     from .db_operations import (
         get_billing_items, create_billing_item, update_billing_item,
         create_bill, get_bill, get_bill_by_number, search_bills,
-        update_bill_status, update_bill, delete_bill, get_billing_summary,
-        get_customer_suggestions,
+        update_bill_status, update_bill, replicate_bill, delete_bill,
+        get_billing_summary, get_customer_suggestions,
     )
 
 
@@ -598,6 +598,7 @@ else:
     def search_bills(**kwargs): return {"total": 0, "bills": []}
     def update_bill_status(bill_id, new_status): return None
     def update_bill(bill_id, **kwargs): return None
+    def replicate_bill(bill_id, **kwargs): return None
     def delete_bill(bill_id): return False
     def get_billing_summary(start_date=None, end_date=None): return {}
     def get_customer_suggestions(query): return []

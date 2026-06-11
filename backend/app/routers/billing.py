@@ -2,13 +2,13 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from typing import Optional
 from datetime import date
 
-from ..models import User, BillCreate, BillUpdate, BillingItemCreate, BillingItemUpdate
+from ..models import User, BillCreate, BillUpdate, BillReplicate, BillingItemCreate, BillingItemUpdate
 from ..auth import get_current_manager_or_admin, get_current_admin
 from ..db_wrapper import (
     get_billing_items, create_billing_item, update_billing_item,
     create_bill, get_bill, get_bill_by_number, search_bills,
-    update_bill_status, update_bill, delete_bill, get_billing_summary,
-    get_customer_suggestions,
+    update_bill_status, update_bill, replicate_bill, delete_bill,
+    get_billing_summary, get_customer_suggestions,
 )
 
 router = APIRouter(prefix="/billing", tags=["Billing"])
@@ -163,6 +163,35 @@ async def edit_bill(
         notes=data.notes,
     )
     if not result:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Bill not found")
+    return result
+
+
+@router.post("/bills/{bill_id}/replicate")
+async def replicate_bill_endpoint(
+    bill_id: str,
+    data: BillReplicate,
+    current_user: User = Depends(get_current_manager_or_admin)
+):
+    """Replicate a bill across each consecutive day in a date range (Manager + Admin).
+
+    Copies the source bill's customer, line items and tax into one new bill per
+    day. Days that already have a bill for the same customer are skipped when
+    skip_existing is true, so only the missing days (gaps) get filled.
+    """
+    if data.end_date < data.start_date:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="End date must be on or after start date")
+    if (data.end_date - data.start_date).days > 92:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Date range too large (max 93 days)")
+
+    result = replicate_bill(
+        bill_id,
+        start_date=data.start_date,
+        end_date=data.end_date,
+        skip_existing=data.skip_existing,
+        created_by=current_user.username,
+    )
+    if result is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Bill not found")
     return result
 

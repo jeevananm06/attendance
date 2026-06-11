@@ -3785,6 +3785,89 @@ def create_bill(customer_name: str, customer_phone: str, customer_place: str,
         db.close()
 
 
+def replicate_bill(bill_id: str, start_date: date, end_date: date,
+                   skip_existing: bool = True, created_by: str = "admin") -> Optional[dict]:
+    """Replicate a bill across each consecutive day in [start_date, end_date].
+
+    Creates one independent bill per day, copying the source bill's customer,
+    line items and tax. Each new bill gets its own unique bill number. When
+    skip_existing is true, days that already have a bill for the same customer
+    are treated as gaps already filled and skipped, so re-running never creates
+    duplicates. Returns the created bills, the skipped dates and the source.
+    """
+    db = get_db_session()
+    try:
+        source = db.query(BillDB).filter(BillDB.id == bill_id).first()
+        if not source:
+            return None
+        if end_date < start_date:
+            raise ValueError("end_date must be on or after start_date")
+
+        source_lines = [
+            {"item_name": li.item_name, "quantity": li.quantity, "rate": li.rate}
+            for li in source.line_items
+        ]
+        tax_percentage = source.tax_percentage or 0.0
+        now = ist_now()
+
+        created = []
+        skipped = []
+        current = start_date
+        while current <= end_date:
+            if skip_existing:
+                exists = db.query(BillDB.id).filter(
+                    BillDB.bill_date == current,
+                    BillDB.customer_name == source.customer_name,
+                ).first()
+                if exists:
+                    skipped.append(current.isoformat())
+                    current += timedelta(days=1)
+                    continue
+
+            bill_id_new = str(uuid.uuid4())[:8]
+            bill_number = _generate_bill_number(db, current)
+
+            subtotal = 0.0
+            db_line_items = []
+            for li in source_lines:
+                amount = round(li["quantity"] * li["rate"], 2)
+                subtotal += amount
+                db_line_items.append(BillLineItemDB(
+                    id=str(uuid.uuid4())[:8],
+                    bill_id=bill_id_new,
+                    item_name=li["item_name"],
+                    quantity=li["quantity"],
+                    rate=li["rate"],
+                    amount=amount,
+                ))
+            subtotal = round(subtotal, 2)
+            tax_amount = round(subtotal * tax_percentage / 100, 2)
+            total_amount = round(subtotal + tax_amount, 2)
+
+            new_bill = BillDB(
+                id=bill_id_new, bill_number=bill_number,
+                customer_name=source.customer_name, customer_phone=source.customer_phone,
+                customer_place=source.customer_place, bill_date=current,
+                status="draft", subtotal=subtotal,
+                tax_percentage=tax_percentage, tax_amount=tax_amount,
+                total_amount=total_amount, notes=source.notes,
+                created_by=created_by, created_at=now,
+            )
+            db.add(new_bill)
+            for li in db_line_items:
+                db.add(li)
+            # Flush per day so the next day's number generation sees this bill
+            # and a failure rolls back the whole batch atomically.
+            db.flush()
+            created.append(_bill_to_dict(new_bill, db_line_items))
+            current += timedelta(days=1)
+
+        db.commit()
+        return {"created": created, "skipped": skipped, "source_bill_number": source.bill_number}
+    finally:
+        db.close()
+
+
 def get_bill(bill_id: str) -> Optional[dict]:
     db = get_db_session()
     try:
