@@ -497,6 +497,7 @@ export const billingAPI = {
   },
   updateStatus: (id, newStatus, paidAmount = 0) => api.put(`/billing/bills/${id}/status?new_status=${newStatus}&paid_amount=${paidAmount}`),
   updateBill: (id, data) => api.put(`/billing/bills/${id}`, data),
+  replicateBill: (id, data) => api.post(`/billing/bills/${id}/replicate`, data),
   deleteBill: (id) => api.delete(`/billing/bills/${id}`),
 
   // Summary & suggestions

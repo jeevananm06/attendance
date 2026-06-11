@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import {
   Search, Printer, Share2, Trash2, CheckCircle,
   Receipt, BarChart3, X, Pencil, Plus, CheckSquare, Square,
-  DollarSign, AlertTriangle, CreditCard,
+  DollarSign, AlertTriangle, CreditCard, CopyPlus,
 } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import { billingAPI } from '../api';
@@ -21,6 +21,19 @@ const currentMonthRange = () => {
     start: fmtDate(new Date(now.getFullYear(), now.getMonth(), 1)),
     end: fmtDate(new Date(now.getFullYear(), now.getMonth() + 1, 0)),
   };
+};
+const addDays = (isoDate, n) => {
+  const [y, m, d] = isoDate.split('-').map(Number);
+  return fmtDate(new Date(y, m - 1, d + n));
+};
+// Inclusive list of YYYY-MM-DD strings between start and end.
+const enumerateDays = (start, end) => {
+  if (!start || !end || end < start) return [];
+  const out = [];
+  let cur = start;
+  let guard = 0;
+  while (cur <= end && guard < 400) { out.push(cur); cur = addDays(cur, 1); guard++; }
+  return out;
 };
 
 const statusColors = {
@@ -79,6 +92,16 @@ export default function BillingHistory() {
   const [editSaving, setEditSaving] = useState(false);
   const [editError, setEditError] = useState('');
   const [billingItems, setBillingItems] = useState([]);
+
+  // ── replicate ──
+  const [repBill, setRepBill] = useState(null);            // source bill
+  const [repStart, setRepStart] = useState('');
+  const [repEnd, setRepEnd] = useState('');
+  const [repSkipExisting, setRepSkipExisting] = useState(true);
+  const [repExistingDates, setRepExistingDates] = useState(new Set()); // days already billed
+  const [repSaving, setRepSaving] = useState(false);
+  const [repError, setRepError] = useState('');
+  const [repResult, setRepResult] = useState(null);        // { created, skipped }
 
   const fetchBills = async (overrides = {}) => {
     const cName = overrides.customerName ?? customerName;
@@ -406,6 +429,63 @@ export default function BillingHistory() {
     setEditSaving(false);
   };
 
+  const openReplicate = async (bill) => {
+    const full = await ensureFullBill(bill);
+    setRepBill(full);
+    // Default: the day after the source bill, single day; user extends the range.
+    const start = addDays(full.bill_date, 1);
+    setRepStart(start);
+    setRepEnd(start);
+    setRepSkipExisting(true);
+    setRepError('');
+    setRepResult(null);
+    setRepExistingDates(new Set());
+  };
+
+  // Preview which days in the chosen range already have a bill for this customer
+  // (the "gaps" that will be skipped).
+  useEffect(() => {
+    if (!repBill || !repStart || !repEnd || repEnd < repStart) { setRepExistingDates(new Set()); return; }
+    let cancelled = false;
+    (async () => {
+      try {
+        const r = await billingAPI.searchBills({
+          customer_name: repBill.customer_name,
+          start_date: repStart, end_date: repEnd, limit: 200,
+        });
+        if (cancelled) return;
+        const dates = new Set(
+          (r.data?.bills || [])
+            .filter(b => (b.customer_name || '') === repBill.customer_name)
+            .map(b => b.bill_date)
+        );
+        setRepExistingDates(dates);
+      } catch { if (!cancelled) setRepExistingDates(new Set()); }
+    })();
+    return () => { cancelled = true; };
+  }, [repBill, repStart, repEnd]);
+
+  const doReplicate = async () => {
+    if (!repBill) return;
+    if (!repStart || !repEnd) { setRepError('Pick a start and end date'); return; }
+    if (repEnd < repStart) { setRepError('End date must be on or after start date'); return; }
+    setRepSaving(true); setRepError('');
+    try {
+      const r = await billingAPI.replicateBill(repBill.id, {
+        start_date: repStart, end_date: repEnd, skip_existing: repSkipExisting,
+      });
+      setRepResult(r.data);
+      fetchBills();
+      fetchSummary();
+    } catch (e) {
+      setRepError(e.response?.data?.detail || 'Failed to replicate bill');
+    }
+    setRepSaving(false);
+  };
+
+  const repDays = enumerateDays(repStart, repEnd);
+  const repToCreate = repSkipExisting ? repDays.filter(d => !repExistingDates.has(d)) : repDays;
+
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
@@ -632,6 +712,11 @@ export default function BillingHistory() {
                               <Pencil size={14} />
                             </button>
                           )}
+                          {isAdmin && (
+                            <button onClick={() => openReplicate(bill)} className="p-1 hover:bg-purple-50 dark:hover:bg-purple-900/30 rounded text-purple-600" title="Replicate for consecutive days">
+                              <CopyPlus size={14} />
+                            </button>
+                          )}
                           {isAdmin && bill.status === 'draft' && (
                             <button onClick={() => handleStatusChange(bill.id, 'finalized')} className="p-1 hover:bg-green-50 dark:hover:bg-green-900/30 rounded text-emerald-600" title="Finalize">
                               <CheckCircle size={14} />
@@ -737,6 +822,102 @@ export default function BillingHistory() {
         </div>
       )}
 
+      {/* Replicate Bill Modal */}
+      {repBill && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 overflow-y-auto"
+          onClick={() => setRepBill(null)}>
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto"
+            onClick={e => e.stopPropagation()}>
+            <div className="sticky top-0 bg-white dark:bg-gray-800 p-4 border-b flex items-center justify-between z-10">
+              <h2 className="font-bold text-lg flex items-center gap-2"><CopyPlus size={18} className="text-purple-600" /> Replicate Bill</h2>
+              <button onClick={() => setRepBill(null)} className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700"><X size={20} /></button>
+            </div>
+
+            {!repResult ? (
+              <>
+                <div className="p-4 space-y-4">
+                  <div className="text-sm text-gray-600 dark:text-gray-300">
+                    Copy <strong>{repBill.bill_number}</strong> ({repBill.customer_name}, {repBill.line_items?.length || 0} item{(repBill.line_items?.length || 0) === 1 ? '' : 's'}, ₹{(repBill.total_amount || 0).toFixed(2)}/day) to each day in the range below. Each day becomes its own bill with a new number.
+                  </div>
+
+                  {repError && <p className="text-red-600 text-sm">{repError}</p>}
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="min-w-0">
+                      <label className="label">From</label>
+                      <input type="date" className="input" value={repStart} onChange={e => setRepStart(e.target.value)} />
+                    </div>
+                    <div className="min-w-0">
+                      <label className="label">To</label>
+                      <input type="date" className="input" value={repEnd} min={repStart} onChange={e => setRepEnd(e.target.value)} />
+                    </div>
+                  </div>
+
+                  <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-200 cursor-pointer">
+                    <input type="checkbox" checked={repSkipExisting} onChange={e => setRepSkipExisting(e.target.checked)} className="rounded" />
+                    Skip days that already have a bill for this customer (fill gaps only)
+                  </label>
+
+                  <div className="rounded-lg border dark:border-gray-700 p-3 bg-gray-50 dark:bg-gray-900/30">
+                    <div className="flex items-center justify-between text-sm mb-2">
+                      <span className="text-gray-500">{repDays.length} day{repDays.length === 1 ? '' : 's'} in range</span>
+                      <span className="font-semibold text-purple-700 dark:text-purple-400">{repToCreate.length} to create</span>
+                    </div>
+                    <div className="flex flex-wrap gap-1 max-h-32 overflow-y-auto">
+                      {repDays.map(d => {
+                        const skip = repSkipExisting && repExistingDates.has(d);
+                        return (
+                          <span key={d} title={skip ? 'Already billed — will skip' : 'Will create a bill'}
+                            className={`text-xs px-2 py-0.5 rounded ${skip
+                              ? 'bg-gray-200 text-gray-500 line-through dark:bg-gray-700 dark:text-gray-400'
+                              : 'bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300'}`}>
+                            {d.slice(5)}
+                          </span>
+                        );
+                      })}
+                      {repDays.length === 0 && <span className="text-xs text-gray-400">Pick a valid date range</span>}
+                    </div>
+                  </div>
+                </div>
+                <div className="sticky bottom-0 bg-white dark:bg-gray-800 p-4 border-t flex gap-2 justify-end">
+                  <button onClick={() => setRepBill(null)} className="btn btn-secondary text-sm">Cancel</button>
+                  <button onClick={doReplicate} disabled={repSaving || repToCreate.length === 0}
+                    className="btn bg-purple-600 hover:bg-purple-700 text-white text-sm flex items-center gap-1 disabled:opacity-50">
+                    {repSaving ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <CopyPlus size={15} />}
+                    Create {repToCreate.length} bill{repToCreate.length === 1 ? '' : 's'}
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="p-4 space-y-3">
+                  <div className="flex items-center gap-2 text-green-700 dark:text-green-400">
+                    <CheckCircle size={18} /> <span className="font-semibold">Created {repResult.created.length} bill{repResult.created.length === 1 ? '' : 's'}</span>
+                  </div>
+                  {repResult.created.length > 0 && (
+                    <div className="flex flex-wrap gap-1 max-h-40 overflow-y-auto">
+                      {repResult.created.map(b => (
+                        <span key={b.id} className="text-xs px-2 py-0.5 rounded bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300">
+                          {b.bill_date.slice(5)} · {b.bill_number}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  {repResult.skipped.length > 0 && (
+                    <div className="text-sm text-gray-500">
+                      Skipped {repResult.skipped.length} day{repResult.skipped.length === 1 ? '' : 's'} that already had a bill: {repResult.skipped.map(d => d.slice(5)).join(', ')}
+                    </div>
+                  )}
+                </div>
+                <div className="sticky bottom-0 bg-white dark:bg-gray-800 p-4 border-t flex justify-end">
+                  <button onClick={() => setRepBill(null)} className="btn bg-purple-600 hover:bg-purple-700 text-white text-sm">Done</button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Bill Detail Modal */}
       {showDetail && selectedBill && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 overflow-y-auto"
@@ -757,6 +938,12 @@ export default function BillingHistory() {
                 <button onClick={() => { setShowDetail(false); openEdit(selectedBill); }}
                   className="btn bg-amber-100 hover:bg-amber-200 text-amber-800 text-sm flex items-center gap-1">
                   <Pencil size={15} /> Edit
+                </button>
+              )}
+              {isAdmin && (
+                <button onClick={() => { setShowDetail(false); openReplicate(selectedBill); }}
+                  className="btn bg-purple-100 hover:bg-purple-200 text-purple-800 text-sm flex items-center gap-1">
+                  <CopyPlus size={15} /> Replicate
                 </button>
               )}
               {isAdmin && selectedBill.status === 'draft' && (

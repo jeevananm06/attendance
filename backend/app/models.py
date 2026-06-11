@@ -462,6 +462,12 @@ class BillUpdate(BaseModel):
     line_items: Optional[List[BillLineItem]] = None
 
 
+class BillReplicate(BaseModel):
+    start_date: date
+    end_date: date
+    skip_existing: bool = True
+
+
 class Bill(BaseModel):
     id: str
     bill_number: str
