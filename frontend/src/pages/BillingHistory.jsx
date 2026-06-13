@@ -12,14 +12,19 @@ import { fetchLogoBase64, printBill, shareBillAsImage, buildBillHTML } from '../
 const LOGO_URL = '/icons/selvam-logo.png';
 const emptyLine = { item_name: '', quantity: '', rate: '' };
 
-// Default the Billing History to a snapshot of the current month.
+// Default the Billing History to a snapshot of the current week (Sunday to Saturday).
 const pad = n => String(n).padStart(2, '0');
 const fmtDate = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-const currentMonthRange = () => {
+const currentWeekRange = () => {
   const now = new Date();
+  const day = now.getDay(); // 0 = Sunday, 6 = Saturday
+  const sunday = new Date(now);
+  sunday.setDate(now.getDate() - day);
+  const saturday = new Date(sunday);
+  saturday.setDate(sunday.getDate() + 6);
   return {
-    start: fmtDate(new Date(now.getFullYear(), now.getMonth(), 1)),
-    end: fmtDate(new Date(now.getFullYear(), now.getMonth() + 1, 0)),
+    start: fmtDate(sunday),
+    end: fmtDate(saturday),
   };
 };
 const addDays = (isoDate, n) => {
@@ -53,8 +58,8 @@ export default function BillingHistory() {
   // ── filters ──
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
-  const [startDate, setStartDate] = useState(currentMonthRange().start);
-  const [endDate, setEndDate] = useState(currentMonthRange().end);
+  const [startDate, setStartDate] = useState(currentWeekRange().start);
+  const [endDate, setEndDate] = useState(currentWeekRange().end);
   const [statusFilter, setStatusFilter] = useState('unpaid'); // Default: show unpaid bills only
 
   // ── data ──
@@ -657,7 +662,7 @@ export default function BillingHistory() {
           <button onClick={handleSearch} className="btn bg-amber-600 hover:bg-amber-700 text-white text-sm flex items-center gap-1 rounded-lg flex-1 md:flex-none justify-center">
             <Search size={15} /> Search
           </button>
-          <button onClick={() => { const m = currentMonthRange(); const reset = { customerName: '', customerPhone: '', startDate: m.start, endDate: m.end, statusFilter: 'unpaid' }; setCustomerName(''); setCustomerPhone(''); setStartDate(m.start); setEndDate(m.end); setStatusFilter('unpaid'); fetchBills(reset); fetchSummary(reset); }}
+          <button onClick={() => { const m = currentWeekRange(); const reset = { customerName: '', customerPhone: '', startDate: m.start, endDate: m.end, statusFilter: 'unpaid' }; setCustomerName(''); setCustomerPhone(''); setStartDate(m.start); setEndDate(m.end); setStatusFilter('unpaid'); fetchBills(reset); fetchSummary(reset); }}
             className="btn btn-secondary text-sm rounded-lg flex-1 md:flex-none">Clear</button>
           {isAdmin && (
             <button onClick={handleConsolidatedPrint}
