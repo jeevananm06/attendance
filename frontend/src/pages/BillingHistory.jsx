@@ -264,6 +264,10 @@ export default function BillingHistory() {
 
     // Build consolidated HTML for each customer with date-wise breakdown
     let allHTML = '';
+    let grandTotal = 0;
+    let totalBillsCount = 0;
+    const customerTotals = {};
+
     for (const [customer, cBills] of Object.entries(customerBills)) {
       const fullBills = await Promise.all(cBills.map(b => ensureFullBill(b)));
       // Sort by date
@@ -327,7 +331,70 @@ export default function BillingHistory() {
       </div>`;
 
       allHTML += html + '<div style="page-break-after:always"></div>';
+      
+      // Track totals for summary
+      grandTotal += totalAmount;
+      totalBillsCount += fullBills.length;
+      customerTotals[customer] = totalAmount;
     }
+
+    // Add summary page at the end
+    const dateRange = startDate && endDate ? `${startDate} to ${endDate}` : 'All dates';
+    const customerCount = Object.keys(customerBills).length;
+    
+    // Build customer-wise summary rows
+    let summaryRows = '';
+    for (const [customer, amount] of Object.entries(customerTotals)) {
+      summaryRows += `<tr>
+        <td style="padding:8px 12px;font-size:13px;border-bottom:1px solid #eee">${customer}</td>
+        <td style="padding:8px 12px;font-size:13px;border-bottom:1px solid #eee;text-align:right">₹${amount.toFixed(2)}</td>
+      </tr>`;
+    }
+
+    const summaryHTML = `<div style="background:#fff;padding:20px;max-width:520px;margin:0 auto;font-family:'Segoe UI',sans-serif;color:#333">
+      <div style="text-align:center;border-bottom:2px dashed #8B4513;padding-bottom:12px;margin-bottom:12px">
+        ${logoBase64 ? `<img src="${logoBase64}" style="width:80px;height:80px;border-radius:50%;object-fit:cover;display:block;margin:0 auto 8px" />` : ''}
+        <div style="font-size:20px;font-weight:700;color:#5D3A1A">Selvam Tea Stall</div>
+        <div style="font-size:11px;color:#8B6914;letter-spacing:1.5px">TEA • COFFEE • SNACKS</div>
+      </div>
+      <div style="text-align:center;margin-bottom:16px">
+        <div style="font-size:18px;font-weight:700;color:#5D3A1A;margin-bottom:4px">Consolidated Bill Summary</div>
+        <div style="font-size:12px;color:#666">Period: ${dateRange}</div>
+      </div>
+      
+      <div style="background:#F5E6D3;padding:12px;border-radius:8px;margin-bottom:16px">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <div style="text-center">
+            <div style="font-size:24px;font-weight:700;color:#5D3A1A">${customerCount}</div>
+            <div style="font-size:11px;color:#666">Customers</div>
+          </div>
+          <div style="text-center">
+            <div style="font-size:24px;font-weight:700;color:#5D3A1A">${totalBillsCount}</div>
+            <div style="font-size:11px;color:#666">Total Bills</div>
+          </div>
+        </div>
+      </div>
+
+      <table style="width:100%;border-collapse:collapse;margin:12px 0">
+        <thead><tr>
+          <th style="background:#F5E6D3;color:#5D3A1A;font-size:12px;padding:8px 12px;text-align:left">Customer</th>
+          <th style="background:#F5E6D3;color:#5D3A1A;font-size:12px;padding:8px 12px;text-align:right">Total</th>
+        </tr></thead>
+        <tbody>${summaryRows}</tbody>
+      </table>
+
+      <div style="border-top:3px solid #8B4513;margin-top:16px;padding-top:12px">
+        <div style="display:flex;justify-content:space-between;padding:8px 0;font-size:14px"><span>Subtotal (All Customers)</span><span>₹${grandTotal.toFixed(2)}</span></div>
+        <div style="display:flex;justify-content:space-between;padding:12px 0 0;font-size:20px;font-weight:700;color:#5D3A1A;border-top:2px dashed #8B4513;margin-top:8px"><span>GRAND TOTAL</span><span>₹${grandTotal.toFixed(2)}</span></div>
+      </div>
+
+      <div style="text-align:center;border-top:2px dashed #8B4513;margin-top:20px;padding-top:12px;font-size:11px;color:#888">
+        <div style="margin-bottom:4px">This is a consolidated summary of all bills for the selected period.</div>
+        <div>Selvam Tea Stall</div>
+      </div>
+    </div>`;
+
+    allHTML += summaryHTML;
 
     // Detect mobile devices: iPhone, iPad (including modern iPadOS), iPod, Android
     const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) ||
