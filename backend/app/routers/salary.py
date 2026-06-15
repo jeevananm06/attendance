@@ -228,21 +228,29 @@ async def pay_salary(
                     remaining_to_deduct -= to_deduct
                     advances_updated.append({"id": adv.id, "amount": to_deduct, "type": "partial"})
 
+    # The entered amount is the CASH actually handed to the labour. Any advance
+    # cleared in this transaction also counts toward settling the salary, so the
+    # amount applied to the unpaid weeks is (cash + advance deducted). If that
+    # total exceeds what is owed, the surplus is money the labour received beyond
+    # their earned salary and is recorded as a new advance.
+    cash_paid = payment.amount_paid
+    settle_amount = None if cash_paid is None else cash_paid + advance_deducted
+
     # Record the advance deduction in the saved payment comment so it is
     # traceable in the payment history (the log only stores the gross amount).
     effective_comment = payment.payment_comment
     if advance_deducted > 0:
-        gross = payment.amount_paid
-        deduction_note = f"Advance deducted: \u20b9{advance_deducted:.0f}"
-        if gross is not None:
-            deduction_note += f", net paid: \u20b9{gross - advance_deducted:.0f}"
+        if cash_paid is not None:
+            deduction_note = f"Cash paid: \u20b9{cash_paid:.0f}, advance cleared: \u20b9{advance_deducted:.0f}"
+        else:
+            deduction_note = f"Advance cleared: \u20b9{advance_deducted:.0f}"
         effective_comment = f"{effective_comment} | {deduction_note}" if effective_comment else deduction_note
 
     result = mark_salary_paid(
         labour_id=payment.labour_id,
         week_end=payment.week_end,
         paid_by=current_user.username,
-        amount_paid=payment.amount_paid,
+        amount_paid=settle_amount,
         payment_comment=effective_comment
     )
 
@@ -252,10 +260,13 @@ async def pay_salary(
             detail="No unpaid salary records found for this period"
         )
 
-    # If excess payment with advance_payment flag, create an advance record
+    # Surplus handling: when the amount applied to the salary exceeds what was
+    # owed, the excess becomes a new advance. This happens automatically whenever
+    # an advance was deducted, and via the explicit advance_payment flag for
+    # plain overpayments with no deduction.
     advance_created = None
     excess_amount = result.get("excess_amount", 0)
-    if excess_amount > 0 and payment.advance_payment:
+    if excess_amount > 0 and (payment.advance_payment or advance_deducted > 0):
         reason = payment.payment_comment or "Advance from excess salary payment"
         advance_created = create_advance(
             labour_id=payment.labour_id,
@@ -264,16 +275,18 @@ async def pay_salary(
             given_by=current_user.username
         )
 
-    # Calculate net payment (salary paid minus advance deducted)
-    net_payment = result['amount_paid'] - advance_deducted
+    # Net cash handed to the labour is exactly the entered amount under this model.
+    net_payment = cash_paid if cash_paid is not None else (result['amount_paid'] - advance_deducted)
+    # Amount that actually cleared salary weeks (the surplus above becomes a new advance).
+    salary_settled = result['amount_paid'] - excess_amount
 
     # In-app notification
     try:
-        msg_text = f"Paid ₹{result['amount_paid']:.0f} to {labour.name}"
+        msg_text = f"Paid ₹{net_payment:.0f} cash to {labour.name}"
         if advance_deducted > 0:
-            msg_text += f" (₹{advance_deducted:.0f} advance deducted, net: ₹{net_payment:.0f})"
+            msg_text += f" (₹{advance_deducted:.0f} advance cleared, ₹{salary_settled:.0f} salary settled)"
         if advance_created:
-            msg_text += f" · Advance of ₹{excess_amount:.0f} recorded"
+            msg_text += f" · ₹{excess_amount:.0f} kept as new advance"
         create_notification(
             user=current_user.username,
             notif_type="salary_paid",
@@ -288,9 +301,9 @@ async def pay_salary(
     if labour.phone:
         if advance_deducted > 0:
             msg = (
-                f"Dear {labour.name}, your salary of ₹{result['amount_paid']:.0f} "
-                f"has been processed. Advance deducted: ₹{advance_deducted:.0f}. "
-                f"Net payment: ₹{net_payment:.0f}. - AttendanceMS"
+                f"Dear {labour.name}, ₹{net_payment:.0f} cash has been paid to you. "
+                f"Advance cleared: ₹{advance_deducted:.0f}, salary settled: ₹{salary_settled:.0f}. "
+                f"- AttendanceMS"
             )
         else:
             msg = (
@@ -300,9 +313,9 @@ async def pay_salary(
         background_tasks.add_task(send_whatsapp_message, labour.phone, msg)
 
     # Push notification to the user who paid
-    push_msg = f"Paid ₹{result['amount_paid']:.0f} to {labour.name}"
+    push_msg = f"Paid ₹{net_payment:.0f} cash to {labour.name}"
     if advance_deducted > 0:
-        push_msg += f" (net: ₹{net_payment:.0f})"
+        push_msg += f" (₹{salary_settled:.0f} salary settled)"
     background_tasks.add_task(
         send_push_to_user,
         current_user.username,
@@ -315,6 +328,8 @@ async def pay_salary(
         "paid_by": current_user.username,
         "weeks_paid": result["weeks_paid"],
         "amount_paid": result["amount_paid"],
+        "cash_paid": net_payment,
+        "salary_settled": salary_settled,
         "remaining": result["remaining"],
         "excess_amount": excess_amount,
     }
