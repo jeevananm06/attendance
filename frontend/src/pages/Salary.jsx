@@ -223,12 +223,6 @@ const Salary = () => {
     const entered = parseFloat(payAmount);
     if (isNaN(entered) || entered <= 0) { setError('Enter a valid amount'); return; }
 
-    const isExcessPayment = entered > total;
-    if (isExcessPayment && !advancePayment && !paymentComment.trim()) {
-      setError('Please provide a reason for the excess payment');
-      return;
-    }
-
     const pendingAdvance = advances[labourId] || 0;
     const partialDeductAmt = parseFloat(advanceDeductionAmount);
     if (advanceDeduction === 'partial') {
@@ -240,6 +234,15 @@ const Salary = () => {
         setError(`Deduction amount cannot exceed pending advance (₹${pendingAdvance.toLocaleString()})`);
         return;
       }
+    }
+
+    // The entered amount is the cash handed over; any advance cleared also counts
+    // toward settling the salary. A reason is only required for a plain overpay
+    // (no deduction) that isn't explicitly being recorded as an advance.
+    const deductAmt = advanceDeduction === 'full' ? pendingAdvance : (advanceDeduction === 'partial' ? partialDeductAmt : 0);
+    if (deductAmt === 0 && entered > total && !advancePayment && !paymentComment.trim()) {
+      setError('Please provide a reason for the excess payment');
+      return;
     }
 
     try {
@@ -254,18 +257,20 @@ const Salary = () => {
         advanceDeduction === 'partial' ? partialDeductAmt : null,
         advancePayment
       );
-      const { amount_paid, remaining, weeks_paid, excess_amount, advance_deducted, net_payment, advance_created } = res.data;
-      let msg = `Paid ₹${amount_paid.toLocaleString()} (${weeks_paid} week${weeks_paid !== 1 ? 's' : ''})`;
+      const { amount_paid, cash_paid, salary_settled, remaining, weeks_paid, excess_amount, advance_deducted, advance_created } = res.data;
+      const cash = cash_paid != null ? cash_paid : amount_paid;
+      const settled = salary_settled != null ? salary_settled : amount_paid;
+      let msg = `Paid ₹${cash.toLocaleString()} cash (${weeks_paid} week${weeks_paid !== 1 ? 's' : ''})`;
       if (advance_deducted > 0) {
-        msg += ` · Advance deducted: ₹${advance_deducted.toLocaleString()} · Net: ₹${net_payment.toLocaleString()}`;
+        msg += ` · ₹${advance_deducted.toLocaleString()} advance cleared · ₹${settled.toLocaleString()} salary settled`;
       }
       if (advance_created) {
-        msg += ` · Advance of ₹${excess_amount.toLocaleString()} recorded`;
+        msg += ` · ₹${excess_amount.toLocaleString()} kept as new advance`;
       } else if (excess_amount > 0) {
         msg += ` · Excess: ₹${excess_amount.toLocaleString()}`;
       } else if (remaining > 0) {
         msg += ` · ₹${remaining.toLocaleString()} still pending`;
-      } else if (!advance_deducted) {
+      } else {
         msg += ' · fully cleared';
       }
       setSuccess(msg);
@@ -953,7 +958,7 @@ const LabourSalaryCard = ({
                   <div className="flex items-center gap-2 flex-wrap">
                     <div className="flex flex-col">
                       <div className="flex items-center gap-2">
-                        <span className="text-sm text-gray-600 dark:text-gray-400">₹</span>
+                        <span className="text-sm text-gray-600 dark:text-gray-400 whitespace-nowrap">Cash paid ₹</span>
                         <input
                           type="number"
                           min="1"
@@ -974,12 +979,8 @@ const LabourSalaryCard = ({
                           )}
                           {(() => {
                             const entered = parseFloat(payAmount);
-                            const pendingAdvance = advances[labour.labour_id] || 0;
-                            const deductAmt = advanceDeduction === 'full'
-                              ? pendingAdvance
-                              : (advanceDeduction === 'partial' ? (parseFloat(advanceDeductionAmount) || 0) : 0);
-                            return deductAmt > 0 && !isNaN(entered)
-                              ? `Pay ₹${Math.max(0, entered - deductAmt).toLocaleString()}`
+                            return !isNaN(entered) && entered > 0
+                              ? `Pay ₹${entered.toLocaleString()}`
                               : 'Confirm Pay';
                           })()}
                         </button>
@@ -989,26 +990,31 @@ const LabourSalaryCard = ({
                       </div>
                       {(() => {
                         const entered = parseFloat(payAmount);
-                        const remaining = isNaN(entered) ? labour.total_pending : Math.max(0, labour.total_pending - entered);
-                        const excess = isNaN(entered) ? 0 : Math.max(0, entered - labour.total_pending);
-                        const color = remaining === 0 ? (excess > 0 ? 'text-blue-600' : 'text-green-600') : 'text-orange-500';
+                        const cash = isNaN(entered) ? 0 : entered;
+                        const total = labour.total_pending || 0;
                         const pendingAdvance = advances[labour.labour_id] || 0;
                         const deductAmt = advanceDeduction === 'full' ? pendingAdvance : (advanceDeduction === 'partial' ? (parseFloat(advanceDeductionAmount) || 0) : 0);
-                        const netPayment = entered - deductAmt;
+                        const settled = cash + deductAmt;               // amount applied to salary weeks
+                        const salaryRemaining = isNaN(entered) ? total : Math.max(0, total - settled);
+                        const surplus = isNaN(entered) ? 0 : Math.max(0, settled - total);  // becomes a new advance
+                        const plainOverpay = deductAmt === 0 && surplus > 0;  // overpay with no advance deducted
+                        const color = salaryRemaining === 0 ? (surplus > 0 ? 'text-blue-600' : 'text-green-600') : 'text-orange-500';
                         return (
                           <>
                             <p className={`text-xs mt-1 ml-5 font-medium ${color}`}>
-                              {excess > 0
-                                ? (advancePayment
-                                    ? `₹${excess.toLocaleString()} will be recorded as advance`
-                                    : `⚠ Excess payment of ₹${excess.toLocaleString()} — comment required`)
-                                : remaining === 0
-                                  ? '✓ Full payment — all weeks cleared'
-                                  : `₹${remaining.toLocaleString()} will remain pending`}
+                              {salaryRemaining === 0
+                                ? (surplus > 0
+                                    ? (deductAmt > 0
+                                        ? `✓ Salary cleared · ₹${surplus.toLocaleString()} surplus kept as new advance`
+                                        : (advancePayment
+                                            ? `₹${surplus.toLocaleString()} will be recorded as advance`
+                                            : `⚠ Excess payment of ₹${surplus.toLocaleString()} — comment required`))
+                                    : '✓ Full payment — all weeks cleared')
+                                : `₹${salaryRemaining.toLocaleString()} will remain pending`}
                             </p>
 
-                            {/* Advance Payment checkbox — visible only on overpay */}
-                            {excess > 0 && (
+                            {/* Advance Payment checkbox — only for a plain overpay with no advance deducted */}
+                            {plainOverpay && (
                               <label className="flex items-center gap-2 mt-2 ml-5 cursor-pointer">
                                 <input
                                   type="checkbox"
@@ -1017,17 +1023,17 @@ const LabourSalaryCard = ({
                                   className="w-4 h-4 rounded border-blue-400 text-blue-600 focus:ring-blue-500"
                                 />
                                 <span className="text-xs font-medium text-blue-700 dark:text-blue-400">
-                                  Record ₹{excess.toLocaleString()} as advance payment
+                                  Record ₹{surplus.toLocaleString()} as advance payment
                                 </span>
                               </label>
                             )}
 
                             <input
                               type="text"
-                              placeholder={excess > 0 && !advancePayment ? "Reason for excess payment (required)" : "Comment (optional)"}
+                              placeholder={plainOverpay && !advancePayment ? "Reason for excess payment (required)" : "Comment (optional)"}
                               value={paymentComment}
                               onChange={(e) => setPaymentComment(e.target.value)}
-                              className={`mt-2 ml-5 w-64 border rounded px-2 py-1.5 text-sm bg-white dark:bg-gray-700 dark:text-gray-100 focus:outline-none focus:ring-2 ${excess > 0 && !advancePayment ? 'border-blue-300 dark:border-blue-600 focus:ring-blue-500' : 'border-gray-300 dark:border-gray-600 focus:ring-primary-500'}`}
+                              className={`mt-2 ml-5 w-64 border rounded px-2 py-1.5 text-sm bg-white dark:bg-gray-700 dark:text-gray-100 focus:outline-none focus:ring-2 ${plainOverpay && !advancePayment ? 'border-blue-300 dark:border-blue-600 focus:ring-blue-500' : 'border-gray-300 dark:border-gray-600 focus:ring-primary-500'}`}
                             />
 
 
@@ -1080,11 +1086,20 @@ const LabourSalaryCard = ({
                                     />
                                   )}
                                 </div>
-                                {deductAmt > 0 && !isNaN(entered) && (
-                                  <p className="text-sm mt-2 font-semibold text-amber-800 dark:text-amber-300">
-                                    Net payable to labour: ₹{Math.max(0, netPayment).toLocaleString()}
-                                    <span className="font-normal text-xs text-amber-700/80 dark:text-amber-400/80"> (₹{entered.toLocaleString()} salary − ₹{deductAmt.toLocaleString()} advance)</span>
-                                  </p>
+                                {!isNaN(entered) && (
+                                  <div className="mt-2 text-xs text-amber-800 dark:text-amber-300 space-y-0.5">
+                                    <div className="flex justify-between"><span>Cash to labour</span><span className="font-semibold">₹{cash.toLocaleString()}</span></div>
+                                    {deductAmt > 0 && (
+                                      <div className="flex justify-between"><span>Advance cleared</span><span className="font-semibold">₹{deductAmt.toLocaleString()}</span></div>
+                                    )}
+                                    <div className="flex justify-between border-t border-amber-200 dark:border-amber-700 pt-0.5"><span>Salary settled</span><span className="font-semibold">₹{Math.min(settled, total).toLocaleString()} / ₹{total.toLocaleString()}</span></div>
+                                    {surplus > 0 && (
+                                      <div className="flex justify-between text-blue-700 dark:text-blue-400"><span>Surplus → new advance</span><span className="font-semibold">₹{surplus.toLocaleString()}</span></div>
+                                    )}
+                                    {salaryRemaining > 0 && (
+                                      <div className="flex justify-between text-orange-600 dark:text-orange-400"><span>Still pending</span><span className="font-semibold">₹{salaryRemaining.toLocaleString()}</span></div>
+                                    )}
+                                  </div>
                                 )}
                               </div>
                             )}
